@@ -1,6 +1,0 @@
-d:\tmp\repos\fsharping\Jik\src\Jik\bin\Debug\netstandard2.0\Jik.deps.json
-d:\tmp\repos\fsharping\Jik\src\Jik\bin\Debug\netstandard2.0\Jik.dll
-d:\tmp\repos\fsharping\Jik\src\Jik\bin\Debug\netstandard2.0\Jik.pdb
-d:\tmp\repos\fsharping\Jik\src\Jik\obj\Debug\netstandard2.0\Jik.fsprojAssemblyReference.cache
-d:\tmp\repos\fsharping\Jik\src\Jik\obj\Debug\netstandard2.0\Jik.dll
-d:\tmp\repos\fsharping\Jik\src\Jik\obj\Debug\netstandard2.0\Jik.pdb
