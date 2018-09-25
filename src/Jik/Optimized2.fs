@@ -158,18 +158,19 @@ let exprsToBeginForm exprs =
 let applyFunction cont funcValue values isTail =
     mainStore <- extend mainStore values
     match funcValue with
-    | Function m ->
-        if not isTail then
+    | Function funcMeaning ->
             let store = mainStore
-            m <| fun value ->
+            funcMeaning <| fun value ->
                 printfn "function returned: %s" <| valueToString value
                 mainStore <- store
                 cont value
-        else
-            m <| fun value ->
-                printfn "function returned: %s" <| valueToString value
-                cont value
     | _ -> failwithf "applyFunction: "
+
+let callNumber =
+    let mutable n = 0
+    fun () ->
+        n <- n + 1
+        n
 
 let rec meaning env expr isTail =
     match expr with
@@ -251,30 +252,40 @@ and meaningLambda env args body isTail =
 and meaningApplication env head tail isTail =
     let funcMeaning = meaning env head false
     let argsMeaning = List.map (fun expr -> meaning env expr false) tail
+    let num = callNumber()
     match List.rev argsMeaning with
-    | m :: ms ->
+    | last :: ms ->
+        printfn "meaningApplication: m :: ms"
         let funcValueRef = ref Undefined
         let valuesRef = ref []
         let lastArgMeaning cont =
-            m <| fun value ->      
-                let funcValue = !funcValueRef
+            printfn "meaningApplication: [%d] evaluating last arg (%A %A)" num head tail
+            last <| fun value ->      
+                let funcValue = !funcValueRef                
                 let values = value :: !valuesRef
-                printfn "call apply function %A" values
-                applyFunction cont funcValue values isTail
+                printfn "call apply function [%d] %A" num values
+                let debugCont = fun value ->
+                    printfn "debugCont: [%d] %A" num value
+                    cont value
+                applyFunction debugCont funcValue values isTail
         let fold (next : Meaning) (curr : Meaning) =
             fun cont ->
+                printfn "meaningApplication: [%d] evaluating arg (%A %A)" num head tail
                 curr <| fun value ->
                     valuesRef := value :: !valuesRef
                     next cont
         let argMeaning =
             List.fold fold lastArgMeaning ms
         fun cont ->
+            printfn "meaningApplication: [%d] evaluating function (%A %A)" num head tail
             funcMeaning <| fun funcValue ->
+                valuesRef := []
                 funcValueRef := funcValue
                 argMeaning cont
     | [] -> fun cont ->
+        printfn "meaningApplication: [%d] evaluating function (%A %A)" num head tail
         funcMeaning <| fun funcValue ->
-            printfn "call apply function %A" []
+            printfn "call apply function [%d] %A" num []
             applyFunction cont funcValue [] isTail
 
 and meaningQuote env form isTail =
@@ -287,6 +298,7 @@ and meaningQuote env form isTail =
 
 /// Definitions
 let plus cont =
+    printfn "plus: store %A" mainStore
     match deepFetch mainStore 0 0, deepFetch mainStore 0 1 with
     | Int n, Int m -> n + m |> Int |> cont
     | _ -> failwith "+"
