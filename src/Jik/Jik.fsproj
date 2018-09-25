@@ -12,5 +12,6 @@
     <Compile Include="ContinuationInterpreter.fs" />
     <Compile Include="TestDriver.fs" />
     <Compile Include="Optimized.fs" />
+    <Compile Include="Optimized2.fs" />
   </ItemGroup>
 </Project>

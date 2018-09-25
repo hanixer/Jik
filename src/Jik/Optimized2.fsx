@@ -1,8 +1,7 @@
 #load "Base.fs"
-open System
-#load "Optimized.fs"
+#load "Optimized2.fs"
 
-open Optimized
+open Optimized2
 
 let runTest input expected : unit=
     try
