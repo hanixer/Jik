@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Library.fs" />
+    <Compile Include="Base.fs" />
+    <Compile Include="Display.fs" />
+    <Compile Include="Util.fs" />
+    <Compile Include="Compile.fs" />
+    <Compile Include="Conversion.fs" />
+    <Compile Include="ContinuationInterpreter.fs" />
+    <Compile Include="TestDriver.fs" />
+    <Compile Include="Optimized.fs" />
+  </ItemGroup>
+</Project>
