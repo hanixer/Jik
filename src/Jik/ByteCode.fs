@@ -35,14 +35,14 @@ type VarKind =
     | GlobalVar of int
     | PredefinedVar of int
 
-type CodeEntry =
+type Instruction =
     | DeepArgumentRef of int * int
     | SetDeepArgument of int * int
     | CheckedGlobalRef of int
     | GlobalRef of int
     | SetGlobal of int
     | Predefined of int
-    | Constant of Value
+    | Constant of int
     | JumpFalse of int
     | Goto of int
     | UnlinkEnv
@@ -259,10 +259,56 @@ let callNumber =
         n <- n + 1
         n
 
-let rec compile env expr =
+let isValuesEq v1 v2 =
+    match v1, v2 with
+    | Int n, Int m -> n = m
+    | Bool b, Bool b2 -> b = b2
+    | SymbValue s1, SymbValue s2 -> s1 = s2
+    | _ -> false
+
+type CompileCtx =
+    { mutable Constants : Value list
+       }
+
+let addConstant ctx value =
+    let rec loop i = function
+        | [] -> 
+            ctx.Constants <- value :: ctx.Constants
+            ctx.Constants.Length
+        | x :: _ when isValuesEq x value -> i
+        | _ :: xs -> loop (i + 1) xs
+    loop 0 ctx.Constants
+
+// Compilation
+// Convert an expression into a list of instructions
+
+let isConstant = function
+    | SExpr.Number _ | SExpr.Bool _ | SExpr.Nil -> true
+    | _ -> false
+
+let compileConstant ctx (expr : SExpr) =
     match expr with
-    | Number n ->  
-        Int n |> Constant
+    | SExpr.Bool true -> [10]
+    | SExpr.Bool false -> [11]
+    | SExpr.Nil -> [12]
+    | SExpr.Number -1 -> [80]
+    | SExpr.Number 0 -> [81]
+    | SExpr.Number 1 -> [82]
+    | SExpr.Number 2 -> [83]
+    | SExpr.Number 4 -> [84]
+    | SExpr.Number n when 0 <= n && n < 255 ->
+        [79; n]
+    | _ ->
+
+let rec compile ctx env expr =
+    match expr with
+    | _ when isConstant expr -> compileConstant ctx expr
+
+// Converts code entry into a sequence of bytes
+let rec toBytes = function
+    | Constant value ->
+
+
 
 let rec meaning env expr isTail =
     match expr with
