@@ -1,3 +1,20 @@
+// <exp> ::= <const>
+//        |  <prim>
+//        |  <var>
+//        |  (lambda (<var> ...) <exp>)
+//        |  (if <exp> <exp> <exp>)
+//        |  (set! <var> <exp>)
+//        |  (<exp> <exp> ...)
+
+// <const> ::= <int>
+//          |  #f 
+
+// Syntactic sugar:
+
+// <exp> ::+ (let ((<var> <exp>) ...) <exp>)
+//        |  (letrec ((<var> <exp>) ...) <exp>)
+//        |  (begin <exp> ...)
+
 module Conversion
 
 open Base
@@ -7,10 +24,15 @@ open Base
 
 type Var =
     | GlobalVar of string
-    | PredefinedVar of string * string
+    | PredefinedVar of string
     | LocalVar of string * bool ref * bool
 
 type Ref = Var
+
+type Value =
+    | Int of int
+    | Bool of bool
+    | Nil
 
 type Program =
     | Ref of Ref
@@ -22,7 +44,7 @@ type Program =
     | Function of Var list * Program
     | Alternative of Program * Program * Program
     | Sequence of Program list
-    | Constant of int
+    | Constant of Value
     | RegularApplication of Program * Program list
     | PredefinedApplication of string * Program list
     | FixLet of Var list * Program list * Program
@@ -39,7 +61,7 @@ let mutable predefinedEnv : Env = []
 let tryFindVariable name env =
     let isGood = function
         | GlobalVar n -> name = n
-        | PredefinedVar (n, _) -> name = n
+        | PredefinedVar n -> name = n
         | LocalVar (n, _, _) -> name = n
     List.tryFind isGood env
     
@@ -90,8 +112,10 @@ let convertClosedApplication variables body tail =
 
 let convertApplication head tail =
     match head with
-    | Function (variables, body) -> convertClosedApplication variables body tail
-
+    | Function (variables, body) -> 
+        convertClosedApplication variables body tail
+    | Ref (PredefinedVar name) ->
+        PredefinedApplication (name, tail)
 
 let rec convert env = function
     | List [Symbol "lambda"; names; body] ->
@@ -112,7 +136,58 @@ let rec convert env = function
         let tail = List.map (convert env) tail
         convertApplication head tail
     | Symbol name -> convertReference name env
+    | Number n -> Int n |> Constant
+    | SExpr.Bool b -> Bool b |> Constant
+    | SExpr.Nil -> Constant Nil
+    | e -> failwithf "nothing know about %A" e
    
 and convertSequence env = function
     | List exprs -> List.map (convert env) exprs |> Sequence
     | _ -> failwith ""
+
+let rec emit out = function
+    | Constant (Int n) ->
+        fprintf out "makeInt(%d)" n
+    | Constant (Bool b) ->
+        fprintf out "makeBool(%d)" <| if b then 1 else 0
+    | Constant Nil ->
+        fprintf out "makeNil()"
+    | PredefinedApplication ("display", [arg]) ->
+        fprintf out "printValue("
+        emit out arg
+        fprintfn out ");"
+    | PredefinedApplication ("+", [arg1; arg2]) ->
+        fprintf out "__plus("
+        emit out arg1
+        fprintf out ","
+        emit out arg2
+        fprintfn out ")"
+    | Alternative (cond, conseq, altern) ->
+        emitIf out cond conseq altern
+
+and emitIf out cond conseq altern =
+    fprintf out "!("
+    emit out cond
+    fprintf out ") ? ("
+    emit out conseq
+    fprintf out ") : "
+    emit out altern
+    // | e -> failwithf "emit: error: %A" e
+
+let emitFull out program =
+    fprintfn out "#include \"scheme.h\""
+    fprintfn out ""
+    fprintfn out "int main() {"
+    emit out program
+    fprintfn out "  return 0;"
+    fprintfn out "}"
+
+
+let compile filename str =
+    predefinedEnv <- [
+        PredefinedVar "display"
+        PredefinedVar "+"
+    ]
+    use file = System.IO.File.CreateText filename
+    let prog = stringToSExpr str |> convert []
+    emitFull file prog

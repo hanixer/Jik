@@ -1,10 +1,10 @@
-#define N 1024
+#include "scheme.h"
 
-int a[N];
+/*
+(if #f 1 2)
+*/
 
-
-void init() {
-    for (int i = 0; i < N; ++i) {
-        a[i] = i;
-    }
+int main() {
+    
+    return 0;
 }
