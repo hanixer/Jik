@@ -336,7 +336,5 @@ ASALocalRun/
 # End of https://www.gitignore.io/api/visualstudio
 scripts/out.txt
 Cool/references.fsx
-Jik/misc/a.exe
-Jik/misc/test.s
-Jik/misc/a.exe.stackdump
-Jik/misc/test.c
+
+misc

@@ -14,7 +14,7 @@ let getTempFile () =
     System.IO.Path.Combine(miscPath, Guid.NewGuid().ToString() + ".s")
 
 let gccCompile filename =
-    let res = Util.executeProcess("gcc", filename + " -g runner.c")
+    let res = Util.executeProcess("gcc", filename + " -g -std=c99 runner.c")
     if res.stderr.Trim().Length > 0 then 
         failwithf "gcc error:\n%s\n\n" res.stderr
     if res.stdout.Trim().Length > 0 then 

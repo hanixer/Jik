@@ -6,9 +6,9 @@
 // #load "scripts/test1.4.fsx"
 // #load "scripts/test1.5.fsx"
 // #load "scripts/test1.6.fsx"
-// #load "scripts/test1.7.fsx"
+#load "scripts/test1.7.fsx"
 // #load "scripts/test1.8.fsx"
-#load "scripts/test1.9.fsx"
+// #load "scripts/test1.9.fsx"
 
 open System
 open Base
