@@ -52,7 +52,6 @@ let extendEnv env names =
 let deepFetch store i j =
     match List.tryItem i store with 
     | Some it -> 
-        printfn "deepFetch: item %s store %A" (Array.item j it |> valueToString) store
         Array.item j it
     | None -> failwithf "deepFetch: i <%d> j <%d> %A" i j store
 
@@ -64,7 +63,6 @@ let deepUpdate store i j value =
     | None -> failwithf "deepUpdate: i <%d> j <%d>" i j
 
 let extend store values =
-    printfn "extend: values %A store %A" values store
     Array.ofList values :: store
 
 type GlobalStore () =
@@ -301,7 +299,6 @@ and meaningQuote env form isTail =
 
 /// Definitions
 let plus cont =
-    printfn "plus: store %A" mainStore
     match deepFetch mainStore 0 0, deepFetch mainStore 0 1 with
     | Int n, Int m -> n + m |> Int |> cont
     | _ -> failwith "+"
