@@ -16,6 +16,7 @@
     <Compile Include="Optimized3.fs" />
     <Compile Include="Optimized4.fs" />
     <Compile Include="ByteCode.fs" />
+    <Compile Include="Cps.fs" />
     <Compile Include="ConversionDriver.fs" />
   </ItemGroup>
 </Project>

@@ -298,3 +298,8 @@ let getTopEnv env =
     [List.last env]
 
 let stringToSExpr s = s |> tokenize |> parse
+
+let symbolsToStrings sexprs =
+    List.map (function
+        | Symbol name -> name
+        | _ -> failwith "symbolsToStrings: Symbol expected") sexprs
