@@ -43,6 +43,32 @@ and freeVarsExprList bound exprList =
     List.map (freeVarsExpr bound) exprList
     |> Set.unionMany
 
+let rec findModifiedVars vars = function 
+    | Ref name -> 
+        Set.empty
+    | If (cond, thenc, elsec) ->
+        Set.unionMany [
+            findModifiedVars vars cond
+            findModifiedVars vars thenc
+            findModifiedVars vars elsec
+        ]
+    | Assign (v, rhs) ->
+        if Set.contains v vars then Set.singleton v else Set.empty 
+        |> Set.union (findModifiedVars vars rhs) 
+    | App (head, tail) ->
+        findModifiedVarsList vars tail
+        |> Set.union (findModifiedVars vars head) 
+    | Lambda (args, call) ->
+        let vars' = (Set.difference vars (Set.ofList args))
+        freeVarsExprList vars' call
+    | Begin exprs ->
+        freeVarsExprList vars exprs
+    | _ -> Set.empty
+
+and findModifiedVarsList vars exprList =
+    List.map (findModifiedVars vars) exprList
+    |> Set.unionMany
+
 let rec sexprToExpr = function
     | SExpr.Number n ->
         Int n
@@ -65,5 +91,7 @@ let rec sexprToExpr = function
         App (sexprToExpr head, List.map sexprToExpr tail)
     | e -> failwith <| sexprToString e
 
-let e = "(lambda (x) (f x (lambda (y) (+ y x))))"
+let e = "(lambda (x) (begin
+    (set! x 2)
+    (f x (lambda (y) (+ y x)))))"
 stringToSExpr e |> sexprToExpr |> freeVarsExpr Set.empty
