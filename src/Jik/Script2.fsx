@@ -546,6 +546,17 @@ let e7 = "(let ((f (lambda (x) x)))
 (f 9999))"
 let e8 = "(let ((f (lambda (x) x)))
 (f 9999))"
+let e9 = "
+(let ((f (lambda (x) x)))
+    (let ((g (lambda (y) (f y))))
+        (g 101010)
+        (g 12345)))
+"
+let e10 = "
+(let ((x 1)
+      (f (lambda (g) (g 12345))))
+    (let ((g (lambda (y) x)))
+        (f g)))"
 (* 
 runTest "1" "1"
 runTest "(if 1 2 3)" "2"
@@ -563,4 +574,6 @@ runTest "(+ 1 2)" "3"
 compileString "(lambda (x) x)"
 compileString "((lambda (x) x) 1)"
 compileString e8
-evaluateString e8
+// evaluateString e8
+evaluateString e10
+compileString e10
