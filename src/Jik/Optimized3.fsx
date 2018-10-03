@@ -48,3 +48,7 @@ runTest "(begin
             acc
             (foo (+ x 1) (+ x acc)))))
     (foo 0 0))" "50005000"
+
+runTest "(begin
+    (set! x +)
+    (x 1 2))" "3"

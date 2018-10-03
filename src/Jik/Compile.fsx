@@ -46,10 +46,11 @@ open TestDriver
     e
 
 let ts = [
-
+    "(let ((x 1))
+        (set! x fx+)
+        (x 1 2))", "3\n"
 ]
 
 
 // runTestsWithName "my" ts
 runAllTests() 
-
