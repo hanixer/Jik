@@ -42,9 +42,12 @@ let rec findFreeVarsExpr bound = function
     | _ -> Set.empty
 
 and freeVarsExprList bound exprList =
-    let results = List.map (findFreeVarsExpr bound) exprList
-    printfn "results: %A expr: %A" results exprList
+    let results = List.map (findFreeVarsExpr bound) exprList    
     Set.unionMany results
+
+let freeVarsInBody vars body =
+    freeVarsExprList (Set.ofSeq vars) body
+    |> Set.toSeq
 
 let rec findModifiedVars vars = function 
     | Ref name -> 
@@ -61,11 +64,11 @@ let rec findModifiedVars vars = function
     | App (head, tail) ->
         findModifiedVarsList vars tail
         |> Set.union (findModifiedVars vars head) 
-    | Lambda (args, call) ->
+    | Lambda (args, body) ->
         let vars' = (Set.difference vars (Set.ofList args))
-        freeVarsExprList vars' call
+        findModifiedVarsList vars' body
     | Begin exprs ->
-        freeVarsExprList vars exprs
+        findModifiedVarsList vars exprs
     | Callcc expr ->
         findModifiedVars vars expr
     | _ -> Set.empty
@@ -73,6 +76,10 @@ let rec findModifiedVars vars = function
 and findModifiedVarsList vars exprList =
     List.map (findModifiedVars vars) exprList
     |> Set.unionMany
+
+let findModiedVarsInBody free argVars body =
+    let sets = findModifiedVarsList (Set.ofSeq argVars) body 
+    Set.union sets (Set.intersect sets (Set.ofSeq free))
 
 let rec sexprToExpr = function
     | SExpr.Number n ->
@@ -155,7 +162,9 @@ let makeBoxes sets vars next =
     let _, result = List.foldBack folder vars (List.length vars, next)
     result
 
-let rec compile expr env s next =
+type Env = string list * string seq
+
+let rec compile expr (env : Env) s next =
     match expr with
     | Ref name -> 
         let next' =
@@ -177,14 +186,12 @@ let rec compile expr env s next =
     | Begin exprs ->
         compileBegin exprs env s next
 
-and compileLambda vars body env s next =
-    let free = freeVarsExprList (Set.ofList vars) body
-    printfn "free: %A" free
-    let sets = findModifiedVarsList (Set.ofList vars) body 
-    let s' = Set.union sets (Set.intersect s free)
-    let env' =  (vars, free) 
+and compileLambda vars body env sets next =
+    let free = freeVarsInBody vars body
+    let sets' = findModiedVarsInBody free vars body
+    let env' : Env =  (vars, free) 
     let next' = (Return (List.length vars))    
-    let compiledBody = compile (Begin body) env' s' next'
+    let compiledBody = compile (Begin body) env' sets' next'
     let boxed = makeBoxes sets vars compiledBody
     collectFree free env <| Close (Seq.length free, boxed, next)
 
@@ -235,14 +242,18 @@ let globals = [
 ] 
 
 /// VM
-let stack = Array.create 1000 Undefined
+let stack : obj [] = Array.create 1000 (new Object())
 
-let push expr sp =
-    Array.set stack sp expr
+let push value sp =
+    Array.set stack sp value
     sp + 1
 
 let stackGet sp i =
     Array.get stack (sp - i - 1)
+
+let stackGetValue sp i = stackGet sp i :?> Value
+let stackGetInstruction sp i = stackGet sp i :?> Instruction
+let stackGetInt sp i = stackGet sp i :?> System.Int32 |> int
 
 let stackSet sp i v =
     Array.set stack (sp - i - 1) v
@@ -253,15 +264,21 @@ let shiftArgs n m s =
 let closure body n sp =
     let v = Array.create n Undefined
     let rec loop i =
-        if i <= n then
-            Array.set v i (stackGet sp i)
+        if i < n then
+            Array.set v i (stackGetValue sp i)
     loop 0
     Closure (body, v)
 
-let closureBody = fst
+let closureBody = function
+    | Closure (body, _) -> body
+    | _ -> failwith "closure expected"
 
-let closureIndex (_, v) i =
-    Array.get v i
+let closureIndex clos i =
+    printfn "closureIndex: %A %d" clos i
+    match clos with 
+    | Closure (_, v) -> 
+        Array.get v i
+    | _ -> failwith "closure expected"
 
 let unbox = function
     | Boxed v -> !v
@@ -285,7 +302,7 @@ let rec VM (accum : Value) expr frame clos sp =
     match expr with
     | Halt -> accum
     | ReferLocal (i, next) ->
-        VM (stackGet frame i) next frame clos sp
+        VM (stackGetValue frame i) next frame clos sp
     | ReferFree (i, next) ->
         VM (closureIndex clos i) next frame clos sp
     | Indirect next ->
@@ -295,7 +312,7 @@ let rec VM (accum : Value) expr frame clos sp =
     | Close (n, body, next) ->
         VM (closure body n sp) next frame clos sp
     | Box (n, next) ->
-        stackSet sp n (box (stackGet sp n))
+        stackSet sp n (box (stackGetValue sp n))
         VM accum next frame clos sp
     | Test (theni, elsei) ->
         let next =
@@ -304,7 +321,7 @@ let rec VM (accum : Value) expr frame clos sp =
             else elsei
         VM accum next frame clos sp
     | AssignLocal (i, next) ->
-        assignRef (stackGet frame i) accum
+        assignRef (stackGetValue frame i) accum
         VM accum next frame clos sp
     | AssignFree (i, next) ->
         assignRef (closureIndex clos i) accum
@@ -315,10 +332,35 @@ let rec VM (accum : Value) expr frame clos sp =
         failwith "not implemented"
     | Frame (ret, next) ->
         VM accum next frame clos (push ret (push frame (push clos sp)))
+    | Argument next ->
+        VM accum next frame clos (push accum sp)
+    | Shift (n, m, next) ->
+        VM accum next frame clos (shiftArgs n m sp)
+    | Apply ->
+        VM accum (closureBody accum) sp accum sp
+    | Return n ->
+        let sp = sp - n
+        VM accum (stackGetInstruction sp 0) (stackGetInt sp 1) (stackGetValue sp 2) (sp - 3)
+
+/// Run untilities
+
+let emptyEnv = [], Set.empty
+let emptySets = Set.empty
+let mutable emptyClosure = Closure (Halt, [||])
+
+let evaluate instr =
+    VM Undefined instr 0 emptyClosure 0
+
+let compileExpr expr =
+    compile expr emptyEnv emptySets Halt
 
 let compileString s =
     let e = stringToSExpr s |> sexprToExpr
-    compile e ([], Set.ofList globals) Set.empty Halt
+    compileExpr e
+
+let evaluateString s =
+    let expr = stringToSExpr s |> sexprToExpr
+    evaluate (compileExpr expr)
 
 let e = "(lambda (x) (begin
     (set! x 2)
@@ -333,4 +375,6 @@ let e3 = "(lambda (n)
     (if (<= n 1)
         n
         (* n (fact (- n 1)))))"
-compileString e2
+compileString "((lambda (x abc) (lambda (y) (lambda (z) x))) 1 2)"
+evaluateString "((((lambda (x abc) (lambda (y) (lambda (z) x))) 1 2) 3) 4)"
+evaluateString "((lambda (x) x) 1)"

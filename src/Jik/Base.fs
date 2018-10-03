@@ -102,11 +102,8 @@ type SExpr =
     | Char of char
     | Symbol of string
     | Bool of bool
-    | Lambda of Env * string list * SExpr
-    | Macro of Env * string list * SExpr
     | BuiltinFunc of (SExpr list -> SExpr)
 and Frame = Map<string, SExpr ref> ref
-and Env = Frame list
 
 let (|List|_|) (e:SExpr) =
     let rec loop = function
@@ -246,8 +243,6 @@ let rec sexprToString expr =
             processCons c
             add ")"
         | BuiltinFunc f ->  add (sprintf "BuiltinFunc %A" f)
-        | Lambda (_, args, body) -> printLambdaMacro "lambda" args body
-        | Macro (_, args, body) -> printLambdaMacro "macro" args body
         | Nil -> add "()"
     and processCons = function
         | Cons (x, y) ->
@@ -273,16 +268,6 @@ let rec sexprToString expr =
         |> add
     loop expr
     s.ToString()
-
-let lookup s (env:Env) =
-    match List.tryPick (fun (frame:Frame) -> Map.tryFind s frame.Value) env with
-    | Some v -> v.Value
-    | _ -> failwithf "Symbol %s is not defined" s
-
-let lookupRef s (env:Env) =
-    match List.tryPick (fun (frame:Frame) -> Map.tryFind s frame.Value) env with
-    | Some v -> v
-    | _ -> failwithf "Symbol %s is not defined" s
 
 let define s env value =
     match env with

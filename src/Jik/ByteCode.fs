@@ -1,5 +1,6 @@
-module ByteCode
 
+module ByteCode
+(*
 /// Expressions are converted to sequence of codes.
 /// These code are then converted to byte representation
 /// Then bytecode representation is run by interpreter.
@@ -304,10 +305,6 @@ let rec compile ctx env expr =
     match expr with
     | _ when isConstant expr -> compileConstant ctx expr
 
-// Converts code entry into a sequence of bytes
-let rec toBytes = function
-    | Constant value ->
-
 
 
 let rec meaning env expr isTail =
@@ -468,5 +465,4 @@ let evaluate (str : string) =
         value
     mainStore <- []
     m () 
-
-let evaluateToString = evaluate >> valueToString
+*)
