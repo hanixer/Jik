@@ -1,0 +1,282 @@
+{accum Undefined} {expr Frame} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Constant 1} {frame 0} {clos Closure (Halt,[||])} {sp 3}
+stack [|Closure (Halt,[||]); 0; Halt|]
+
+{accum IntVal 1} {expr Argument} {frame 0} {clos Closure (Halt,[||])} {sp 3}
+stack [|Closure (Halt,[||]); 0; Halt|]
+
+{accum IntVal 1} {expr Close 0} {frame 0} {clos Closure (Halt,[||])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 1|]
+
+{accum Closure (ReferLocal (0,Return 1),[||])} {expr Apply} {frame 0} {clos Closure (Halt,[||])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 1|]
+
+{accum Closure (ReferLocal (0,Return 1),[||])} {expr ReferLocal 0} {frame 4} {clos Closure (ReferLocal (0,Return 1),[||])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 1|]
+
+{accum IntVal 1} {expr Return 1} {frame 4} {clos Closure (ReferLocal (0,Return 1),[||])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 1|]
+
+{accum IntVal 1} {expr Halt} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Constant 1} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 1} {expr Halt} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Constant 1} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 1} {expr Test} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 1} {expr Constant 2} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 2} {expr Halt} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Constant 1} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 1} {expr Test} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 1} {expr Constant 2} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 2} {expr Test} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 2} {expr Constant 3} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 3} {expr Halt} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Constant 1} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 1} {expr Halt} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Constant 1} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 1} {expr Constant 2} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 2} {expr Constant 3} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 3} {expr Halt} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Constant 2} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 2} {expr Constant 3} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 3} {expr Constant 4} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum IntVal 4} {expr Halt} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Frame} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Constant 2} {frame 0} {clos Closure (Halt,[||])} {sp 3}
+stack [|Closure (Halt,[||]); 0; Halt|]
+
+{accum IntVal 2} {expr Argument} {frame 0} {clos Closure (Halt,[||])} {sp 3}
+stack [|Closure (Halt,[||]); 0; Halt|]
+
+{accum IntVal 2} {expr Frame} {frame 0} {clos Closure (Halt,[||])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 2|]
+
+{accum IntVal 2} {expr Constant 1} {frame 0} {clos Closure (Halt,[||])} {sp 7}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 2; Closure (Halt,[||]); 0; Apply|]
+
+{accum IntVal 1} {expr Argument} {frame 0} {clos Closure (Halt,[||])} {sp 7}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 2; Closure (Halt,[||]); 0; Apply|]
+
+{accum IntVal 1} {expr Close 0} {frame 0} {clos Closure (Halt,[||])} {sp 8}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 2; Closure (Halt,[||]); 0; Apply;
+  IntVal 1|]
+
+{accum Closure (ReferLocal (0,Close (1,ReferFree (0,Return 1),Return 1)),[||])} {expr Apply} {frame 0} {clos Closure (Halt,[||])} {sp 8}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 2; Closure (Halt,[||]); 0; Apply;
+  IntVal 1|]
+
+{accum Closure (ReferLocal (0,Close (1,ReferFree (0,Return 1),Return 1)),[||])} {expr ReferLocal 0} {frame 8} {clos Closure (ReferLocal (0,Close (1,ReferFree (0,Return 1),Return 1)),[||])} {sp 8}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 2; Closure (Halt,[||]); 0; Apply;
+  IntVal 1|]
+
+{accum IntVal 1} {expr Close 1} {frame 8} {clos Closure (ReferLocal (0,Close (1,ReferFree (0,Return 1),Return 1)),[||])} {sp 8}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 2; Closure (Halt,[||]); 0; Apply;
+  IntVal 1|]
+
+{accum Closure (ReferFree (0,Return 1),[|IntVal 1|])} {expr Return 1} {frame 8} {clos Closure (ReferLocal (0,Close (1,ReferFree (0,Return 1),Return 1)),[||])} {sp 8}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 2; Closure (Halt,[||]); 0; Apply;
+  IntVal 1|]
+
+{accum Closure (ReferFree (0,Return 1),[|IntVal 1|])} {expr Apply} {frame 0} {clos Closure (Halt,[||])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 2|]
+
+{accum Closure (ReferFree (0,Return 1),[|IntVal 1|])} {expr ReferFree 0} {frame 4} {clos Closure (ReferFree (0,Return 1),[|IntVal 1|])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 2|]
+
+{accum IntVal 1} {expr Return 1} {frame 4} {clos Closure (ReferFree (0,Return 1),[|IntVal 1|])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 2|]
+
+{accum IntVal 1} {expr Halt} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Frame} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Constant 4} {frame 0} {clos Closure (Halt,[||])} {sp 3}
+stack [|Closure (Halt,[||]); 0; Halt|]
+
+{accum IntVal 4} {expr Argument} {frame 0} {clos Closure (Halt,[||])} {sp 3}
+stack [|Closure (Halt,[||]); 0; Halt|]
+
+{accum IntVal 4} {expr Frame} {frame 0} {clos Closure (Halt,[||])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4|]
+
+{accum IntVal 4} {expr Constant 3} {frame 0} {clos Closure (Halt,[||])} {sp 7}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply|]
+
+{accum IntVal 3} {expr Argument} {frame 0} {clos Closure (Halt,[||])} {sp 7}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply|]
+
+{accum IntVal 3} {expr Frame} {frame 0} {clos Closure (Halt,[||])} {sp 8}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3|]
+
+{accum IntVal 3} {expr Constant 2} {frame 0} {clos Closure (Halt,[||])} {sp 11}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply|]
+
+{accum IntVal 2} {expr Argument} {frame 0} {clos Closure (Halt,[||])} {sp 11}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply|]
+
+{accum IntVal 2} {expr Constant 1} {frame 0} {clos Closure (Halt,[||])} {sp 12}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply; IntVal 2|]
+
+{accum IntVal 1} {expr Argument} {frame 0} {clos Closure (Halt,[||])} {sp 12}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply; IntVal 2|]
+
+{accum IntVal 1} {expr Close 0} {frame 0} {clos Closure (Halt,[||])} {sp 13}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply; IntVal 2; IntVal 1|]
+
+{accum Closure
+  (ReferLocal
+     (0,
+      Close (1,ReferFree (0,Close (1,ReferFree (0,Return 1),Return 1)),Return 2)),
+   [||])} {expr Apply} {frame 0} {clos Closure (Halt,[||])} {sp 13}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply; IntVal 2; IntVal 1|]
+
+{accum Closure
+  (ReferLocal
+     (0,
+      Close (1,ReferFree (0,Close (1,ReferFree (0,Return 1),Return 1)),Return 2)),
+   [||])} {expr ReferLocal 0} {frame 13} {clos Closure
+  (ReferLocal
+     (0,
+      Close (1,ReferFree (0,Close (1,ReferFree (0,Return 1),Return 1)),Return 2)),
+   [||])} {sp 13}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply; IntVal 2; IntVal 1|]
+
+{accum IntVal 1} {expr Close 1} {frame 13} {clos Closure
+  (ReferLocal
+     (0,
+      Close (1,ReferFree (0,Close (1,ReferFree (0,Return 1),Return 1)),Return 2)),
+   [||])} {sp 13}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply; IntVal 2; IntVal 1|]
+
+{accum Closure (ReferFree (0,Close (1,ReferFree (0,Return 1),Return 1)),[|IntVal 1|])} {expr Return 2} {frame 13} {clos Closure
+  (ReferLocal
+     (0,
+      Close (1,ReferFree (0,Close (1,ReferFree (0,Return 1),Return 1)),Return 2)),
+   [||])} {sp 13}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply; IntVal 2; IntVal 1|]
+
+{accum Closure (ReferFree (0,Close (1,ReferFree (0,Return 1),Return 1)),[|IntVal 1|])} {expr Apply} {frame 0} {clos Closure (Halt,[||])} {sp 8}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3|]
+
+{accum Closure (ReferFree (0,Close (1,ReferFree (0,Return 1),Return 1)),[|IntVal 1|])} {expr ReferFree 0} {frame 8} {clos Closure (ReferFree (0,Close (1,ReferFree (0,Return 1),Return 1)),[|IntVal 1|])} {sp 8}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3|]
+
+{accum IntVal 1} {expr Close 1} {frame 8} {clos Closure (ReferFree (0,Close (1,ReferFree (0,Return 1),Return 1)),[|IntVal 1|])} {sp 8}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3|]
+
+{accum Closure (ReferFree (0,Return 1),[|IntVal 3|])} {expr Return 1} {frame 8} {clos Closure (ReferFree (0,Close (1,ReferFree (0,Return 1),Return 1)),[|IntVal 1|])} {sp 8}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3|]
+
+{accum Closure (ReferFree (0,Return 1),[|IntVal 3|])} {expr Apply} {frame 0} {clos Closure (Halt,[||])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4|]
+
+{accum Closure (ReferFree (0,Return 1),[|IntVal 3|])} {expr ReferFree 0} {frame 4} {clos Closure (ReferFree (0,Return 1),[|IntVal 3|])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4|]
+
+{accum IntVal 3} {expr Return 1} {frame 4} {clos Closure (ReferFree (0,Return 1),[|IntVal 3|])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4|]
+
+{accum IntVal 3} {expr Halt} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Frame} {frame 0} {clos Closure (Halt,[||])} {sp 0}
+stack [||]
+
+{accum Undefined} {expr Constant 4} {frame 0} {clos Closure (Halt,[||])} {sp 3}
+stack [|Closure (Halt,[||]); 0; Halt|]
+
+{accum IntVal 4} {expr Argument} {frame 0} {clos Closure (Halt,[||])} {sp 3}
+stack [|Closure (Halt,[||]); 0; Halt|]
+
+{accum IntVal 4} {expr Frame} {frame 0} {clos Closure (Halt,[||])} {sp 4}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4|]
+
+{accum IntVal 4} {expr Constant 3} {frame 0} {clos Closure (Halt,[||])} {sp 7}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply|]
+
+{accum IntVal 3} {expr Argument} {frame 0} {clos Closure (Halt,[||])} {sp 7}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply|]
+
+{accum IntVal 3} {expr Frame} {frame 0} {clos Closure (Halt,[||])} {sp 8}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3|]
+
+{accum IntVal 3} {expr Constant 2} {frame 0} {clos Closure (Halt,[||])} {sp 11}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply|]
+
+{accum IntVal 2} {expr Argument} {frame 0} {clos Closure (Halt,[||])} {sp 11}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply|]
+
+{accum IntVal 2} {expr Constant 1} {frame 0} {clos Closure (Halt,[||])} {sp 12}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closure (Halt,[||]); 0; Apply;
+  IntVal 3; Closure (Halt,[||]); 0; Apply; IntVal 2|]
+
+{accum IntVal 1} {expr Argument} {frame 0} {clos Closure (Halt,[||])} {sp 12}
+stack [|Closure (Halt,[||]); 0; Halt; IntVal 4; Closu

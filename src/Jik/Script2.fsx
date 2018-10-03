@@ -128,8 +128,35 @@ type Instruction =
 and Value =
     | IntVal of int
     | Closure of Instruction * (Value [])
+    | Predefined of int * (unit -> Value)
     | Boxed of Value ref
     | Undefined
+
+let instructionToString = function
+    | ReferLocal (n, _) -> sprintf "ReferLocal %d" n
+    | ReferFree(n, _) -> sprintf "ReferFree %d" n
+    | AssignLocal(n, _) -> sprintf "AssignLocal %d" n
+    | AssignFree(n, _) -> sprintf "AssignFree %d" n
+    | Constant(n, _) -> sprintf "Constant %d" n
+    | Return(n) -> sprintf "Return %d" n
+    | Close(n, _, _) -> sprintf "Close %d" n
+    | Test(_, _) -> sprintf "Test"
+    | Apply -> sprintf "Apply"
+    | Conti(_) -> sprintf "Conti" 
+    | Frame(_, _) -> sprintf "Frame" 
+    | Argument(_) -> sprintf "Argument" 
+    | Indirect(_) -> sprintf "Indirect" 
+    | Shift(n, _, _) -> sprintf "Shift %d" n
+    | Halt -> sprintf "Halt" 
+    | Box(_, _) -> sprintf "Box" 
+    | Nuate(_, _) -> sprintf "Nuate" 
+
+let rec valueToString = function
+    | IntVal n -> sprintf "%d" n
+    | Boxed r -> sprintf "<box %s>" (valueToString !r)
+    | Closure _ -> "<closure>"
+    | Undefined -> "<undefined>"
+    | Predefined(_, _) -> "<predefined>"
 
 let isTail = function
     | Return _ -> true
@@ -150,8 +177,10 @@ let compileRefer name env next =
 
 let collectFree vars env next =
     let fold next name =
-        compileRefer name env next
-    Seq.fold fold next vars 
+        compileRefer name env (Argument next)
+    let result = Seq.fold fold next vars 
+    printfn "collectFree: vars %A, result %A" vars result
+    result
 
 let makeBoxes sets vars next =
     let folder var (i, next) =
@@ -267,6 +296,8 @@ let closure body n sp =
         if i < n then
             Array.set v i (stackGetValue sp i)
     loop 0
+    printfn "closure: [%A, %A]" body v
+    printfn "closure: stack: %A" (Array.sub stack 0 sp)
     Closure (body, v)
 
 let closureBody = function
@@ -298,7 +329,10 @@ let assignRef v = function
 let continuation sp =
     closure (Nuate (sp, "v")) 1 sp
 
+let mutable out : StreamWriter = System.IO.File.CreateText("misc/debug.txt") 
+
 let rec VM (accum : Value) expr frame clos sp =
+    fprintf out "{accum %s} {expr %s} {frame %d} {clos %A} {sp %d}\nstack %A\n\n" (valueToString accum) (instructionToString expr) frame clos sp (Array.sub stack 0 sp)
     match expr with
     | Halt -> accum
     | ReferLocal (i, next) ->
@@ -310,7 +344,7 @@ let rec VM (accum : Value) expr frame clos sp =
     | Constant (n, next) ->
         VM (IntVal n) next frame clos sp
     | Close (n, body, next) ->
-        VM (closure body n sp) next frame clos sp
+        VM (closure body n sp) next frame clos (sp - n)
     | Box (n, next) ->
         stackSet sp n (box (stackGetValue sp n))
         VM accum next frame clos sp
@@ -344,15 +378,25 @@ let rec VM (accum : Value) expr frame clos sp =
 
 /// Run untilities
 
-let emptyEnv = [], Set.empty
+let add sp =
+    let n = stackGetInt sp 0
+    let m = stackGetInt sp 1
+    IntVal (n + m)
+
+let predefined = [
+    "+", 2, add
+]
+
+let initEnv = [], Set.empty
 let emptySets = Set.empty
 let mutable emptyClosure = Closure (Halt, [||])
 
 let evaluate instr =
+    fprintf out "****** INSTRUCTION **** \n%A\n************\n" instr
     VM Undefined instr 0 emptyClosure 0
 
 let compileExpr expr =
-    compile expr emptyEnv emptySets Halt
+    compile expr initEnv emptySets Halt
 
 let compileString s =
     let e = stringToSExpr s |> sexprToExpr
@@ -361,6 +405,25 @@ let compileString s =
 let evaluateString s =
     let expr = stringToSExpr s |> sexprToExpr
     evaluate (compileExpr expr)
+
+let evaluateStringToString =
+    evaluateString >> valueToString
+
+/// Tests
+let runTest input expected : unit=
+    try
+        let output = evaluateStringToString input
+        if output <> expected then
+            printfn "FAIL. input <%s>\nexpected<%s>\ngot<%s>" input expected output
+        else ()
+        ()
+    with
+    | e -> 
+        out.Flush()
+        if expected <> "***" then
+            printfn "FAIL. Exception <%s>\ninput <%s>" e.Message input
+        ()
+
 
 let e = "(lambda (x) (begin
     (set! x 2)
@@ -375,6 +438,15 @@ let e3 = "(lambda (n)
     (if (<= n 1)
         n
         (* n (fact (- n 1)))))"
-compileString "((lambda (x abc) (lambda (y) (lambda (z) x))) 1 2)"
+(*
+runTest "1" "1"
+runTest "(if 1 2 3)" "2"
+runTest "(if (if 1 2 3) 3 4)" "3"
+runTest "(begin 1)" "1"
+runTest "(begin 1 2 3)" "3"
+runTest "(begin 2 (begin 3 4))" "4"
+runTest "((((lambda (x abc) (lambda (y) (lambda (z) x))) 1 2) 3) 4)" "1"
 evaluateString "((((lambda (x abc) (lambda (y) (lambda (z) x))) 1 2) 3) 4)"
-evaluateString "((lambda (x) x) 1)"
+compileString "((((lambda (x abc) (lambda (y) (lambda (z) x))) 1 2) 3) 4)"
+*)
+runTest "(((lambda (x) (lambda (y) x)) 1) 2)" "1"
