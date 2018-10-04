@@ -46,11 +46,6 @@ and freeVarsExprList bound exprList =
     let results = List.map (findFreeVarsExpr bound) exprList    
     Set.unionMany results
 
-let freeVarsInBody vars body =
-    let s = freeVarsExprList (Set.ofSeq vars) body
-    let result = Set.toSeq s
-    result
-
 let rec findModifiedVars (vars : string seq) expr =
     match expr with
     | Ref name -> 
@@ -161,7 +156,7 @@ type Instruction =
     | Nuate of (obj []) * Instruction
 
 and Value =
-    | IntVal of int
+    | IntVal of bigint
     | BoolVal of bool
     | Closure of Instruction * (Value [])
     | PredefinedVal of int * PredefinedFunc
@@ -174,7 +169,7 @@ let mutable globalEnv : string list = []
 let mutable predefinedEnv : string list = []
 
 let rec valueToString = function
-    | IntVal n -> sprintf "%d" n
+    | IntVal n -> (n.ToString())
     | BoolVal true -> "#t"
     | BoolVal false -> "#f"
     | Boxed r -> sprintf "<box %s>" (valueToString !r)
@@ -213,6 +208,12 @@ let compileRefer name env next =
         (fun i -> ReferFree (i, next))
         (fun i -> ReferGlobal (i, next))
         (fun i -> ReferPredefined (i, next))
+
+let freeVarsInBody vars body =
+    let bound = Set.union (Set.ofSeq vars) (Set.ofSeq predefinedEnv)
+    let s = freeVarsExprList bound body
+    let result = Set.toSeq s
+    result
 
 let collectFree vars env next =
     let fold next name =
@@ -369,9 +370,9 @@ let handleApply accum sp =
 
 let closureIndex clos i =
     match clos with 
-    | Closure (_, v) -> 
+    | Closure (_, v) | Boxed {contents = Closure (_, v)} -> 
         Array.get v i
-    | _ -> failwith "closure expected"
+    | e -> failwithf "closureIndex: closure expected, got %A" e
 
 let unbox = function
     | Boxed v -> !v
@@ -442,7 +443,7 @@ let rec VM (accum : Value) expr frame clos sp =
     | Indirect next ->
         VM (unbox accum) next frame clos sp
     | Constant (n, next) ->
-        VM (IntVal n) next frame clos sp
+        VM (IntVal <| bigint n) next frame clos sp
     | Close (n, body, next) ->
         VM (closure body n sp) next frame clos (sp - n)
     | Box (n, next) ->
@@ -516,6 +517,8 @@ let evaluate instr =
     VM Undefined instr 0 emptyClosure 0
 
 let prepareEnv () =
+    predefinedEnv <- []
+    globalEnv <- []
     for (name, arity, func) in predefined do
         let i = List.length predefinedEnv
         predefinedEnv <- List.append predefinedEnv [name]
@@ -652,6 +655,12 @@ let e14 = "
         x
         (* x (fact (- x 1)))))))
   (fact 5))"
+let e16 = "
+(letrec ((fact (lambda (x) 
+    (if (< x 2)
+        x
+        (* x (fact (- x 1)))))))
+  (fact 50))"
 let e15 = "
 (letrec (
     (g (lambda (x) (f x)))
@@ -676,4 +685,3 @@ runTest e12 "2"
 runTest e13 "12"
 runTest e14 "120"
 *)
-compileString e4 |> printInstruction
