@@ -2,12 +2,40 @@
 #load "Util.fs"
 #load "Display.fs"
 
+/// Supported features: 
+/// - core Scheme
+/// - let
+/// - letrec
+/// - integer, booleans, pairs
+/// - set!
+/// - call/cc
+/// - tail calls
+/// - inline primitives (like +, -, etc.)
+/// This interpreter translates s-expressions into core Scheme making 
+/// some desugaring (let, letrec). Then core expression is translated
+/// into Tree-like instructions for ''VM''.
+/// VM has following state:
+/// - accumulator, holding result value 
+/// - next instruction to evaluate - emulating instruction pointer
+/// - frame pointer - pointer to beginning of the current frame
+/// - closure - which contains code and free variables for current executing function.
+/// - stack pointer - which points to next free location on the stack.
+/// Memory organization. 
+/// Predefined storage - where primitives are stored.
+/// Global storage - where global variables are store.
+/// Stack memory - implemented as an array, supporting push, pop.
+/// Each closure has its own area of memory for free variables.
+/// call/cc is implemented by saving all active stack elements and then
+/// restoring them back as needed.
+
 open System
 open Base
 open Display
+open System.Text
 
 type Expr =
     | Int of int
+    | Bool of bool
     | Ref of string
     | If of Expr * Expr * Expr
     | Assign of string * Expr
@@ -85,6 +113,8 @@ let rec sexprToExpr sexpr =
         Int n
     | SExpr.Symbol name ->
         Ref name
+    | SExpr.Bool b ->
+        Bool b
     | List [SExpr.Symbol "if"; cond; conseq; altern] ->
         If (sexprToExpr cond,
             sexprToExpr conseq,
@@ -156,8 +186,10 @@ type Instruction =
     | Nuate of (obj []) * Instruction
 
 and Value =
+    | NilVal
     | IntVal of bigint
     | BoolVal of bool
+    | ConsVal of Value * Value
     | Closure of Instruction * (Value [])
     | PredefinedVal of int * PredefinedFunc
     | Boxed of Value ref
@@ -169,9 +201,21 @@ let mutable globalEnv : string list = []
 let mutable predefinedEnv : string list = []
 
 let rec valueToString = function
+    | NilVal -> "()"
     | IntVal n -> (n.ToString())
     | BoolVal true -> "#t"
     | BoolVal false -> "#f"
+    | ConsVal (x, y) -> 
+        let sb = new StringBuilder()
+        sb.Append("(").Append(valueToString x) |> ignore
+        let rec loop = function
+            | ConsVal (x, y) -> 
+                sb.Append(valueToString x) |> ignore
+                loop y
+            | _ -> ()
+        loop y
+        sb.Append(")") |> ignore
+        sb.ToString()
     | Boxed r -> sprintf "<box %s>" (valueToString !r)
     | Closure _ -> "<closure>"
     | Undefined -> "<undefined>"
@@ -495,12 +539,32 @@ let compar func sp =
         BoolVal (func n m)
     | _ -> failwith "compar: wrong values"
 
+let cons sp =
+    ConsVal (stackGetValue sp 0, stackGetValue sp 1)
+
+let pairHelper func sp =
+    match stackGetValue sp 0 with
+    | ConsVal (x, y) -> func x y
+    | _ -> failwith "pairHelper: cons expected"
+
+let car = pairHelper (fun x _ -> x)
+let cdr = pairHelper (fun _ y -> y)
+
+let isPair sp = 
+    match stackGetValue sp 0 with
+    | ConsVal (_, _) -> BoolVal true
+    | _ -> BoolVal false
+
 let predefined = [
     "+", 2, arithm (+)
     "-", 2, arithm (-)
     "*", 2, arithm (*)
     "/", 2, arithm (/)
     "<", 2, compar (<)
+    "cons", 2, cons
+    "car", 1, car
+    "cdr", 1, cdr
+    "pair?", 1, isPair
 ]
 
 let globalVars = [
@@ -667,21 +731,38 @@ let e15 = "
     (f (lambda (x) (+ 123 x))))
   (g 100))"
 (* 
+// Basic tests
 runTest "1" "1"
 runTest "(if 1 2 3)" "2"
 runTest "(if (if 1 2 3) 3 4)" "3"
 runTest "(begin 1)" "1"
 runTest "(begin 1 2 3)" "3"
 runTest "(begin 2 (begin 3 4))" "4"
+// Procedures
 runTest "((((lambda (x abc) (lambda (y) (lambda (z) x))) 1 2) 3) 4)" "1"
+// Let
 runTest e4 "321"
 runTest e5 "123"
 runTest e6 "1"
+// Predefined
 runTest "(+ 1 2)" "3"
 runTest "(+ (+ 1 2) (+ 3 4))" "10"
 runTest "(let ((f +)) (f 1 2))" "3"
 runTest e11 "3"
+// Callcc
 runTest e12 "2"
 runTest e13 "12"
+// Letrec, recursive
 runTest e14 "120"
+// Lists
+runTest "(pair? (cons 1 2))" "#t"
+runTest "(pair? #t)" "#f"
+runTest "(cons 1 2)" "(1 . 2)"
+runTest "(cons 1 ())" "(1)"
+runTest "(cons 1 (cons 2 3))" "(1 2 . 3)"
+runTest "(cons 1 (cons (cons 2 ()) (cons 3 ())))" "(1 (2) 3)"
+runTest "(car (cons 1 2))" "1"
+runTest "(cdr (cons 1 2))" "2"
+runTest "(cdr (car (cdr (cons 1 (cons (cons 2 ()) (cons 3 ()))))))" "()"
+
 *)
