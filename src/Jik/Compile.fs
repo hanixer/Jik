@@ -94,11 +94,7 @@ let compile s =
             emitSchemeEntry Map.empty -wordSize mainExpr
 
     and ``letrec`` env si bindings body =
-        let bindings = List.map (function
-            | List [Symbol name; List [Symbol "lambda"; List args; body]] -> 
-                let args = List.map (function | Symbol n -> n | e -> failwithf "arg is expected") args
-                name, (args, body)
-            | e -> failwithf "letrec: wrong bindings %A" e) bindings
+        let bindings = transformLetrecBindings bindings
         let names = List.map fst bindings        
         let newEnv = 
             List.fold (fun newEnv name -> 

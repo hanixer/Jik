@@ -288,3 +288,10 @@ let symbolsToStrings sexprs =
     List.map (function
         | Symbol name -> name
         | _ -> failwith "symbolsToStrings: Symbol expected") sexprs
+
+let transformLetrecBindings bindings =
+  List.map (function
+    | List [Symbol name; List [Symbol "lambda"; List args; body]] -> 
+        let args = List.map (function | Symbol n -> n | e -> failwithf "arg is expected") args
+        name, (args, body)
+    | e -> failwithf "letrec: wrong bindings %A" e) bindings

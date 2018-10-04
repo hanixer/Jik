@@ -4,7 +4,6 @@
 
 open System
 open Base
-open System.IO
 open Display
 
 type Expr =
@@ -49,8 +48,7 @@ and freeVarsExprList bound exprList =
 
 let freeVarsInBody vars body =
     let s = freeVarsExprList (Set.ofSeq vars) body
-    let result =  Set.toSeq s
-    printfn "freeVarsInBody: vars %A body %A result %A" vars body result
+    let result = Set.toSeq s
     result
 
 let rec findModifiedVars (vars : string seq) expr =
@@ -77,20 +75,17 @@ let rec findModifiedVars (vars : string seq) expr =
     | Callcc expr ->
         findModifiedVars vars expr
     | _ -> Set.empty
-    |> (fun x -> printfn "findModifiedVars: vars %A expr %A result %A" vars expr x ; x)
 
 and findModifiedVarsList vars exprList =
     List.map (findModifiedVars vars) exprList
     |> Set.unionMany
-    |> (fun x -> printfn "findModifiedVarsList: vars %A exprList %A result %A" vars exprList x ; x)
 
 let findModiedVarsInBody free argVars body =
     let sets = findModifiedVarsList (Set.ofSeq argVars) body 
     Set.union sets (Set.intersect sets (Set.ofSeq free))
 
 let rec sexprToExpr sexpr =
-    printfn "sexprToExpr: %s" (sexprToString sexpr)
-    match sexpr with
+   match sexpr with
     | SExpr.Number n ->
         Int n
     | SExpr.Symbol name ->
@@ -117,10 +112,28 @@ let rec sexprToExpr sexpr =
         let lam = Lambda (names, List.map sexprToExpr body)
         let argExprs = List.map sexprToExpr initExprs
         App (lam, argExprs)
-    | List (head :: tail) ->
-        App (sexprToExpr head, List.map sexprToExpr tail)
+    | List (Symbol "letrec" :: List bindings :: body) ->
+        let bindings = transformLetrecBindings bindings
+        let fnames = List.map fst bindings
+        let bindInitial fname = 
+            Cons (Symbol fname, Cons (Number 0, Nil))
+        let letBindings = 
+            fnames
+            |> List.map bindInitial
+            |> exprsToList
+        let foldSets (name, (args, lamBody)) next =
+            let args = List.map Symbol args |> exprsToList
+            let lambda = exprsToList [Symbol "lambda"; args; lamBody]
+            let set = exprsToList [Symbol "set!"; Symbol name; lambda]
+            set :: next
+        let body =
+            List.foldBack foldSets bindings body
+        exprsToList (Symbol "let" :: letBindings :: body)
+        |> sexprToExpr
     | List [Symbol "call/cc"; sexpr] ->
         Callcc (sexprToExpr sexpr)
+    | List (head :: tail) ->
+        App (sexprToExpr head, List.map sexprToExpr tail)
     | e -> failwith <| sexprToString e
 
 /// Compile
@@ -145,10 +158,11 @@ type Instruction =
     | Shift of int * int * Instruction
     | Halt
     | Box of int * Instruction
-    | Nuate of int * string
+    | Nuate of (obj []) * Instruction
 
 and Value =
     | IntVal of int
+    | BoolVal of bool
     | Closure of Instruction * (Value [])
     | PredefinedVal of int * PredefinedFunc
     | Boxed of Value ref
@@ -159,30 +173,10 @@ and PredefinedFunc = (int -> Value)
 let mutable globalEnv : string list = []
 let mutable predefinedEnv : string list = []
 
-let instructionToString = function
-    | ReferLocal (n, _) -> sprintf "ReferLocal %d" n
-    | ReferFree(n, _) -> sprintf "ReferFree %d" n
-    | AssignLocal(n, _) -> sprintf "AssignLocal %d" n
-    | AssignFree(n, _) -> sprintf "AssignFree %d" n
-    | Constant(n, _) -> sprintf "Constant %d" n
-    | Return(n) -> sprintf "Return %d" n
-    | Close(n, _, _) -> sprintf "Close %d" n
-    | Test(_, _) -> sprintf "Test"
-    | Apply -> sprintf "Apply"
-    | Conti(_) -> sprintf "Conti" 
-    | Frame(_, _) -> sprintf "Frame" 
-    | Argument(_) -> sprintf "Argument" 
-    | Indirect(_) -> sprintf "Indirect" 
-    | Shift(n, _, _) -> sprintf "Shift %d" n
-    | Halt -> sprintf "Halt" 
-    | Box(_, _) -> sprintf "Box" 
-    | Nuate(_, _) -> sprintf "Nuate"
-    | ReferGlobal(n, _) -> sprintf "ReferGlobal %d" n
-    | ReferPredefined(n, _) -> sprintf "ReferPredefined %d" n
-    | AssignGlobal(n, _) -> sprintf "ReferLocal %d" n
-
 let rec valueToString = function
     | IntVal n -> sprintf "%d" n
+    | BoolVal true -> "#t"
+    | BoolVal false -> "#f"
     | Boxed r -> sprintf "<box %s>" (valueToString !r)
     | Closure _ -> "<closure>"
     | Undefined -> "<undefined>"
@@ -233,7 +227,6 @@ let makeBoxes sets vars next =
         then i', (Box (i', next))
         else i', next
     let _, result = List.foldBack folder vars (List.length vars, next)
-    printfn "makeBoxes: sets %A vars %A result %A " sets vars result
     result
 
 type Env = string list * string seq
@@ -267,18 +260,14 @@ and compileLambda vars body env next =
     let next' = (Return (List.length vars))    
     let compiledBody = compile (Begin body) env' sets' next'
     let boxed = makeBoxes sets' vars compiledBody
-    printfn "compileLambda: free %A boxed %A next %A" free boxed next
     collectFree free env <| Close (Seq.length free, boxed, next)
 
 and compileApp func argExprs env s next =
-    printfn "compileApp: func %A argExprs %A" func argExprs
-    match tryFindPredefinedIndex func with
+   match tryFindPredefinedIndex func with
     | Some i ->
-        printfn "compileApp: predefined %d" i
-        compilePredefined i argExprs env s next
+       compilePredefined i argExprs env s next
     | None ->
-        printfn "compileApp: regular"
-        compileFunc func argExprs env s next
+       compileFunc func argExprs env s next
 
 and compilePredefined i argExprs env s next =
     compileArgs argExprs env s <| PredefinedInstr (i, next)
@@ -340,21 +329,15 @@ let push value sp =
     sp + 1
 
 let stackGet sp i =
-    printfn "<<<<<<<<<<<<<<<<<"
-    for j in [0..sp] do
-        printfn "stackGet %d %d: [%d] %A" sp i j (Array.get stack j)
-    printfn ">>>>>>>>>>>>>>>>>"
-    Array.get stack (sp - i - 1)
+    match Array.tryItem (sp - i - 1) stack with
+    | Some x -> x
+    | _ -> failwithf "stackGet sp=%d i=%d" sp i
 
 let stackGetValue sp i = stackGet sp i :?> Value
 let stackGetInstruction sp i = stackGet sp i :?> Instruction
 let stackGetInt sp i = stackGet sp i :?> System.Int32 |> int
 
 let stackSet sp i v =
-    printfn "<<<<<<<<<<<<<<<<<"
-    for i in [0..sp] do
-        printfn "stackSet: [%d] %A" i (Array.get stack i)
-    printfn ">>>>>>>>>>>>>>>>>"
     Array.set stack (sp - i - 1) v
 
 let shiftArgs newCount oldCount sp =
@@ -371,7 +354,6 @@ let closure body n sp =
         if i < n then
             Array.set v i (stackGetValue sp i)
     loop 0
-    printfn "closure: %A %A" body v
     Closure (body, v)
 
 let handleApply accum sp =
@@ -379,7 +361,11 @@ let handleApply accum sp =
     | Closure (body, _) -> accum, body
     | PredefinedVal (arity, func) ->
         func sp, Return arity
-    | _ -> failwith "closure expected"
+    | Boxed r ->
+        match !r with
+        | Closure (body, _) -> accum, body
+        | e -> failwithf "closure expected, got BOXED %A" e
+    | e -> failwithf "closure expected, got %A" e
 
 let closureIndex clos i =
     match clos with 
@@ -394,7 +380,7 @@ let unbox = function
 let box v = Boxed (ref v)
 
 let boolify = function
-    | IntVal 0 -> false
+    | BoolVal false -> false
     | _ -> true
 
 let assignRef v = function
@@ -402,8 +388,18 @@ let assignRef v = function
         r := v
     | _ -> failwith "assignRef: "
 
+let saveStack sp =
+    Array.sub stack 0 sp 
+
+let restoreStack savedStack =
+    let length = Array.length savedStack
+    for i in [0..length - 1] do
+        Array.set stack i (Array.get savedStack i)
+    length
+
 let continuation sp =
-    closure (Nuate (sp, "v")) 1 sp
+    let savedStack = saveStack sp
+    closure (ReferLocal (0, Nuate (savedStack, Return 0))) 0 sp
 
 let globalStoreGet i =
     Array.get globalStore i
@@ -456,12 +452,10 @@ let rec VM (accum : Value) expr frame clos sp =
         VM accum (testNext accum theni elsei) frame clos sp
     | AssignLocal (i, next) ->
         let refVal = stackGetValue frame i 
-        printfn "assignLocal: %d refVal %A" i refVal
         assignRef accum refVal
         VM accum next frame clos sp
     | AssignFree (i, next) ->
         let refVal = closureIndex clos i 
-        printfn "assignFree: %d refVal %A" i refVal
         assignRef accum refVal 
         VM accum next frame clos sp
     | AssignGlobal (i, next) ->
@@ -483,20 +477,31 @@ let rec VM (accum : Value) expr frame clos sp =
         VM (getPredefinedFunc i sp) next frame clos (sp - (getPredefinedArity i))
     | Conti next ->
         VM (continuation sp) next frame clos sp
-    | Nuate _ ->
-        failwith "not implemented"
+    | Nuate (savedStack, next) ->
+         VM accum next frame clos (restoreStack savedStack)
 
 /// Run untilities
 
-let add sp =
+let arithm func sp =
     match stackGetValue sp 0, stackGetValue sp 1 with
     | IntVal n, IntVal m ->
-        IntVal (n + m)
-    | _ -> failwith "add: wrong values"
-    
+        IntVal (func n m)
+    | _ -> failwith "arithm: wrong values"
+
+let compar func sp =
+    match stackGetValue sp 0, stackGetValue sp 1 with
+    | IntVal n, IntVal m ->
+        BoolVal (func n m)
+    | _ -> failwith "compar: wrong values"
+
 let predefined = [
-    "+", 2, add
+    "+", 2, arithm (+)
+    "-", 2, arithm (-)
+    "*", 2, arithm (*)
+    "/", 2, arithm (/)
+    "<", 2, compar (<)
 ]
+
 let globalVars = [
     "x"
     "y"
@@ -566,8 +571,10 @@ let rec showInstruction instr =
     | Shift(newCount, oldCount, next) ->
         iConcat [iStr "Shift new="; iNum newCount; iStr ", old="; iNum oldCount; iNewline; showInstruction next]
     | Box(n, next) -> withNumber "Box " n next
-    | Conti(_) -> failwith "Not Implemented"
-    | Nuate(_, _) -> failwith "Not Implemented"
+    | Conti(next) -> 
+        iConcat [iStr "Conti"; iNewline; showInstruction next]
+    | Nuate(_, _) -> 
+        iConcat [iStr "Nuate"; ]//iNewline; showInstruction next]
     | PredefinedInstr(n, next) -> withNumber "PredefinedInstr " n next
 
 let printInstruction instr = 
@@ -637,6 +644,19 @@ let e11 = "
 (let ((f +)) 
     (let ((g f))
         (g 1 2)))"
+let e12 = "(call/cc (lambda (k) (k 2) 3))"
+let e13 = "(call/cc (lambda (k) (+ 1 (k 12))))"
+let e14 = "
+(letrec ((fact (lambda (x) 
+    (if (< x 2)
+        x
+        (* x (fact (- x 1)))))))
+  (fact 5))"
+let e15 = "
+(letrec (
+    (g (lambda (x) (f x)))
+    (f (lambda (x) (+ 123 x))))
+  (g 100))"
 (* 
 runTest "1" "1"
 runTest "(if 1 2 3)" "2"
@@ -652,5 +672,8 @@ runTest "(+ 1 2)" "3"
 runTest "(+ (+ 1 2) (+ 3 4))" "10"
 runTest "(let ((f +)) (f 1 2))" "3"
 runTest e11 "3"
+runTest e12 "2"
+runTest e13 "12"
+runTest e14 "120"
 *)
-compileString e11 |> printInstruction
+compileString e4 |> printInstruction
