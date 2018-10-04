@@ -374,8 +374,11 @@ let closure body n sp =
     printfn "closure: %A %A" body v
     Closure (body, v)
 
-let functionBody = function
-    | Closure (body, _) -> body
+let handleApply accum sp =
+    match accum with
+    | Closure (body, _) -> accum, body
+    | PredefinedVal (arity, func) ->
+        func sp, Return arity
     | _ -> failwith "closure expected"
 
 let closureIndex clos i =
@@ -471,7 +474,8 @@ let rec VM (accum : Value) expr frame clos sp =
     | Shift (n, m, next) ->
         VM accum next frame clos (shiftArgs n m sp)
     | Apply ->
-        VM accum (functionBody accum) sp accum sp
+        let accum, next = handleApply accum sp
+        VM accum next sp accum sp
     | Return n ->
         let sp = sp - n
         VM accum (stackGetInstruction sp 0) (stackGetInt sp 1) (stackGetValue sp 2) (sp - 3)
@@ -629,6 +633,10 @@ let e10 = "
       (f (lambda (g) (g 12345))))
     (let ((g (lambda (y) x)))
         (f g)))"
+let e11 = "
+(let ((f +)) 
+    (let ((g f))
+        (g 1 2)))"
 (* 
 runTest "1" "1"
 runTest "(if 1 2 3)" "2"
@@ -642,5 +650,7 @@ runTest e5 "123"
 runTest e6 "1"
 runTest "(+ 1 2)" "3"
 runTest "(+ (+ 1 2) (+ 3 4))" "10"
+runTest "(let ((f +)) (f 1 2))" "3"
+runTest e11 "3"
 *)
-compileString "(+ 1 2)" |> printInstruction
+compileString e11 |> printInstruction
