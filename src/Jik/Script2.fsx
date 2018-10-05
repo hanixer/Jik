@@ -658,6 +658,8 @@ let rec showInstruction instr =
 
 let printInstruction instr = 
     showInstruction instr |> iDisplay |> printf "%s"
+let compilePrintInstruction e = 
+    compileString e |> showInstruction |> iDisplay |> printf "%s"
 
 /// Tests
 let runTest input expected : unit=
@@ -742,6 +744,21 @@ let e15 = "
     (g (lambda (x) (f x)))
     (f (lambda (x) (+ 123 x))))
   (g 100))"
+let e18 = "
+(letrec (
+(sort (lambda (lst)
+    (if (pair? lst)
+        (insert (car lst) (sort (cdr lst)))
+        ())))
+(insert (lambda (elem lst)
+    (if (pair? lst)
+        (let ((x (car lst))
+            (l (cdr lst)))
+            (if (< elem x)
+                (cons elem (cons x l))
+                (cons x (insert elem l))))
+        (cons elem ())))))
+    (sort (cons 333 (cons 222 (cons 111 ())))))"
 (* 
 // Basic tests
 runTest "1" "1"
@@ -777,4 +794,12 @@ runTest "(car (cons 1 2))" "1"
 runTest "(cdr (cons 1 2))" "2"
 runTest "(cdr (car (cdr (cons 1 (cons (cons 2 ()) (cons 3 ()))))))" "()"
 
-*)
+*)  
+
+compilePrintInstruction "
+(let ((x 1))
+    (let ((y (+ x 123)))
+        (+ x y)))"
+
+" (let ((x 1)) (let ((y (+ x 123))) (+ x y)))"
+"(compile '(let ((x 1)) (let ((y (+ x 123))) (+ x y))) #:from 'scheme #:to 'tree-il)"
