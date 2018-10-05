@@ -170,7 +170,8 @@ type Instruction =
     | AssignLocal of int * Instruction
     | AssignFree of int * Instruction
     | AssignGlobal of int * Instruction
-    | Constant of int * Instruction
+    | ConstantInt of int * Instruction
+    | ConstantBool of bool * Instruction
     | Return of int
     | Close of int * Instruction * Instruction
     | Test of Instruction * Instruction
@@ -205,13 +206,18 @@ let rec valueToString = function
     | IntVal n -> (n.ToString())
     | BoolVal true -> "#t"
     | BoolVal false -> "#f"
-    | ConsVal (x, y) -> 
+    | ConsVal (x, y) as e-> 
+        printfn "cons cons : %A" e
         let sb = new StringBuilder()
         sb.Append("(").Append(valueToString x) |> ignore
         let rec loop = function
-            | ConsVal (x, y) -> 
+            | ConsVal (x, NilVal) ->
                 sb.Append(valueToString x) |> ignore
+            | ConsVal (x, (ConsVal (_, _) as y)) ->
+                sb.Append(valueToString x).Append(" ") |> ignore
                 loop y
+            | ConsVal (x, y) -> 
+                sb.Append(valueToString x).Append(" . ").Append(valueToString y) |> ignore
             | _ -> ()
         loop y
         sb.Append(")") |> ignore
@@ -284,7 +290,8 @@ let rec compile expr (env : Env) s next =
             then Indirect next
             else next
         compileRefer name env next'
-    | Int n -> Constant (n, next)
+    | Int n -> ConstantInt (n, next)
+    | Bool n -> ConstantBool (n, next)
     | Lambda (vars, body) ->
         compileLambda vars body env next
     | If (cond, thenc, elsec) ->
@@ -486,8 +493,10 @@ let rec VM (accum : Value) expr frame clos sp =
         VM (predefinedStoreGet i) next frame clos sp
     | Indirect next ->
         VM (unbox accum) next frame clos sp
-    | Constant (n, next) ->
+    | ConstantInt (n, next) ->
         VM (IntVal <| bigint n) next frame clos sp
+    | ConstantBool (b, next) ->
+        VM (BoolVal b) next frame clos sp
     | Close (n, body, next) ->
         VM (closure body n sp) next frame clos (sp - n)
     | Box (n, next) ->
@@ -620,7 +629,10 @@ let rec showInstruction instr =
     | AssignLocal(n, next) -> withNumber "AssignLocal " n next
     | AssignFree(n, next) -> withNumber "AssignFree " n next
     | AssignGlobal(n, next) -> withNumber "AssignGlobal " n next
-    | Constant(n, next) -> withNumber "Constant " n next
+    | ConstantInt(n, next) -> withNumber "Constant " n next
+    | ConstantBool(n, next) -> 
+        let x = if n then iStr "#t" else iStr "#f"
+        iConcat [iStr "ConstantBool "; x; iNewline; showInstruction next]
     | Return(n) -> 
         iConcat [iStr "Return "; iNum n; iNewline]
     | Close(freeCount, body, next) -> 
