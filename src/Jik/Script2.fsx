@@ -172,6 +172,7 @@ type Instruction =
     | AssignGlobal of int * Instruction
     | ConstantInt of int * Instruction
     | ConstantBool of bool * Instruction
+    | PutLocal of int * Instruction
     | Return of int
     | Close of int * Instruction * Instruction
     | Test of Instruction * Instruction
@@ -280,6 +281,32 @@ let makeBoxes sets vars next =
     let _, result = List.foldBack folder vars (List.length vars, next)
     result
 
+let rec getNonArgLocalsCount count expr = 
+    match expr with
+    | Ref name -> count
+    | Int(_) -> count
+    | Bool(_) -> count
+    | If (cond, thenc, elsec) ->
+        let count1 = getNonArgLocalsCount count cond
+        let count2 = getNonArgLocalsCount count thenc
+        let count3 = getNonArgLocalsCount count elsec
+        List.max [count1; count2; count3]
+    | Assign(_, rhs) -> getNonArgLocalsCount count rhs
+    | Lambda(args, body) -> getNonArgLocalsCount 0 (Begin body)
+    | Begin(exprs) -> 
+        exprs
+        |> List.map (getNonArgLocalsCount count)
+        |> List.max
+    | App(Lambda(vars, body), argExprs) ->
+        let countInLambda = getNonArgLocalsCount (count + vars.Length) (Begin body)
+        let countInArgs = getNonArgLocalsCount count (Begin argExprs)
+        max countInLambda countInArgs
+    | App(func, argExprs) ->
+        let countInLambda = getNonArgLocalsCount count func
+        let countInArgs = getNonArgLocalsCount count (Begin argExprs)
+        max countInLambda countInArgs
+    | Callcc(_) -> failwith "Not Implemented"
+
 type Env = string list * string seq
 
 let rec compile expr (env : Env) s next =
@@ -319,21 +346,25 @@ and compileApp func argExprs env s next =
     | Some i ->
        compilePredefined i argExprs env s next
     | None ->
-       compileFunc func argExprs env s next
+       compileFuncApp func argExprs env s next
 
 and compilePredefined i argExprs env s next =
     compileArgs argExprs env s <| PredefinedInstr (i, next)
 
-and compileFunc func argExprs env s next = 
-    match next with
-    | Return n -> 
-        let next' = Shift (List.length argExprs, n, Apply)
-        let compiledFunc = compile func env s next'
-        compileArgs argExprs env s compiledFunc
-    | _ -> 
-        let next' = Apply
-        let compiledFunc = compile func env s next'        
-        Frame (next, compileArgs argExprs env s compiledFunc)
+and compileFuncApp func argExprs env s next = 
+    match func with
+    // | Lambda (args, body) ->
+        // failwith ""
+    | _ ->
+        match next with
+        | Return n -> 
+            let next' = Shift (List.length argExprs, n, Apply)
+            let compiledFunc = compile func env s next'
+            compileArgs argExprs env s compiledFunc
+        | _ -> 
+            let next' = Apply
+            let compiledFunc = compile func env s next'        
+            Frame (next, compileArgs argExprs env s compiledFunc)
 
 and compileArgs argExprs env s compiledFunc =
     let compileArg next arg =
@@ -796,10 +827,14 @@ runTest "(cdr (car (cdr (cons 1 (cons (cons 2 ()) (cons 3 ()))))))" "()"
 
 *)  
 
-compilePrintInstruction "
+"
 (let ((x 1))
     (let ((y (+ x 123)))
-        (+ x y)))"
+(if 1
+    (let ((z (+ x x))
+        (oijewroij 1234))
+        (+ x z))
+    (let ((w (+ y y)))
+        (+ w y)))))" |> compilePrintInstruction
 
-" (let ((x 1)) (let ((y (+ x 123))) (+ x y)))"
-"(compile '(let ((x 1)) (let ((y (+ x 123))) (+ x y))) #:from 'scheme #:to 'tree-il)"
+"(x (lambda (y) y))" |> stringToSExpr |> transformLetrecBindings
