@@ -130,9 +130,12 @@ let rec convert expr cont =
         convertIf cond ethen eelse cont
     | Expr.Assign(var, rhs) ->
         convertAssign var rhs cont
-    | Expr.Lambda(_) -> failwith "Not Implemented"
-    | Expr.Begin(_) -> failwith "Not Implemented"
-    | Expr.LetRec(_, _) -> failwith "Not Implemented"
+    | Expr.Lambda(args, body) ->
+        convertLambda args body cont
+    | Expr.Begin(exprs) ->
+        convertBegin exprs cont
+    | Expr.LetRec(bindings, body) ->
+        convertLetRec bindings body cont
 
 and convertApp func args cont =
     convert func (fun funcVar ->
@@ -159,10 +162,36 @@ and convertAssign var rhs cont =
         let dummy = freshLabel "unspecified"
         LetVal ([dummy, Assign (var, value)], cont dummy))
 
+and convertLambda args body cont =
+    let body = convert (Expr.Begin body) Return
+    let var = freshLabel "lam"
+    LetVal ([var, body], cont var)
+
+and convertBegin exprs cont =
+    let rec loop var = function
+        | expr :: rest ->
+            convert expr (fun var -> loop var rest)
+        | [] -> 
+            cont var
+    loop "" exprs
+
+and convertLetRec bindings body cont =
+    let handleBinding (name, (args, body)) =
+        name, args, convertBegin body Return
+    let bindings = List.map handleBinding bindings
+    let body = convertBegin body cont
+    LetRec (bindings, body)
+
 let rec showCps cps = 
     let funclike needEq s args body = 
         let v = if needEq then iStr " = " else iNil
         iConcat [iStr s; iStr " ("; iInterleave (iStr ",") (List.map iStr args); iStr ")"; v; iNewline; iStr "  "; iIndent <| showCps body; iNewline]
+    let letHelper kind bindings body=
+        iConcat [iStr kind;
+                 iStr "in ";
+                 showCps body; iNewline; iStr "  "
+                 iIndent (iConcat (List.map (fun (v, args, e) -> 
+                    funclike true v args e) bindings));iNewline; ]
     match cps with
     | Cps.Ref v -> iStr v
     | Cps.Const n -> iNum n
@@ -170,25 +199,18 @@ let rec showCps cps =
     | Cps.LetVal(bindings, body) -> 
         iConcat [iStr "letval "; 
                  iIndent (iConcat (List.map (fun (v, e) -> 
-                    iConcat [iStr v; iStr " = "; showCps e; iNewline]) bindings));
+                    iConcat [iStr v; iStr " = "; showCps e; iNewline]) bindings));iNewline; 
                  iStr " in ";
                  showCps body]
     | Cps.LetCont(bindings, body) -> 
-        iConcat [iStr "letcont "; 
-                 iIndent (iConcat (List.map (fun (v, args, e) -> 
-                    funclike true v args e) bindings));
-                 iStr " in ";
-                 showCps body]
+        letHelper "letcont " bindings body
     | Cps.LetRec(bindings, body) -> 
-        iConcat [iStr "letrec "; 
-                 iIndent (iConcat (List.map (fun (v, args, e) -> 
-                    funclike true v args e) bindings));
-                 iStr " in ";
-                 showCps body]
+        letHelper "letrec " bindings body
     | Cps.If(c, t, e) ->
-        iConcat [iStr "if "; iStr c; iNewline
-                 showCps t;
-                 showCps e]
+        iIndent (iConcat 
+                    [ iStr "if "; iStr c; iNewline
+                      showCps t; iNewline
+                      showCps e])
     | Cps.Assign(v, e) -> iConcat [iStr v; iStr " <- "; iStr e]
     | Cps.Seq(es) -> List.map showCps es |> iConcat
     | Cps.TailCall(f, v) -> [iStr "tailcall"; iStr f; List.map iStr v |> iInterleave (iStr ",")] |> iInterleave (iStr " ")
@@ -198,5 +220,20 @@ let rec showCps cps =
 
 let cpsToString = showCps >> iDisplay
 
-"(if (a j)(b i)(c w))" |> stringToSExpr |> sexprToExpr |> convert <| (fun v -> Return v) |> cpsToString
-"(if (a j)(set! b i)(set! c w))" |> stringToSExpr |> sexprToExpr |> convert <| (fun v -> Return v) |> cpsToString
+// "(if (a j)(b i)(c w))" |> stringToSExpr |> sexprToExpr |> convert <| (fun v -> Return v) |> cpsToString
+// "(if (a j)(set! b i)(set! c w))" |> stringToSExpr |> sexprToExpr |> convert <| (fun v -> Return v) |> cpsToString |> printfn "%s"
+let tryit s = stringToSExpr s |> sexprToExpr |> convert <| (fun v -> Return v) |> cpsToString |> printfn "%s"
+"(letrec (
+(sort (lambda (lst)
+    (if (pair? lst)
+        (insert (car lst) (sort (cdr lst)))
+        1)))
+(insert (lambda (elem lst)
+    (if (pair? lst)
+        (let ((x (car lst))
+            (l (cdr lst)))
+            (if (< elem x)
+                (cons elem (cons x l))
+                (cons x (insert elem l))))
+        (cons elem 1)))))
+    (sort (cons 333 (cons 222 (cons 111 1)))))" |> tryit
