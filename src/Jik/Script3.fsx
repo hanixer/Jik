@@ -198,7 +198,7 @@ and convertAssign var rhs cont =
 and convertLambda args body cont = 
     let body = convert (Expr.Begin body) Return
     let var = freshLabel "lam"
-    LetVal((var, body), cont var)
+    LetVal((var, Lambda (ref [], args, body)), cont var)
 
 and convertBegin exprs cont = 
     let rec loop var = 
@@ -220,6 +220,10 @@ let unionFree list1 list2 =
     list1 @ list2
     |> List.distinct
 
+let difference list1 list2 =
+    Set.difference (Set.ofSeq list1) (Set.ofSeq list2)
+    |> Set.toList
+
 let freeOrNot var bound =
     if List.contains var bound then []
     else [var]
@@ -233,13 +237,15 @@ let freeOrNotMany vars bound =
 // returns free variables in expression
 // modifies list of free vars in lambdas
 let rec analyzeFreeVars bound cps =
+    printfn "%A %A\n\n" bound cps
     match cps with
     | Const n -> []
-    | Ref(_) -> failwith "Not Implemented"
+    | Ref v -> freeOrNot v bound
     | Lambda(freeRef, args, body) ->
-        let free = analyzeFreeVars (args @ bound) body
-        freeRef := unionFree free !freeRef
-        free
+        let free = analyzeFreeVars args body
+        printfn "lambda:::: free %A bound %A" free bound
+        freeRef := free
+        difference free bound
     | LetVal((var, rhs), body) ->
         let freeRhs = analyzeFreeVars bound rhs
         let freeBody = analyzeFreeVars (unionFree bound [var]) body
@@ -255,11 +261,11 @@ let rec analyzeFreeVars bound cps =
     | LetRec(bindings, body) ->
         let names = List.map (fun (name, _) -> name) bindings
         let folder acc (_, (freeRef, args, body)) =
-            let free = analyzeFreeVars (unionFree bound args) body
-            freeRef := free
-            unionFree acc free
+            let free = analyzeFreeVars args body
+            freeRef := difference free bound
+            unionFree acc !freeRef
         let free = List.fold folder [] bindings
-        let freeBody = analyzeFreeVars (unionFree bound names) body
+        let freeBody = analyzeFreeVars names body
         unionFree free freeBody
     | If(cond, conseq, altern) ->
         let freeCond = freeOrNot cond bound
@@ -282,6 +288,7 @@ let rec analyzeFreeVars bound cps =
     | Return(v) -> 
         freeOrNot v bound
     | _ -> failwith "analyzeFreeVars: invalid case"
+    |> (fun x -> printfn "returns: %A %A" x cps; x)
 
 let rec closureConvert cps = 
     match cps with
@@ -423,6 +430,7 @@ let testFree s =
         stringToSExpr s
         |> sexprToExpr
         |> exprToCps
+    printfn "before:\n%A\n\n\nafter:" cps
     printfn "%A\n\n---\n\n%A" (analyzeFreeVars [] cps) cps
 
 "(letrec (
@@ -438,8 +446,9 @@ let testFree s =
                 (cons elem (cons x l))
                 (cons x (insert elem l))))
         (cons elem 1)))))
-    (sort (cons 333 (cons 222 (cons 111 1)))))" |> tryit
+    (sort (cons 333 (cons 222 (cons 111 1)))))"
 "1"
 "(let ((f (lambda (a) (lambda (b) (+ a b)))))
     ((f 1) 2))"
-"(lambda (a) (lambda (b) (lambda (c) (+ a b c))))" |> testFree
+"(lambda (a) (lambda (b) (lambda (c) (+ a b c))))"
+"(lambda (a) (lambda (b) (+ a b)))" |> testFree
