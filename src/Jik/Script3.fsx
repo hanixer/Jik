@@ -37,6 +37,12 @@ type Expr =
 
 and LambdaData = string list * Expr list
 
+let mutable n = 0
+
+let freshLabel s =
+    n <- n + 1
+    sprintf "%s%d" s n
+
 let transformLetrecBindings2 bindings =
   List.map (function
     | List [Symbol name; List (Symbol "lambda" :: List args :: body)] -> 
@@ -84,6 +90,48 @@ let rec sexprToExpr sexpr =
         App (sexprToExpr head, convertList tail)
     | e -> failwith <| sexprToString e
 
+let trySubstitute v mapping = 
+    match Map.tryFind v mapping with
+    | Some (w) -> w
+    | _ -> v
+
+let extendMapping vars mapping =
+    let newVars = List.map freshLabel vars
+    let folder mapping (oldVar, newVar) =
+        Map.add oldVar newVar mapping
+    newVars, List.fold folder mapping (List.zip vars newVars)
+
+let rec alphaRename mapping = function
+    | Int _ as e -> e
+    | Ref v ->
+        trySubstitute v mapping
+        |> Ref
+    | If (cond, thenExpr, elseExpr) ->
+        If (alphaRename mapping cond,
+            alphaRename mapping thenExpr,
+            alphaRename mapping elseExpr)
+    | Assign(var, rhs) ->
+        Assign (trySubstitute var mapping, alphaRename mapping rhs)
+    | Lambda (args, body) ->
+        let newVars, mapping = extendMapping args mapping
+        Lambda (newVars, List.map (alphaRename mapping) body)
+    | Begin exprs ->
+        Begin (List.map (alphaRename mapping) exprs)
+    | App (func, argsExprs) ->
+        App (alphaRename mapping func,
+             List.map (alphaRename mapping) argsExprs)
+    | LetRec (bindings, body) ->
+        let vars = List.map fst bindings
+        let _, mapping = extendMapping vars mapping
+        let transform (var, (args, body)) =
+            let var = trySubstitute var mapping
+            let args, mappingFunc = extendMapping args mapping
+            let body = List.map (alphaRename mappingFunc) body
+            var, (args, body)
+        let bindings = List.map transform bindings
+        let body = List.map (alphaRename mapping) body
+        LetRec (bindings, body)
+
 type Var = string
 
 type Cps =
@@ -111,12 +159,6 @@ type Cps =
 //         |  (letrec ((<var> <exp)*) <body>)
 //  <simple> ::= <literal>
 //            |  <var>
-
-let mutable n = 0
-
-let freshLabel s =
-        n <- n + 1
-        sprintf "%s%d" s n
 
 let rec convert expr cont =
     match expr with
@@ -187,11 +229,11 @@ let rec showCps cps =
         let v = if needEq then iStr " = " else iNil
         iConcat [iStr s; iStr " ("; iInterleave (iStr ",") (List.map iStr args); iStr ")"; v; iNewline; iStr "  "; iIndent <| showCps body; iNewline]
     let letHelper kind bindings body=
-        iConcat [iStr kind;
-                 iStr "in ";
-                 showCps body; iNewline; iStr "  "
+        iConcat [iStr kind; iNewline; iStr "  "
                  iIndent (iConcat (List.map (fun (v, args, e) -> 
-                    funclike true v args e) bindings));iNewline; ]
+                    funclike true v args e) bindings));iNewline;
+                 iStr "in ";
+                 showCps body; ]
     match cps with
     | Cps.Ref v -> iStr v
     | Cps.Const n -> iNum n
@@ -223,6 +265,7 @@ let cpsToString = showCps >> iDisplay
 // "(if (a j)(b i)(c w))" |> stringToSExpr |> sexprToExpr |> convert <| (fun v -> Return v) |> cpsToString
 // "(if (a j)(set! b i)(set! c w))" |> stringToSExpr |> sexprToExpr |> convert <| (fun v -> Return v) |> cpsToString |> printfn "%s"
 let tryit s = stringToSExpr s |> sexprToExpr |> convert <| (fun v -> Return v) |> cpsToString |> printfn "%s"
+let tryRename s = stringToSExpr s |> sexprToExpr |> alphaRename Map.empty |> printfn "%A"
 "(letrec (
 (sort (lambda (lst)
     (if (pair? lst)
@@ -236,4 +279,5 @@ let tryit s = stringToSExpr s |> sexprToExpr |> convert <| (fun v -> Return v) |
                 (cons elem (cons x l))
                 (cons x (insert elem l))))
         (cons elem 1)))))
-    (sort (cons 333 (cons 222 (cons 111 1)))))" |> tryit
+    (sort (cons 333 (cons 222 (cons 111 1)))))"
+"1" |> tryit
