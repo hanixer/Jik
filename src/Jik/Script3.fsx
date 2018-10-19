@@ -124,6 +124,46 @@ let rec alphaRename mapping =
         let body = List.map (alphaRename mapping) body
         LetRec(bindings, body)
 
+let rec findFreeVarsExpr bound = function
+    | If (cond, thenc, elsec) ->
+        Set.unionMany [
+            findFreeVarsExpr bound cond
+            findFreeVarsExpr bound thenc
+            findFreeVarsExpr bound elsec
+        ]
+    | Assign (v, rhs) ->
+        Set.difference (Set.singleton v) bound
+        |> Set.union (findFreeVarsExpr bound rhs) 
+    | App (head, tail) ->
+        freeVarsExprList bound tail
+        |> Set.union (findFreeVarsExpr bound head) 
+    | Lambda (vars, body) ->
+        freeVarsLambda vars body
+    | Begin exprs ->
+        freeVarsExprList bound exprs
+    | Ref name -> 
+        if Set.contains name bound then
+            Set.empty
+        else 
+            Set.singleton name
+    | LetRec (bindings, body) ->
+        let names = List.map fst bindings
+        let folder freeAcc (_, (args, body)) =
+            freeVarsLambda args body
+            |> Set.union freeAcc
+        let freeBindings = List.fold folder Set.empty bindings
+        let freeBody = findFreeVarsExpr (Set.union bound (Set.ofSeq names)) (Begin body)
+        Set.union freeBindings freeBody
+    | _ -> Set.empty
+
+and freeVarsExprList bound exprList =
+    let results = List.map (findFreeVarsExpr bound) exprList    
+    Set.unionMany results
+
+and freeVarsLambda vars body =
+    let bound' = Set.ofList vars
+    freeVarsExprList bound' body
+
 type Var = string
 
 type Cps = 
@@ -144,7 +184,115 @@ type Cps =
     | ClosureCall of Var * Var list
     | EnvRef of Var * int
 
-and CpsLambda = (Var list ref) * (Var list) * Cps
+and CpsLambda = ((Var list) ref) * (Var list) * Cps
+
+
+
+let rec showCps cps = 
+    let funclike needEq s (free : Var list ref) args body = 
+        let free = !free
+        let v = 
+            if needEq then iStr " = "
+            else iNil
+        iConcat [iStr s;
+                 iStr " (";
+                 iInterleave (iStr ",") (List.map iStr args);
+                 iStr ")";
+                 iStr "<";
+                 iInterleave (iStr ",") (List.map iStr free);
+                 iStr ">";
+                 v;
+                 iNewline;
+                 iStr "  ";
+                 iIndent <| showCps body;
+                 iNewline]
+    
+    let letHelper kind bindings body = 
+        iConcat [iStr kind;
+                 iNewline;
+                 iStr "  ";
+                 
+                 iIndent
+                     (iConcat
+                          (List.map (fun (v, args, e) -> funclike true v (ref []) args e) 
+                               bindings));
+                 iNewline;
+                 iStr "in ";
+                 showCps body]
+    
+    match cps with
+    | Cps.Ref v -> iStr v
+    | Cps.Const n -> iNum n
+    | Cps.Lambda(free, args, body) -> funclike false "lambda" free args body
+    | Cps.LetVal(bindings, body) -> 
+        let v, e = bindings
+        iConcat [iStr "letval ";
+                 iIndent(iConcat([iStr v;
+                                  iStr " = ";
+                                  showCps e;
+                                  iNewline]));
+                 iNewline;
+                 iStr " in ";
+                 showCps body]
+    | Cps.LetCont(bindings, body) -> letHelper "letcont " bindings body
+    | Cps.LetRec(bindings, body) -> 
+        iConcat [iStr "letrec ";
+                 iNewline;
+                 iStr "  ";
+                 
+                 iIndent
+                     (iConcat
+                          (List.map (fun (v, (free, args, e)) -> funclike true v free args e) 
+                               bindings));
+                 iNewline;
+                 iStr "in ";
+                 showCps body]
+    | Cps.If(c, t, e) -> 
+        iIndent(iConcat [iStr "if ";
+                         iStr c;
+                         iNewline;
+                         showCps t;
+                         iNewline;
+                         showCps e])
+    | Cps.Assign(v, e) -> 
+        iConcat [iStr v;
+                 iStr " <- ";
+                 iStr e]
+    | Cps.Seq(es) -> List.map showCps es |> iConcat
+    | Cps.TailCall(f, v) -> 
+        [iStr "tailcall";
+         iStr f;
+         List.map iStr v |> iInterleave(iStr ",")]
+        |> iInterleave(iStr " ")
+    | Cps.NonTailCall(k, f, v) -> 
+        [iStr "call";
+         iStr k;
+         iStr f;
+         List.map iStr v |> iInterleave(iStr ",")]
+        |> iInterleave(iStr " ")
+    | Cps.ContCall(k, x) -> 
+        [iStr "contcall";
+         iStr k;
+         List.map iStr x |> iInterleave(iStr ",")]
+        |> iInterleave(iStr " ")
+    | Cps.Return(v) -> 
+        iConcat [iStr "return ";
+                 iStr v]
+    | Cps.MakeClosure vars -> 
+        iConcat [iStr "make-closure ";
+                 iInterleave (iStr ",") (List.map iStr vars)]
+    | Cps.ClosureCall(func, vars) -> 
+        iConcat [iStr "closure-call ";
+                 iStr func;
+                 iStr " ";
+                 iInterleave (iStr ",") (List.map iStr vars)]
+    | Cps.EnvRef(var, n) -> 
+        iConcat [iStr "env-ref ";
+                 iStr var;
+                 iStr " ";
+                 iNum n]
+
+let cpsToString = showCps >> iDisplay
 
 // Higher-order
 //  <exp> ::= (if <simple> <exp> <exp>)
@@ -237,17 +385,14 @@ let freeOrNotMany vars bound =
 // returns free variables in expression
 // modifies list of free vars in lambdas
 let rec analyzeFreeVars bound cps =
-    printfn "%A %A\n\n" bound cps
     match cps with
     | Const n -> []
     | Ref v -> freeOrNot v bound
     | Lambda(freeRef, args, body) ->
-        let free = analyzeFreeVars args body
-        printfn "lambda:::: free %A bound %A" free bound
-        freeRef := free
-        difference free bound
+        analyzeFreeLambda bound (freeRef, args, body)
     | LetVal((var, rhs), body) ->
         let freeRhs = analyzeFreeVars bound rhs
+        // let freeRhs = difference (analyzeFreeVars bound rhs) bound
         let freeBody = analyzeFreeVars (unionFree bound [var]) body
         unionFree freeRhs freeBody
     | LetCont(bindings, body) -> 
@@ -260,13 +405,10 @@ let rec analyzeFreeVars bound cps =
         unionFree free freeBody
     | LetRec(bindings, body) ->
         let names = List.map (fun (name, _) -> name) bindings
-        let folder acc (_, (freeRef, args, body)) =
-            let free = analyzeFreeVars args body
-            freeRef := difference free bound
-            unionFree acc !freeRef
-        let free = List.fold folder [] bindings
         let freeBody = analyzeFreeVars names body
-        unionFree free freeBody
+        bindings
+        |> List.map (snd >> analyzeFreeLambda (unionFree bound names))
+        |> List.fold unionFree freeBody
     | If(cond, conseq, altern) ->
         let freeCond = freeOrNot cond bound
         let freeConseq = analyzeFreeVars bound conseq
@@ -288,7 +430,11 @@ let rec analyzeFreeVars bound cps =
     | Return(v) -> 
         freeOrNot v bound
     | _ -> failwith "analyzeFreeVars: invalid case"
-    |> (fun x -> printfn "returns: %A %A" x cps; x)
+
+and analyzeFreeLambda bound (freeRef, args, body) =
+    let free = analyzeFreeVars args body
+    freeRef := free
+    difference free bound
 
 let rec closureConvert cps = 
     match cps with
@@ -309,108 +455,6 @@ let rec closureConvert cps =
     | MakeClosure(_) -> failwith "Not Implemented"
     | ClosureCall(_, _) -> failwith "Not Implemented"
     | EnvRef(_, _) -> failwith "Not Implemented"
-
-let rec showCps cps = 
-    let funclike needEq s args body = 
-        let v = 
-            if needEq then iStr " = "
-            else iNil
-        iConcat [iStr s;
-                 iStr " (";
-                 iInterleave (iStr ",") (List.map iStr args);
-                 iStr ")";
-                 v;
-                 iNewline;
-                 iStr "  ";
-                 iIndent <| showCps body;
-                 iNewline]
-    
-    let letHelper kind bindings body = 
-        iConcat [iStr kind;
-                 iNewline;
-                 iStr "  ";
-                 
-                 iIndent
-                     (iConcat
-                          (List.map (fun (v, args, e) -> funclike true v args e) 
-                               bindings));
-                 iNewline;
-                 iStr "in ";
-                 showCps body]
-    
-    match cps with
-    | Cps.Ref v -> iStr v
-    | Cps.Const n -> iNum n
-    | Cps.Lambda(_, args, body) -> funclike false "lambda" args body
-    | Cps.LetVal(bindings, body) -> 
-        let v, e = bindings
-        iConcat [iStr "letval ";
-                 iIndent(iConcat([iStr v;
-                                  iStr " = ";
-                                  showCps e;
-                                  iNewline]));
-                 iNewline;
-                 iStr " in ";
-                 showCps body]
-    | Cps.LetCont(bindings, body) -> letHelper "letcont " bindings body
-    | Cps.LetRec(bindings, body) -> 
-        iConcat [iStr "letrec ";
-                 iNewline;
-                 iStr "  ";
-                 
-                 iIndent
-                     (iConcat
-                          (List.map (fun (v, (_, args, e)) -> funclike true v args e) 
-                               bindings));
-                 iNewline;
-                 iStr "in ";
-                 showCps body]
-    | Cps.If(c, t, e) -> 
-        iIndent(iConcat [iStr "if ";
-                         iStr c;
-                         iNewline;
-                         showCps t;
-                         iNewline;
-                         showCps e])
-    | Cps.Assign(v, e) -> 
-        iConcat [iStr v;
-                 iStr " <- ";
-                 iStr e]
-    | Cps.Seq(es) -> List.map showCps es |> iConcat
-    | Cps.TailCall(f, v) -> 
-        [iStr "tailcall";
-         iStr f;
-         List.map iStr v |> iInterleave(iStr ",")]
-        |> iInterleave(iStr " ")
-    | Cps.NonTailCall(k, f, v) -> 
-        [iStr "call";
-         iStr k;
-         iStr f;
-         List.map iStr v |> iInterleave(iStr ",")]
-        |> iInterleave(iStr " ")
-    | Cps.ContCall(k, x) -> 
-        [iStr "contcall";
-         iStr k;
-         List.map iStr x |> iInterleave(iStr ",")]
-        |> iInterleave(iStr " ")
-    | Cps.Return(v) -> 
-        iConcat [iStr "return ";
-                 iStr v]
-    | Cps.MakeClosure vars -> 
-        iConcat [iStr "make-closure ";
-                 iInterleave (iStr ",") (List.map iStr vars)]
-    | Cps.ClosureCall(func, vars) -> 
-        iConcat [iStr "closure-call ";
-                 iStr func;
-                 iStr " ";
-                 iInterleave (iStr ",") (List.map iStr vars)]
-    | Cps.EnvRef(var, n) -> 
-        iConcat [iStr "env-ref ";
-                 iStr var;
-                 iStr " ";
-                 iNum n]
-
-let cpsToString = showCps >> iDisplay
 
 let tryit s = 
     stringToSExpr s
@@ -446,9 +490,12 @@ let testFree s =
                 (cons elem (cons x l))
                 (cons x (insert elem l))))
         (cons elem 1)))))
-    (sort (cons 333 (cons 222 (cons 111 1)))))"
+    (sort (cons 333 (cons 222 (cons 111 1)))))" |> testFree
 "1"
 "(let ((f (lambda (a) (lambda (b) (+ a b)))))
     ((f 1) 2))"
 "(lambda (a) (lambda (b) (lambda (c) (+ a b c))))"
-"(lambda (a) (lambda (b) (+ a b)))" |> testFree
+"(lambda (a) (lambda (b) (opera a b)))"
+"(letrec ((f (lambda (x) (opera f g x)))
+          (g (lambda (y) (opera f g y))))
+    1)" 
