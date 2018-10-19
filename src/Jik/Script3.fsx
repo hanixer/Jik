@@ -1,4 +1,5 @@
 #load "Base.fs"
+open System.Collections.Generic
 #load "Util.fs"
 #load "Display.fs"
 
@@ -34,11 +35,14 @@ type Expr =
 
 and LambdaData = string list * Expr list
 
-let mutable n = 0
-
-let freshLabel s = 
-    n <- n + 1
-    sprintf "%s%d" s n
+let freshLabel = 
+    let mutable dict  = Dictionary<string, int>()
+    fun prefix ->
+        if dict.ContainsKey prefix |> not then
+            dict.Add(prefix, 0)
+        let count = dict.Item prefix
+        dict.Item prefix <- count + 1
+        sprintf "%s%d" prefix count
 
 let transformLetrecBindings2 bindings = 
     List.map (function 
@@ -170,19 +174,19 @@ type Cps =
     | Const of int
     | Ref of Var
     | Lambda of CpsLambda
+    | Code of (Var list) * Cps
     | LetVal of (Var * Cps) * Cps
     | LetCont of (Var * Var list * Cps) list * Cps
     | LetRec of (Var * CpsLambda) list * Cps
     | If of Var * Cps * Cps
     | Assign of Var * Var
     | Seq of Cps list
-    | TailCall of Var * Var list
-    | NonTailCall of Var * Var * Var list
+    | Call of Var * Var * Var list
     | ContCall of Var * Var list
     | Return of Var
     | MakeClosure of Var list
     | ClosureCall of Var * Var list
-    | EnvRef of Var * int
+    | EnvRef of int
 
 and CpsLambda = ((Var list) ref) * (Var list) * Cps
 
@@ -259,12 +263,7 @@ let rec showCps cps =
                  iStr " <- ";
                  iStr e]
     | Cps.Seq(es) -> List.map showCps es |> iConcat
-    | Cps.TailCall(f, v) -> 
-        [iStr "tailcall";
-         iStr f;
-         List.map iStr v |> iInterleave(iStr ",")]
-        |> iInterleave(iStr " ")
-    | Cps.NonTailCall(k, f, v) -> 
+    | Call(k, f, v) -> 
         [iStr "call";
          iStr k;
          iStr f;
@@ -286,9 +285,8 @@ let rec showCps cps =
                  iStr func;
                  iStr " ";
                  iInterleave (iStr ",") (List.map iStr vars)]
-    | Cps.EnvRef(var, n) -> 
+    | Cps.EnvRef(n) -> 
         iConcat [iStr "env-ref ";
-                 iStr var;
                  iStr " ";
                  iNum n]
 
@@ -327,7 +325,7 @@ and convertApp func args cont =
                 let resultVar = freshLabel "callResult"
                 LetCont
                     ([contVar, [resultVar], cont resultVar], 
-                     NonTailCall(contVar, funcVar, vars))
+                     Call(contVar, funcVar, vars))
             | arg :: args -> 
                 convert arg (fun argVar -> loop (argVar :: vars) args)
         loop [] args)
@@ -392,7 +390,6 @@ let rec analyzeFreeVars bound cps =
         analyzeFreeLambda bound (freeRef, args, body)
     | LetVal((var, rhs), body) ->
         let freeRhs = analyzeFreeVars bound rhs
-        // let freeRhs = difference (analyzeFreeVars bound rhs) bound
         let freeBody = analyzeFreeVars (unionFree bound [var]) body
         unionFree freeRhs freeBody
     | LetCont(bindings, body) -> 
@@ -421,9 +418,7 @@ let rec analyzeFreeVars bound cps =
             let free = analyzeFreeVars bound expr
             unionFree acc free
         List.fold folder [] exprs
-    | TailCall(func, args) ->
-        freeOrNotMany (func :: args) bound
-    | NonTailCall(k, func, args) -> 
+    | Call(k, func, args) -> 
         freeOrNotMany (k :: func :: args) bound
     | ContCall(k, args) -> 
         freeOrNotMany (k :: args) bound
@@ -440,21 +435,29 @@ let rec closureConvert cps =
     match cps with
     | Const n as e -> e
     | Ref v -> Ref v
-    | Lambda(_) -> failwith "Not Implemented"
-    | LetVal(binding, body) ->
-        failwith "Not Implemented"
-    | LetCont(_, _) -> failwith "Not Implemented"
+    | Lambda(free, args, body) ->
+        Lambda (free, args, closureConvert body)
+    | LetVal((var, Lambda(lambda)), body) ->
+        closureConvertLambda var lambda body
+    | LetVal((var, rhs), body) ->
+        LetVal((var, closureConvert rhs), closureConvert body)
+    | LetCont(bindings, body) -> failwith "Not Implemented"
     | LetRec(_, _) -> failwith "Not Implemented"
     | If(_, _, _) -> failwith "Not Implemented"
     | Assign(_, _) -> failwith "Not Implemented"
     | Seq(_) -> failwith "Not Implemented"
-    | TailCall(_, _) -> failwith "Not Implemented"
-    | NonTailCall(_, _, _) -> failwith "Not Implemented"
+    | Call(_, _, _) -> failwith "Not Implemented"
     | ContCall(_, _) -> failwith "Not Implemented"
     | Return(_) -> failwith "Not Implemented"
     | MakeClosure(_) -> failwith "Not Implemented"
     | ClosureCall(_, _) -> failwith "Not Implemented"
-    | EnvRef(_, _) -> failwith "Not Implemented"
+    | EnvRef(_) -> failwith "Not Implemented"
+
+and closureConvertLambda var (free, args, lambdaBody) body =
+    let varCode = freshLabel (var + "/code")
+    LetVal((varCode, Code(args, lambdaBody)), 
+        LetVal((var, MakeClosure(varCode :: !free)), 
+            closureConvert body))
 
 let tryit s = 
     stringToSExpr s
@@ -490,12 +493,12 @@ let testFree s =
                 (cons elem (cons x l))
                 (cons x (insert elem l))))
         (cons elem 1)))))
-    (sort (cons 333 (cons 222 (cons 111 1)))))" |> testFree
+    (sort (cons 333 (cons 222 (cons 111 1)))))"
 "1"
 "(let ((f (lambda (a) (lambda (b) (+ a b)))))
     ((f 1) 2))"
 "(lambda (a) (lambda (b) (lambda (c) (+ a b c))))"
-"(lambda (a) (lambda (b) (opera a b)))"
+"(lambda (a) (lambda (b) (opera a b)))"|> testFree
 "(letrec ((f (lambda (x) (opera f g x)))
           (g (lambda (y) (opera f g y))))
     1)" 
