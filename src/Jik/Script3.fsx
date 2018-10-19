@@ -176,7 +176,7 @@ type Cps =
     | Lambda of CpsLambda
     | Code of (Var list) * Cps
     | LetVal of (Var * Cps) * Cps
-    | LetCont of (Var * Var list * Cps) list * Cps
+    | LetCont of (Var * Var list * Cps) * Cps
     | LetRec of (Var * CpsLambda) list * Cps
     | If of Var * Cps * Cps
     | Assign of Var * Var
@@ -238,7 +238,15 @@ let rec showCps cps =
                  iNewline;
                  iStr " in ";
                  showCps body]
-    | Cps.LetCont(bindings, body) -> letHelper "letcont " bindings body
+    | Cps.LetCont(bindings, body) -> 
+        let v, args, e = bindings
+        iConcat [iStr "letcont ";
+                 iNewline;
+                 iStr "  ";                 
+                 iIndent (funclike true v (ref []) args e);
+                 iNewline;
+                 iStr "in ";
+                 showCps body]
     | Cps.LetRec(bindings, body) -> 
         iConcat [iStr "letrec ";
                  iNewline;
@@ -289,6 +297,7 @@ let rec showCps cps =
         iConcat [iStr "env-ref ";
                  iStr " ";
                  iNum n]
+    | Code(_, _) -> failwith "Not Implemented"
 
 let cpsToString = showCps >> iDisplay
 
@@ -324,7 +333,7 @@ and convertApp func args cont =
                 let contVar = freshLabel "k"
                 let resultVar = freshLabel "callResult"
                 LetCont
-                    ([contVar, [resultVar], cont resultVar], 
+                    ((contVar, [resultVar], cont resultVar), 
                      Call(contVar, funcVar, vars))
             | arg :: args -> 
                 convert arg (fun argVar -> loop (argVar :: vars) args)
@@ -392,13 +401,9 @@ let rec analyzeFreeVars bound cps =
         let freeRhs = analyzeFreeVars bound rhs
         let freeBody = analyzeFreeVars (unionFree bound [var]) body
         unionFree freeRhs freeBody
-    | LetCont(bindings, body) -> 
-        let names = List.map (fun (name, _, _) -> name) bindings
-        let folder acc (_, args, body) =
-            let free = analyzeFreeVars (unionFree bound args) body
-            unionFree acc free
-        let free = List.fold folder [] bindings
-        let freeBody = analyzeFreeVars (unionFree bound names) body
+    | LetCont((name, args, contBody), body) -> 
+        let free = analyzeFreeVars (unionFree bound args) body
+        let freeBody = analyzeFreeVars (unionFree bound [name]) body
         unionFree free freeBody
     | LetRec(bindings, body) ->
         let names = List.map (fun (name, _) -> name) bindings
