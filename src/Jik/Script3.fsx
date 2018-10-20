@@ -12,7 +12,6 @@ open System.Text
 //  - integers
 //  - conditionals
 //  - assignments
-// Assumption for source language: rhs expressions in letrec are lambdas.
 // Input:
 //  <exp> ::= <literal>
 //         |  <variable>
@@ -22,7 +21,6 @@ open System.Text
 //         |  (begin <body>)
 //         |  (<exp> <exp>*)
 //         |  (let ((<var> <exp)*) <body>)
-//         |  (letrec ((<var> <exp)*) <body>)
 type Expr = 
     | Int of int
     | Ref of string
@@ -31,7 +29,6 @@ type Expr =
     | Lambda of LambdaData
     | Begin of Expr list
     | App of Expr * Expr list
-    | LetRec of (string * LambdaData) list * Expr list
 
 and LambdaData = string list * Expr list
 
@@ -45,16 +42,6 @@ let freshLabel =
         sprintf "%s%d" prefix count
 
 let freshCodeLabel prefix = freshLabel (prefix + "/code")
-
-let transformLetrecBindings2 bindings = 
-    List.map (function 
-        | List [Symbol name; List(Symbol "lambda" :: List args :: body)] -> 
-            let args = 
-                List.map (function 
-                    | Symbol n -> n
-                    | e -> failwithf "arg is expected") args
-            name, (args, body)
-        | e -> failwithf "letrec: wrong bindings %A" e) bindings
 
 let rec sexprToExpr sexpr = 
     let convertList = List.map sexprToExpr
@@ -83,10 +70,23 @@ let rec sexprToExpr sexpr =
         let argExprs = convertList initExprs
         App(lam, argExprs)
     | List(Symbol "letrec" :: List bindings :: body) -> 
-        let bindings = transformLetrecBindings2 bindings
-        let handleLambda(name, (args, body)) = name, (args, convertList body)
-        let lambdas = List.map handleLambda bindings
-        LetRec(lambdas, convertList body)
+        let bindings = transformLetrecBindings bindings
+        let fnames = List.map fst bindings
+        let bindInitial fname = 
+            Cons (Symbol fname, Cons (Number 0, Nil))
+        let letBindings = 
+            fnames
+            |> List.map bindInitial
+            |> exprsToList
+        let foldSets (name, (args, lamBody)) next =
+            let args = List.map Symbol args |> exprsToList
+            let lambda = exprsToList [Symbol "lambda"; args; lamBody]
+            let set = exprsToList [Symbol "set!"; Symbol name; lambda]
+            set :: next
+        let body =
+            List.foldBack foldSets bindings body
+        exprsToList (Symbol "let" :: letBindings :: body)
+        |> sexprToExpr
     | List(head :: tail) -> App(sexprToExpr head, convertList tail)
     | e -> failwith <| sexprToString e
 
@@ -116,59 +116,6 @@ let rec alphaRename mapping =
     | Begin exprs -> Begin(List.map (alphaRename mapping) exprs)
     | App(func, argsExprs) -> 
         App(alphaRename mapping func, List.map (alphaRename mapping) argsExprs)
-    | LetRec(bindings, body) -> 
-        let vars = List.map fst bindings
-        let _, mapping = extendMapping vars mapping
-        
-        let transform(var, (args, body)) = 
-            let var = trySubstitute var mapping
-            let args, mappingFunc = extendMapping args mapping
-            let body = List.map (alphaRename mappingFunc) body
-            var, (args, body)
-        
-        let bindings = List.map transform bindings
-        let body = List.map (alphaRename mapping) body
-        LetRec(bindings, body)
-
-let rec findFreeVarsExpr bound = function
-    | If (cond, thenc, elsec) ->
-        Set.unionMany [
-            findFreeVarsExpr bound cond
-            findFreeVarsExpr bound thenc
-            findFreeVarsExpr bound elsec
-        ]
-    | Assign (v, rhs) ->
-        Set.difference (Set.singleton v) bound
-        |> Set.union (findFreeVarsExpr bound rhs) 
-    | App (head, tail) ->
-        freeVarsExprList bound tail
-        |> Set.union (findFreeVarsExpr bound head) 
-    | Lambda (vars, body) ->
-        freeVarsLambda vars body
-    | Begin exprs ->
-        freeVarsExprList bound exprs
-    | Ref name -> 
-        if Set.contains name bound then
-            Set.empty
-        else 
-            Set.singleton name
-    | LetRec (bindings, body) ->
-        let names = List.map fst bindings
-        let folder freeAcc (_, (args, body)) =
-            freeVarsLambda args body
-            |> Set.union freeAcc
-        let freeBindings = List.fold folder Set.empty bindings
-        let freeBody = findFreeVarsExpr (Set.union bound (Set.ofSeq names)) (Begin body)
-        Set.union freeBindings freeBody
-    | _ -> Set.empty
-
-and freeVarsExprList bound exprList =
-    let results = List.map (findFreeVarsExpr bound) exprList    
-    Set.unionMany results
-
-and freeVarsLambda vars body =
-    let bound' = Set.ofList vars
-    freeVarsExprList bound' body
 
 type Var = string
 
@@ -179,7 +126,6 @@ type Cps =
     | Code of (Var list) * Cps
     | LetVal of (Var * Cps) * Cps
     | LetCont of (Var * Var list * Cps) * Cps
-    | LetRec of (Var * CpsLambda) list * Cps
     | If of Var * Cps * Cps
     | Assign of Var * Var
     | Seq of Cps list
@@ -249,18 +195,6 @@ let rec showCps cps =
                  iNewline;
                  iStr "in ";
                  showCps body]
-    | Cps.LetRec(bindings, body) -> 
-        iConcat [iStr "letrec ";
-                 iNewline;
-                 iStr "  ";
-                 
-                 iIndent
-                     (iConcat
-                          (List.map (fun (v, (free, args, e)) -> funclike true v free args e) 
-                               bindings));
-                 iNewline;
-                 iStr "in ";
-                 showCps body]
     | Cps.If(c, t, e) -> 
         iIndent(iConcat [iStr "if ";
                          iStr c;
@@ -324,7 +258,6 @@ let rec convert expr cont =
     | Expr.Assign(var, rhs) -> convertAssign var rhs cont
     | Expr.Lambda(args, body) -> convertLambda args body cont
     | Expr.Begin(exprs) -> convertBegin exprs cont
-    | Expr.LetRec(bindings, body) -> convertLetRec bindings body cont
 
 and convertApp func args cont = 
     convert func (fun funcVar -> 
@@ -364,12 +297,6 @@ and convertBegin exprs cont =
         | [] -> cont var
     loop "" exprs
 
-and convertLetRec bindings body cont = 
-    let handleBinding(name, (args, body)) = name, (ref [], args, convertBegin body Return)
-    let bindings = List.map handleBinding bindings
-    let body = convertBegin body cont
-    LetRec(bindings, body)
-
 let exprToCps e =
     convert e Return
 
@@ -407,12 +334,6 @@ let rec analyzeFreeVars bound cps =
         let free = analyzeFreeVars (unionFree bound args) body
         let freeBody = analyzeFreeVars (unionFree bound [name]) body
         unionFree free freeBody
-    | LetRec(bindings, body) ->
-        let names = List.map (fun (name, _) -> name) bindings
-        let freeBody = analyzeFreeVars names body
-        bindings
-        |> List.map (snd >> analyzeFreeLambda (unionFree bound names))
-        |> List.fold unionFree freeBody
     | If(cond, conseq, altern) ->
         let freeCond = freeOrNot cond bound
         let freeConseq = analyzeFreeVars bound conseq
@@ -451,9 +372,8 @@ let rec closureConvert cps =
         LetVal((var, t rhs), t body)
     | LetCont((var, args, contBody), body) -> 
         LetCont((var, args, contBody), body)
-    | LetRec(bindings, body) ->
+    | If(cond, conseq, altern) ->
         failwith "Not Implemented"
-    | If(_, _, _) -> failwith "Not Implemented"
     | Assign(_, _) -> failwith "Not Implemented"
     | Seq(_) -> failwith "Not Implemented"
     | Call(_, _, _) -> failwith "Not Implemented"
