@@ -44,6 +44,8 @@ let freshLabel =
         dict.Item prefix <- count + 1
         sprintf "%s%d" prefix count
 
+let freshCodeLabel prefix = freshLabel (prefix + "/code")
+
 let transformLetrecBindings2 bindings = 
     List.map (function 
         | List [Symbol name; List(Symbol "lambda" :: List args :: body)] -> 
@@ -437,17 +439,20 @@ and analyzeFreeLambda bound (freeRef, args, body) =
     difference free bound
 
 let rec closureConvert cps = 
+    let t = closureConvert
     match cps with
     | Const n as e -> e
     | Ref v -> Ref v
     | Lambda(free, args, body) ->
-        Lambda (free, args, closureConvert body)
+        Lambda (free, args, t body)
     | LetVal((var, Lambda(lambda)), body) ->
         closureConvertLambda var lambda body
     | LetVal((var, rhs), body) ->
-        LetVal((var, closureConvert rhs), closureConvert body)
-    | LetCont(bindings, body) -> failwith "Not Implemented"
-    | LetRec(_, _) -> failwith "Not Implemented"
+        LetVal((var, t rhs), t body)
+    | LetCont((var, args, contBody), body) -> 
+        LetCont((var, args, contBody), body)
+    | LetRec(bindings, body) ->
+        failwith "Not Implemented"
     | If(_, _, _) -> failwith "Not Implemented"
     | Assign(_, _) -> failwith "Not Implemented"
     | Seq(_) -> failwith "Not Implemented"
@@ -459,7 +464,7 @@ let rec closureConvert cps =
     | EnvRef(_) -> failwith "Not Implemented"
 
 and closureConvertLambda var (free, args, lambdaBody) body =
-    let varCode = freshLabel (var + "/code")
+    let varCode = freshCodeLabel var
     LetVal((varCode, Code(args, lambdaBody)), 
         LetVal((var, MakeClosure(varCode :: !free)), 
             closureConvert body))
