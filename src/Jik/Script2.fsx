@@ -835,6 +835,8 @@ runTest "(cdr (car (cdr (cons 1 (cons (cons 2 ()) (cons 3 ()))))))" "()"
         (oijewroij 1234))
         (+ x z))
     (let ((w (+ y y)))
-        (+ w y)))))" |> compilePrintInstruction
+        (+ w y)))))"
 
-["(x (lambda (y) y y))" |> stringToSExpr] |> transformLetrecBindings
+"(let ((x 0))
+        (set! x (+ x 1))
+        (if x 1234 4321))" |> compilePrintInstruction

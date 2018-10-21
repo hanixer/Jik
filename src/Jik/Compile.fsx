@@ -46,11 +46,16 @@ open TestDriver
     e
 
 let ts = [
-    "(let ((x 1))
-        (set! x fx+)
-        (x 1 2))", "3\n"
+    // "(let ((x 1))
+    //     (set! x fx+)
+    //     (x 1 2))", "3\n"
+    "(letrec ((fact (lambda (x) 
+    (if (fx< x 2)
+        x
+        (fx* x (fact (fx- x 1)))))))
+  (fact 3))", "6\n"
 ]
 
 
-// runTestsWithName "my" ts
-runAllTests() 
+runTestsWithName "my" ts
+// runAllTests() 

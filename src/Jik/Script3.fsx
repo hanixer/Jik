@@ -177,12 +177,10 @@ type Cps =
     | Const of int
     | Ref of Var
     | Lambda of CpsLambda
-    | Code of (Var list) * Cps
     | LetVal of (Var * Cps) * Cps
     | LetCont of (Var * Var list * Cps) * Cps
     | If of Var * Cps * Cps
     | Assign of Var * Var
-    | Seq of Cps list
     | Call of Var * Var * Var list
     | ContCall of Var * Var list
     | Return of Var
@@ -259,7 +257,6 @@ let rec showCps cps =
         iConcat [iStr v;
                  iStr " <- ";
                  iStr e]
-    | Cps.Seq(es) -> List.map showCps es |> iConcat
     | Call(k, f, v) -> 
         [iStr "call";
          iStr k;
@@ -286,10 +283,6 @@ let rec showCps cps =
         iConcat [iStr "env-ref ";
                  iStr " ";
                  iNum n]
-    | Code(formals, body) ->
-        iConcat [iStr "code "
-                 iInterleave (iStr ",") (List.map iStr formals); iNewline
-                 showCps body]
     | PrimCall(op, args) ->
         iConcat [iStr "prim-call "
                  iStr (sprintf "%A " op)
@@ -297,16 +290,6 @@ let rec showCps cps =
 
 let cpsToString = showCps >> iDisplay
 
-// Higher-order
-//  <exp> ::= (if <simple> <exp> <exp>)
-//         |  (set! <var> <simple>)
-//         |  (lambda (<var>*) <body>)
-//         |  (begin <body>)
-//         |  (<simple> <simple>*)
-//         |  (let ((<var> <exp)) <body>)
-//         |  (letrec ((<var> <exp)*) <body>)
-//  <simple> ::= <literal>
-//            |  <var>
 let rec convert expr cont = 
     match expr with
     | Expr.Ref v -> cont v
@@ -387,81 +370,84 @@ let freeOrNotMany vars bound =
         unionFree acc (freeOrNot var bound)
     List.fold folder [] vars
 
-// takes bound variables and CPS expressions and
+// takes CPS expressions and
 // returns free variables in expression
 // modifies list of free vars in lambdas
-let rec analyzeFreeVars bound cps =
+let rec analyzeFreeVars2 cps =
     match cps with
-    | Const n -> []
-    | Ref v -> freeOrNot v bound
-    | Lambda(freeRef, args, body) ->
-        analyzeFreeLambda bound (freeRef, args, body)
-    | LetVal((var, rhs), body) ->
-        let freeRhs = analyzeFreeVars bound rhs
-        let freeBody = analyzeFreeVars (unionFree bound [var]) body
-        unionFree freeRhs freeBody
-    | LetCont((name, args, contBody), body) -> 
-        let free = analyzeFreeVars (unionFree bound args) body
-        let freeBody = analyzeFreeVars (unionFree bound [name]) body
-        unionFree free freeBody
-    | If(cond, conseq, altern) ->
-        let freeCond = freeOrNot cond bound
-        let freeConseq = analyzeFreeVars bound conseq
-        let freeAltern = analyzeFreeVars bound altern
-        unionFree freeCond <| unionFree freeConseq freeAltern
-    | Assign(var, rhs) ->
-        unionFree (freeOrNot var bound) (freeOrNot rhs bound)
-    | Seq exprs ->
-        let folder acc expr = 
-            let free = analyzeFreeVars bound expr
-            unionFree acc free
-        List.fold folder [] exprs
-    | Call(k, func, args) -> 
-        freeOrNotMany (k :: func :: args) bound
-    | ContCall(k, args) -> 
-        freeOrNotMany (k :: args) bound
-    | Return(v) -> 
-        freeOrNot v bound
-    | PrimCall(op, args) ->
-        freeOrNotMany args bound
-    | _ -> failwith "analyzeFreeVars: invalid case"
+    | Lambda(freeRef, formals, body) ->
+        let free = analyzeFreeVars2 body
+        let free = difference free formals
+        freeRef := free
+        free
+    | LetVal((var, rhs), body) -> 
+        let freeRhs = analyzeFreeVars2 rhs
+        let free = difference (analyzeFreeVars2 body) [var]
+        unionFree freeRhs free
+    | LetCont((var, formals, contBody), body) -> 
+        let freeCont = difference (analyzeFreeVars2 contBody) formals
+        let free = difference (analyzeFreeVars2 body) [var]
+        unionFree freeCont free
+    | If(cond, conseq, altern) -> 
+        [cond]
+        |> unionFree (analyzeFreeVars2 conseq)
+        |> unionFree (analyzeFreeVars2 altern)
+    | Assign(var, rhs) -> [var; rhs]
+    | Call(k, f, args) -> k :: f :: args
+    | ContCall(k, args) -> k :: args
+    | Ref(v) -> [v]
+    | Const(_) -> []
+    | Return(v) -> [v]
+    | PrimCall(_, args) -> args
+    | e -> failwithf "analyze free: not implemented for %A" e
 
-and analyzeFreeLambda bound (freeRef, args, body) =
-    let free = analyzeFreeVars args body
-    freeRef := free
-    difference free bound
+type Codes = (Var * Var list * Var list * Cps) list * Cps
 
-let rec closureConvert cps = 
-    let t = closureConvert
-    match cps with
-    | Const n  -> Const n
-    | Ref v -> Ref v
-    | Lambda(free, args, body) ->
-        Lambda (free, args, t body)
-    | LetVal((var, Lambda(lambda)), body) ->
-        closureConvertLambda var lambda body
-    | LetVal((var, rhs), body) ->
-        LetVal((var, t rhs), t body)
-    | LetCont((var, args, contBody), body) -> 
-        LetCont((var, args, contBody), body)
-    | If(cond, conseq, altern) ->
-        failwith "Not Implemented"
-    | Assign(_, _) -> failwith "Not Implemented"
-    | Seq(_) -> failwith "Not Implemented"
-    | Call(_, _, _) -> failwith "Not Implemented"
-    | ContCall(_, _) -> failwith "Not Implemented"
-    | Return(_) -> failwith "Not Implemented"
-    | MakeClosure(_) -> failwith "Not Implemented"
-    | ClosureCall(_, _) -> failwith "Not Implemented"
-    | EnvRef(_) -> failwith "Not Implemented"
-    | Code(formals, body) -> failwith "Not Implemented"
-    | PrimCall(_, _) -> failwith "Not Implemented"
+// Converts CPS expression into list of first-order 'codes' - procedures,
+// followed by main expression.
+let rec cpsToCodes cps : Codes = 
+    let rec transform cps codes =
+        match cps with
+        | Lambda(free, formals, body) ->
+            let body, codes1 = transform body codes
+            let codeName = freshLabel "code"
+            let code = (codeName, !free, formals, body)
+            MakeClosure(codeName :: !free), (code :: codes1)
+        | LetVal((var, rhs), body) ->
+            let rhs, codes1 = transform rhs codes
+            let body, codes2 = transform body codes1
+            LetVal((var, rhs), body), codes2            
+        | LetCont((var, args, contBody), body) -> 
+            let contBody, codes1 = transform contBody codes
+            let body, codes2 = transform body codes1
+            LetCont((var, args, contBody), body), codes2
+        | If(cond, conseq, altern) ->
+            let conseq, codes1 = transform conseq codes
+            let altern, codes2 = transform altern codes1
+            If(cond, conseq, altern), codes2
+        | _ as e -> e, codes
+    let e, codes = transform cps []
+    codes, e
 
-and closureConvertLambda var (free, args, lambdaBody) body =
-    let varCode = freshCodeLabel var
-    LetVal((varCode, Code(args, lambdaBody)), 
-        LetVal((var, MakeClosure(varCode :: !free)), 
-            closureConvert body))
+let showCommaSep strings =
+    iInterleave (iStr ",") (List.map iStr strings)
+
+let showCodes (codes, cps) =
+    let codes =
+      List.map (fun (name, free, formals, body) ->
+        iConcat 
+            [iStr name; 
+             iStr " <"; 
+             showCommaSep free;
+             iStr "> ";
+             iStr "("
+             showCommaSep formals;
+             iStr ")"; iNewline;
+             showCps body; iNewline; iStr "--------"; iNewline]) 
+        codes
+    iAppend (iConcat codes) (showCps cps)
+
+let codesToString = showCodes >> iDisplay
 
 let stringToExpr = stringToSExpr >> sexprToExpr
 
@@ -478,14 +464,6 @@ let tryRename s =
     |> alphaRename Map.empty
     |> printfn "%A"
 
-let testFree s =
-    let cps =
-        stringToSExpr s
-        |> sexprToExpr
-        |> exprToCps
-    printfn "before:\n%A\n\n\nafter:" cps
-    printfn "%A\n\n---\n\n%A" (analyzeFreeVars [] cps) cps
-
 let test s =
     let cps =
         s
@@ -493,9 +471,10 @@ let test s =
         |> sexprToExpr
         |> assignmentConvert
         |> exprToCps
-    let _ = analyzeFreeVars [] cps
+    let _ = analyzeFreeVars2 cps
     cps
-    |> cpsToString
+    |> cpsToCodes
+    |> codesToString
     |> printfn "%s"
 
 let testModified s =
@@ -531,5 +510,9 @@ let testModified s =
         (if x 1234 4321)))"
 "(let ((x 0))
         (set! x (+ x 1))
-        (if x 1234 4321))" |> test
-1
+        (if x 1234 4321))"
+"(letrec ((fact (lambda (x) 
+    (if (< x 2)
+        x
+        (* x (fact (- x 1)))))))
+  (fact 5))" |> test
