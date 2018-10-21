@@ -25,6 +25,10 @@ type Prim =
     | BoxRead
     | BoxWrite
     | BoxCreate
+    | Add
+    | Sub
+    | Mul
+    | Lt
 
 type Expr = 
     | Int of int
@@ -48,6 +52,19 @@ let freshLabel =
         sprintf "%s%d" prefix count
 
 let freshCodeLabel prefix = freshLabel (prefix + "/code")
+
+let stringPrimop = [
+    "+", Add
+    "-", Sub
+    "*", Mul
+    "<", Lt
+]
+
+let tryStringToPrimop s =
+    List.tryFind (fst >> ((=) s)) stringPrimop
+    |> Option.map snd
+
+let isPrimop = tryStringToPrimop >> Option.isSome
 
 let rec sexprToExpr sexpr = 
     let convertList = List.map sexprToExpr
@@ -93,6 +110,9 @@ let rec sexprToExpr sexpr =
             List.foldBack foldSets bindings body
         exprsToList (Symbol "let" :: letBindings :: body)
         |> sexprToExpr
+    | List(Symbol op :: tail) when isPrimop op ->
+        let op = tryStringToPrimop op
+        PrimApp(Option.get op, convertList tail)
     | List(head :: tail) -> App(sexprToExpr head, convertList tail)
     | e -> failwith <| sexprToString e
 
