@@ -359,9 +359,14 @@ and convertApp func args cont =
 
 and convertIf cond ethen eelse cont = 
     convert cond (fun condVar -> 
-        let thenk = convert ethen cont
-        let elsek = convert eelse cont
-        If(condVar, thenk, elsek))
+        let ifResKVar = freshLabel "ifResk"
+        let ifResVar = freshLabel "ifRes"
+        let cont2 var =
+            ContCall(ifResKVar, [var])
+        let thenk = convert ethen cont2
+        let elsek = convert eelse cont2
+        LetCont((ifResKVar, [ifResVar], cont ifResVar),
+            If(condVar, thenk, elsek)))
 
 and convertAssign var rhs cont = 
     convert rhs (fun value -> 
