@@ -122,43 +122,30 @@ let rec alphaRename mapping =
     | Begin exprs -> Begin(List.map (alphaRename mapping) exprs)
     | App(func, argsExprs) -> 
         App(alphaRename mapping func, List.map (alphaRename mapping) argsExprs)
+    | PrimApp(op, args) ->
+        PrimApp(op, List.map (alphaRename mapping) args)
 
-
-let rec findModifiedVars (vars : string seq) expr =
+let rec findModifiedVars expr =
+    let find = findModifiedVars
+    let findMany = List.map find >> Set.unionMany
     match expr with
-    | Ref name -> 
-        Set.empty
+    | Ref _ -> Set.empty
     | If (cond, thenc, elsec) ->
-        Set.unionMany [
-            findModifiedVars vars cond
-            findModifiedVars vars thenc
-            findModifiedVars vars elsec
-        ]
+        findMany [cond; thenc; elsec]
     | Assign (v, rhs) ->
-        if Seq.contains v vars then Set.singleton v else Set.empty 
-        |> Set.union (findModifiedVars vars rhs) 
+        Set.add v (find rhs)
     | App (head, tail) ->
-        findModifiedVarsList vars tail
-        |> Set.union (findModifiedVars vars head) 
+        findMany (head :: tail)
     | Lambda (args, body) ->
-        let vars' = (Set.difference (Set.ofSeq vars) (Set.ofList args))
-        findModifiedVarsList vars' body
+        findMany body
     | Begin exprs ->
-        findModifiedVarsList vars exprs
+        findMany exprs
     | _ -> Set.empty
-
-and findModifiedVarsList vars exprList =
-    List.map (findModifiedVars vars) exprList
-    |> Set.unionMany
-
-let findModiedVarsInBody free argVars body =
-    let sets = findModifiedVarsList (Set.ofSeq argVars) body 
-    Set.union sets (Set.intersect sets (Set.ofSeq free))
 
 let assignmentConvert expr =
     let alpha = alphaRename Map.empty expr
-    let modified = findModifiedVars Seq.empty expr 
-    let rec boxify = function
+    let modified = findModifiedVars alpha
+    let rec transform = function
         | Int n -> Int n
         | Ref var ->
             if modified.Contains var then
@@ -166,24 +153,23 @@ let assignmentConvert expr =
             else
                 Ref var
         | If(cond, conseq, altern) ->
-            If(t cond, t conseq, t altern)
+            If(transform cond, transform conseq, transform altern)
         | Assign(var, rhs) -> 
-            PrimApp(BoxWrite, [Ref var; t rhs])
+            PrimApp(BoxWrite, [Ref var; transform rhs])
         | Lambda(args, body) -> 
             boxifyLambda args body
-        | Begin exprs -> Begin(List.map t exprs)
-        | App(func, args) -> App(t func, List.map t args)
-        | PrimApp(op, args) -> PrimApp(op, List.map t args)
-    and t = boxify
+        | Begin exprs -> Begin(List.map transform exprs)
+        | App(func, args) -> App(transform func, List.map transform args)
+        | PrimApp(op, args) -> PrimApp(op, List.map transform args)
     and boxifyLambda args body =
         let folder var body =
             if modified.Contains var then
                 PrimApp(BoxCreate, [Ref var]) :: body
             else
                 body
-        let body = List.foldBack folder args (List.map t body)
+        let body = List.foldBack folder args (List.map transform body)
         Lambda(args, body)
-    boxify alpha
+    transform alpha
 
 type Var = string
 
@@ -203,10 +189,9 @@ type Cps =
     | MakeClosure of Var list
     | ClosureCall of Var * Var list
     | EnvRef of int
+    | PrimCall of Prim * Var list
 
 and CpsLambda = ((Var list) ref) * (Var list) * Cps
-
-
 
 let rec showCps cps = 
     let funclike needEq s (free : Var list ref) args body = 
@@ -301,7 +286,14 @@ let rec showCps cps =
         iConcat [iStr "env-ref ";
                  iStr " ";
                  iNum n]
-    | Code(_, _) -> failwith "Not Implemented"
+    | Code(formals, body) ->
+        iConcat [iStr "code "
+                 iInterleave (iStr ",") (List.map iStr formals); iNewline
+                 showCps body]
+    | PrimCall(op, args) ->
+        iConcat [iStr "prim-call "
+                 iStr (sprintf "%A " op)
+                 iInterleave (iStr ",") (List.map iStr args); iNewline]
 
 let cpsToString = showCps >> iDisplay
 
@@ -326,6 +318,16 @@ let rec convert expr cont =
     | Expr.Assign(var, rhs) -> convertAssign var rhs cont
     | Expr.Lambda(args, body) -> convertLambda args body cont
     | Expr.Begin(exprs) -> convertBegin exprs cont
+    | Expr.PrimApp(op, args) ->
+        let rec loop vars = 
+            function 
+            | [] -> 
+                let vars = List.rev vars
+                let var = freshLabel "primResult"
+                LetVal((var, PrimCall(op, vars)), cont var)
+            | arg :: args -> 
+                convert arg (fun argVar -> loop (argVar :: vars) args)
+        loop [] args
 
 and convertApp func args cont = 
     convert func (fun funcVar -> 
@@ -420,6 +422,8 @@ let rec analyzeFreeVars bound cps =
         freeOrNotMany (k :: args) bound
     | Return(v) -> 
         freeOrNot v bound
+    | PrimCall(op, args) ->
+        freeOrNotMany args bound
     | _ -> failwith "analyzeFreeVars: invalid case"
 
 and analyzeFreeLambda bound (freeRef, args, body) =
@@ -430,7 +434,7 @@ and analyzeFreeLambda bound (freeRef, args, body) =
 let rec closureConvert cps = 
     let t = closureConvert
     match cps with
-    | Const n as e -> e
+    | Const n  -> Const n
     | Ref v -> Ref v
     | Lambda(free, args, body) ->
         Lambda (free, args, t body)
@@ -450,12 +454,16 @@ let rec closureConvert cps =
     | MakeClosure(_) -> failwith "Not Implemented"
     | ClosureCall(_, _) -> failwith "Not Implemented"
     | EnvRef(_) -> failwith "Not Implemented"
+    | Code(formals, body) -> failwith "Not Implemented"
+    | PrimCall(_, _) -> failwith "Not Implemented"
 
 and closureConvertLambda var (free, args, lambdaBody) body =
     let varCode = freshCodeLabel var
     LetVal((varCode, Code(args, lambdaBody)), 
         LetVal((var, MakeClosure(varCode :: !free)), 
             closureConvert body))
+
+let stringToExpr = stringToSExpr >> sexprToExpr
 
 let tryit s = 
     stringToSExpr s
@@ -478,12 +486,24 @@ let testFree s =
     printfn "before:\n%A\n\n\nafter:" cps
     printfn "%A\n\n---\n\n%A" (analyzeFreeVars [] cps) cps
 
-let testMutable s =
+let test s =
+    let cps =
+        s
+        |> stringToSExpr
+        |> sexprToExpr
+        |> assignmentConvert
+        |> exprToCps
+    let _ = analyzeFreeVars [] cps
+    cps
+    |> cpsToString
+    |> printfn "%s"
+
+let testModified s =
     s
-    |> stringToSExpr
-    |> sexprToExpr
-    |> assignmentConvert
+    |> stringToExpr
+    |> findModifiedVars
     |> printfn "%A"
+    
 
 "(letrec (
 (sort (lambda (lst)
@@ -508,4 +528,8 @@ let testMutable s =
           (g (lambda (y) (opera f g y))))
     (let ((x 0))
         (set! x (+ x 1))
-        (set! global x)))" |> testMutable
+        (if x 1234 4321)))"
+"(let ((x 0))
+        (set! x (+ x 1))
+        (if x 1234 4321))" |> test
+1

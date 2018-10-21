@@ -282,7 +282,7 @@ let extend env bindings =
 let getTopEnv env = 
     [List.last env]
 
-let stringToSExpr s = s |> tokenize |> parse
+let stringToSExpr (s : string) = s |> tokenize |> parse
 
 let symbolsToStrings sexprs =
     List.map (function
