@@ -21,6 +21,11 @@ open System.Text
 //         |  (begin <body>)
 //         |  (<exp> <exp>*)
 //         |  (let ((<var> <exp)*) <body>)
+type Prim =
+    | BoxRead
+    | BoxWrite
+    | BoxCreate
+
 type Expr = 
     | Int of int
     | Ref of string
@@ -29,6 +34,7 @@ type Expr =
     | Lambda of LambdaData
     | Begin of Expr list
     | App of Expr * Expr list
+    | PrimApp of Prim * Expr list
 
 and LambdaData = string list * Expr list
 
@@ -116,6 +122,68 @@ let rec alphaRename mapping =
     | Begin exprs -> Begin(List.map (alphaRename mapping) exprs)
     | App(func, argsExprs) -> 
         App(alphaRename mapping func, List.map (alphaRename mapping) argsExprs)
+
+
+let rec findModifiedVars (vars : string seq) expr =
+    match expr with
+    | Ref name -> 
+        Set.empty
+    | If (cond, thenc, elsec) ->
+        Set.unionMany [
+            findModifiedVars vars cond
+            findModifiedVars vars thenc
+            findModifiedVars vars elsec
+        ]
+    | Assign (v, rhs) ->
+        if Seq.contains v vars then Set.singleton v else Set.empty 
+        |> Set.union (findModifiedVars vars rhs) 
+    | App (head, tail) ->
+        findModifiedVarsList vars tail
+        |> Set.union (findModifiedVars vars head) 
+    | Lambda (args, body) ->
+        let vars' = (Set.difference (Set.ofSeq vars) (Set.ofList args))
+        findModifiedVarsList vars' body
+    | Begin exprs ->
+        findModifiedVarsList vars exprs
+    | _ -> Set.empty
+
+and findModifiedVarsList vars exprList =
+    List.map (findModifiedVars vars) exprList
+    |> Set.unionMany
+
+let findModiedVarsInBody free argVars body =
+    let sets = findModifiedVarsList (Set.ofSeq argVars) body 
+    Set.union sets (Set.intersect sets (Set.ofSeq free))
+
+let assignmentConvert expr =
+    let alpha = alphaRename Map.empty expr
+    let modified = findModifiedVars Seq.empty expr 
+    let rec boxify = function
+        | Int n -> Int n
+        | Ref var ->
+            if modified.Contains var then
+                PrimApp(BoxRead, [Ref var])
+            else
+                Ref var
+        | If(cond, conseq, altern) ->
+            If(t cond, t conseq, t altern)
+        | Assign(var, rhs) -> 
+            PrimApp(BoxWrite, [Ref var; t rhs])
+        | Lambda(args, body) -> 
+            boxifyLambda args body
+        | Begin exprs -> Begin(List.map t exprs)
+        | App(func, args) -> App(t func, List.map t args)
+        | PrimApp(op, args) -> PrimApp(op, List.map t args)
+    and t = boxify
+    and boxifyLambda args body =
+        let folder var body =
+            if modified.Contains var then
+                PrimApp(BoxCreate, [Ref var]) :: body
+            else
+                body
+        let body = List.foldBack folder args (List.map t body)
+        Lambda(args, body)
+    boxify alpha
 
 type Var = string
 
@@ -410,6 +478,13 @@ let testFree s =
     printfn "before:\n%A\n\n\nafter:" cps
     printfn "%A\n\n---\n\n%A" (analyzeFreeVars [] cps) cps
 
+let testMutable s =
+    s
+    |> stringToSExpr
+    |> sexprToExpr
+    |> assignmentConvert
+    |> printfn "%A"
+
 "(letrec (
 (sort (lambda (lst)
     (if (pair? lst)
@@ -428,7 +503,9 @@ let testFree s =
 "(let ((f (lambda (a) (lambda (b) (+ a b)))))
     ((f 1) 2))"
 "(lambda (a) (lambda (b) (lambda (c) (+ a b c))))"
-"(lambda (a) (lambda (b) (opera a b)))"|> testFree
+"(lambda (a) (lambda (b) (opera a b)))"
 "(letrec ((f (lambda (x) (opera f g x)))
           (g (lambda (y) (opera f g y))))
-    1)" 
+    (let ((x 0))
+        (set! x (+ x 1))
+        (set! global x)))" |> testMutable
