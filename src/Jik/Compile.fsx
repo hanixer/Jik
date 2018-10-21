@@ -49,11 +49,12 @@ let ts = [
     // "(let ((x 1))
     //     (set! x fx+)
     //     (x 1 2))", "3\n"
-    "(letrec ((fact (lambda (x) 
-    (if (fx< x 2)
-        x
-        (fx* x (fact (fx- x 1)))))))
-  (fact 3))", "6\n"
+//     "(letrec ((fact (lambda (x) 
+//     (if (fx< x 2)
+//         x
+//         (fx* x (fact (fx- x 1)))))))
+//   (fact 3))", "6\n"
+    "(fx+ 1 (fx* 22 33))", "55\n"
 ]
 
 

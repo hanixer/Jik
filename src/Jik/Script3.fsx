@@ -21,6 +21,16 @@ open System.Text
 //         |  (begin <body>)
 //         |  (<exp> <exp>*)
 //         |  (let ((<var> <exp)*) <body>)
+
+/// TODO:
+/// 1. Code generation.
+///     - For beginning, compile just a simple arithmetic expressions.
+///     - Let-bound variables arithmetic.
+///     - Next, compile conditional.
+///     - Function calls.
+///     - Recursive function calls.
+///     - Closures.
+
 type Prim =
     | BoxRead
     | BoxWrite
@@ -393,25 +403,25 @@ let freeOrNotMany vars bound =
 // takes CPS expressions and
 // returns free variables in expression
 // modifies list of free vars in lambdas
-let rec analyzeFreeVars2 cps =
+let rec analyzeFreeVars cps =
     match cps with
     | Lambda(freeRef, formals, body) ->
-        let free = analyzeFreeVars2 body
+        let free = analyzeFreeVars body
         let free = difference free formals
         freeRef := free
         free
     | LetVal((var, rhs), body) -> 
-        let freeRhs = analyzeFreeVars2 rhs
-        let free = difference (analyzeFreeVars2 body) [var]
+        let freeRhs = analyzeFreeVars rhs
+        let free = difference (analyzeFreeVars body) [var]
         unionFree freeRhs free
     | LetCont((var, formals, contBody), body) -> 
-        let freeCont = difference (analyzeFreeVars2 contBody) formals
-        let free = difference (analyzeFreeVars2 body) [var]
+        let freeCont = difference (analyzeFreeVars contBody) formals
+        let free = difference (analyzeFreeVars body) [var]
         unionFree freeCont free
     | If(cond, conseq, altern) -> 
         [cond]
-        |> unionFree (analyzeFreeVars2 conseq)
-        |> unionFree (analyzeFreeVars2 altern)
+        |> unionFree (analyzeFreeVars conseq)
+        |> unionFree (analyzeFreeVars altern)
     | Assign(var, rhs) -> [var; rhs]
     | Call(k, f, args) -> k :: f :: args
     | ContCall(k, args) -> k :: args
@@ -424,15 +434,13 @@ let rec analyzeFreeVars2 cps =
 type Codes = (Var * Var list * Var list * Cps) list * Cps
 
 // Converts CPS expression into list of first-order 'codes' - procedures,
-// followed by main expression.
+// which do not contain nested procedures.
+// Codes are followed by main expression.
 let rec cpsToCodes cps : Codes = 
     let rec transform cps codes =
         match cps with
-        | Lambda(free, formals, body) ->
-            let body, codes1 = transform body codes
-            let codeName = freshLabel "code"
-            let code = (codeName, !free, formals, body)
-            MakeClosure(codeName :: !free), (code :: codes1)
+        | LetVal((var, Lambda(free, formals, lambdaBody)), body) ->
+            transformLambda var free formals lambdaBody body codes
         | LetVal((var, rhs), body) ->
             let rhs, codes1 = transform rhs codes
             let body, codes2 = transform body codes1
@@ -446,7 +454,20 @@ let rec cpsToCodes cps : Codes =
             let altern, codes2 = transform altern codes1
             If(cond, conseq, altern), codes2
         | _ as e -> e, codes
+
+    and transformLambda var free formals lambdaBody body codes =
+        let body, codes1 = transform body codes
+        let lambdaBody, codes2 = transform lambdaBody codes1
+        if List.isEmpty !free then
+            let code = (var, !free, formals, lambdaBody)
+            body, (code :: codes2)
+        else
+            let codeName = freshLabel "code"
+            let codes3 = (codeName, !free, formals, lambdaBody) :: codes2
+            MakeClosure(codeName :: !free), codes3
+
     let e, codes = transform cps []
+
     codes, e
 
 let showCommaSep strings =
@@ -491,7 +512,7 @@ let test s =
         |> sexprToExpr
         |> assignmentConvert
         |> exprToCps
-    let _ = analyzeFreeVars2 cps
+    let _ = analyzeFreeVars cps
     cps
     |> cpsToCodes
     |> codesToString
@@ -535,4 +556,6 @@ let testModified s =
     (if (< x 2)
         x
         (* x (fact (- x 1)))))))
-  (fact 5))" |> test
+  (fact 5))"
+"(+ 1 (* 22 33)))" 
+"(if (if 1 2 3) (if 111 222 333) 33)" |> test
