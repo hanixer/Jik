@@ -1,12 +1,17 @@
 #load "Base.fs"
-open System.Collections.Generic
 #load "Util.fs"
 #load "Display.fs"
+#load "TestDriver.fs"
+#load "RuntimeConstants.fs"
 
 open System
 open Base
 open Display
+open TestDriver
+open RuntimeConstants
 open System.Text
+open System.Collections.Generic
+open System.IO
 
 // Supported features:
 //  - integers
@@ -265,7 +270,7 @@ let rec showCps cps =
                                   showCps e;
                                   iNewline]));
                  iNewline;
-                 iStr " in ";
+                 iStr "in ";
                  showCps body]
     | Cps.LetCont(bindings, body) -> 
         let v, args, e = bindings
@@ -497,6 +502,155 @@ let codesToString = showCodes >> iDisplay
 
 let stringToExpr = stringToSExpr >> sexprToExpr
 
+let stringToCps2 = stringToSExpr >> sexprToExpr >> assignmentConvert >> exprToCps
+
+////////////////////////////////////////////////////
+/// Machine code generation section
+
+/// Passes from CPS to x86
+/// - selectInstr - select instructions
+/// - assignHomes
+/// - patchInstr
+/// - print to string
+
+type Register =
+    | Rsp | Rbp | Rax | Rbx | Rcx | Rdx | Rsi | Rdi 
+    | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15
+
+type Operand =
+    | Int of int
+    | Reg of Register
+    | Deref of int * Register
+    | Var of Var
+
+type InstrName =
+    | Add
+    | Sub
+    | Neg
+    | Mov
+    | Call
+    | Push
+    | Pop
+    | Ret
+
+type Instr = InstrName * Operand list
+
+let showInstrs out instrs =
+    let showOp op =
+        let s = sprintf "%A" op
+        fprintf out "%s" (s.ToLower() + "q ")
+
+    let reg r = 
+        let s = sprintf "%%%A" r
+        s.ToLower()
+
+    let showArg = function
+        | Int n -> fprintf out "$%d" n
+        | Reg(r) -> fprintf out "%s" (reg r)
+        | Deref(n, r) -> fprintf out "%d(%s)" n (reg r)
+        | Var(v) -> fprintf out "[var %s]" v
+        
+    let showArgs args =
+        List.iteri (fun i arg -> 
+            showArg arg
+            if i <> List.length args - 1 then
+                fprintf out ", ") args
+
+    List.iter (fun (op, args) ->
+        fprintf out "    "
+        showOp op
+        showArgs args
+        fprintfn out "") instrs
+
+let instrsToString instrs =
+    let out = new StringWriter()
+    fprintfn out "    .globl schemeEntry"
+    fprintfn out "schemeEntry:"
+    showInstrs out instrs
+    out.ToString()
+
+let rec selectInstr cps =
+    let fixNumber n = n <<< fixnumShift |> Int
+    let opToOp op = if op = Prim.Add then Add else Sub
+
+    let prim dest (op, args) = 
+        match (op, args) with
+        | (Prim.Add, [var1; var2])
+        | (Prim.Sub, [var1; var2]) ->
+            let op = opToOp op
+            match dest with
+            | None ->
+                [Mov, [Var var1; Reg Rax]
+                 op, [Var var2; Reg Rax]]
+            | Some dest ->
+                [Mov, [Var var1; dest]
+                 op, [Var var2; dest]]
+        | _ -> failwith "prim:"
+
+    match cps with
+    | Const n -> [Mov, [fixNumber n; Reg Rax ]]
+    | PrimCall(op, args) -> prim None (op, args)
+    | LetVal((var, Cps.Const n), body) ->
+        let body = selectInstr body
+        [Mov, [fixNumber n; Var var]] @ body
+    | LetVal((var, PrimCall(op, args)), body) ->
+        let rhs = prim (Some (Var var)) (op, args)
+        let body = selectInstr body
+        rhs @ body
+    | LetVal((var, rhs), body) ->
+        let rhs = selectInstr rhs
+        let body = selectInstr body
+        rhs @ [Mov, [Reg Rax; Var var]] @ body
+    | Return var ->
+        [Mov, [Var var; Reg Rax]
+         Ret, []]
+    | e -> failwithf "selectInstr: not implemented %A" e
+    
+let rec assignHomes instrs =
+    let mutable count = 0
+    let env = Dictionary<string, int>()
+
+    let handleArg = function
+        | Var var ->
+            if not <| env.ContainsKey var then
+                count <- count - 8
+                env.Add(var, count)
+            Deref(env.Item var, Rbp)
+        | arg -> arg
+
+    let handleInstr(op, args) =
+        op, List.map handleArg args
+
+    List.map handleInstr instrs
+
+let rec patchInstr instrs =
+    let transform = function
+        | op, [Deref(n, Rbp); Deref(m, Rbp)] ->
+            [Mov, [Deref(n,  Rbp); Reg Rax];
+             op, [Reg Rax; Deref(m,  Rbp)]]
+        | e -> [e]
+
+    List.collect transform instrs
+
+let dbg func =
+    (fun x -> let y = func x in printfn "%s" (instrsToString y); y)
+
+let compile s =
+    let cps = stringToCps2 s
+    let instrs = cps |> dbg selectInstr |> dbg assignHomes |> dbg patchInstr    
+    let out = instrsToString instrs
+
+    printfn "%s" (cpsToString cps)
+    printfn "----"
+    printfn "%s" (out.ToString())
+    printfn "----"
+    printfn "----"
+
+    out.ToString()
+
+/////////////////////////////////////////////////////////////////
+/// Testing
+
 let tryit s = 
     stringToSExpr s
     |> sexprToExpr
@@ -528,7 +682,13 @@ let testModified s =
     |> stringToExpr
     |> findModifiedVars
     |> printfn "%A"
-    
+let testSelIn s =
+    stringToCps2 s |> selectInstr |> printfn "%A"
+let testAssignHomes s =
+    stringToCps2 s 
+    // |> selectInstr 
+    //|> assignHomes 
+    |> printfn "%A"
 
 "(letrec (
 (sort (lambda (lst)
@@ -543,7 +703,7 @@ let testModified s =
                 (cons elem (cons x l))
                 (cons x (insert elem l))))
         (cons elem 1)))))
-    (sort (cons 333 (cons 222 (cons 111 1)))))"
+    (sort (cons 333 (cons 222 (cons 111 1)))))" |> test
 "1"
 "(let ((f (lambda (a) (lambda (b) (+ a b)))))
     ((f 1) 2))"
@@ -562,5 +722,13 @@ let testModified s =
         x
         (* x (fact (- x 1)))))))
   (fact 5))"
-"(+ 1 (* 22 33)))" 
-"(if (if 1 2 3) (if 111 222 333) 33)" |> test
+"(if (if 1 2 3) (if 111 222 333) 33)" 
+"(+ 1 (- 22 33)))"
+"(let ((a 1))
+    (let ((b 2))
+        (+ a b)))"
+
+runTestsWithName compile "basic" [
+    // "1", "1\n"
+    // "(+ 1 (- 22 33)))", "-10\n"
+]

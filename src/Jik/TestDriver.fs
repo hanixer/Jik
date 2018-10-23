@@ -1,6 +1,5 @@
 module TestDriver
 
-open Compile
 open System
 open System.IO
 
@@ -26,7 +25,7 @@ let runCompiled () =
 
 let mutable testCases : List<string * (List<string * string>)> = []
 
-let runTest input =
+let runTest compile input =
     let prevCD = Environment.CurrentDirectory
     Environment.CurrentDirectory <- miscPath
     let prevPath = System.Environment.GetEnvironmentVariable("PATH")
@@ -53,10 +52,10 @@ let runTest input =
 let addTests str tests =
     testCases <- (str, tests) :: testCases
 
-let runTestsWithName testName tests =
+let runTestsWithName compile testName tests =
     let fold (passed, i) (input, expected) =
         try
-            let output = runTest input
+            let output = runTest compile input
             if output <> expected then
                 printfn "FAIL! Test<%s> #%d\nexpected:\n<%s>\ngot:\n<%s>\ninput:\n%s\n" testName i expected output input
                 passed, i + 1
@@ -69,10 +68,10 @@ let runTestsWithName testName tests =
 
     List.fold fold (0, 1) tests |> fst
 
-let runAllTests () =
+let runAllTests compile =
     let tests = List.rev testCases
     List.iter (fun (testName, tests) ->
-        let passed = runTestsWithName testName tests          
+        let passed = runTestsWithName compile testName tests          
         printfn "-- Test <%s>: passed <%d> of <%d> \n\n" 
             testName passed (tests.Length))
         tests

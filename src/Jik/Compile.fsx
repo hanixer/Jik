@@ -1,3 +1,4 @@
+#load "RuntimeConstants.fs"
 #load "Base.fs"
 #load "Util.fs"
 #load "Compile.fs"
@@ -58,5 +59,5 @@ let ts = [
 ]
 
 
-runTestsWithName "my" ts
+runTestsWithName Compile.compile "my" ts
 // runAllTests() 
