@@ -325,6 +325,22 @@ let rec showCps cps =
 
 let cpsToString = showCps >> iDisplay
 
+let rec replaceVars mapping expr =
+    let transf = replaceVars mapping
+    let replace var = 
+        match Map.tryFind var mapping with
+        | Some var2 -> var2
+        | _ -> var
+    match expr with
+    | Expr.Ref var -> replace var |> Expr.Ref
+    | Expr.Int n -> Expr.Int n
+    | Expr.If(cond, conseq, altern) -> Expr.If(transf cond, transf conseq, transf altern)
+    | Expr.Assign(var, rhs) -> Expr.Assign(replace var, transf rhs)
+    | Expr.Lambda(args, body) -> Expr.Lambda(args, List.map transf body)
+    | Expr.Begin(exprs) -> Expr.Begin(List.map transf exprs)
+    | Expr.App(func, args) -> Expr.App(transf func, List.map transf args)
+    | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
+
 let rec convert expr cont = 
     match expr with
     | Expr.Ref v -> cont v
@@ -348,19 +364,32 @@ let rec convert expr cont =
         loop [] args
 
 and convertApp func args cont = 
-    convert func (fun funcVar -> 
-        let rec loop vars = 
-            function 
-            | [] -> 
+    let rec accumulateArgs receiveVars vars = 
+        function 
+        | [] -> 
+            let vars = List.rev vars
+            receiveVars vars
+        | arg :: rest -> 
+            convert arg (fun argVar -> 
+                accumulateArgs receiveVars (argVar :: vars) rest)
+
+    match func with
+    | Expr.Lambda(formals, body) ->
+        accumulateArgs (fun vars ->        
+            let vars = List.rev vars
+            let mapping = 
+                List.zip formals vars |> Map.ofList
+            let body = replaceVars mapping (Begin body)
+            convert body cont) [] args
+    | _ ->
+        convert func (fun funcVar -> 
+            accumulateArgs (fun vars ->      
                 let vars = List.rev vars
                 let contVar = freshLabel "k"
                 let resultVar = freshLabel "callResult"
                 LetCont
                     ((contVar, [resultVar], cont resultVar), 
-                     Call(contVar, funcVar, vars))
-            | arg :: args -> 
-                convert arg (fun argVar -> loop (argVar :: vars) args)
-        loop [] args)
+                     Call(contVar, funcVar, vars))) [] args)
 
 and convertIf cond ethen eelse cont = 
     convert cond (fun condVar -> 
@@ -648,6 +677,38 @@ let compile s =
 
     out.ToString()
 
+let rec computeLiveAfter instrs =
+    let writtenBy (op, args)  = 
+        match op with
+        | Add | Sub | Mov -> 
+            match args with
+            | [_; Var var] -> Set.singleton var
+            | _ -> Set.empty
+        | Neg | Pop ->
+            match args with
+            | [Var var] -> Set.singleton var
+            | _ -> Set.empty
+        | _ -> Set.empty
+
+    let readBy (_, args) =
+        match args with
+        | [Var var1; Var var2] -> Set.ofList [var1; var2]
+        | [_; Var var] -> Set.singleton var
+        | [Var var; _] -> Set.singleton var
+        | [Var var] -> Set.singleton var
+        | _ -> Set.empty
+
+    let folder instr (after, liveAfter) =
+        let w = writtenBy instr
+        let r = readBy instr
+        let before = Set.union (Set.difference after w) r
+        before, after :: liveAfter
+
+    let liveAfter = 
+        List.foldBack folder instrs (Set.empty, [])
+
+    instrs, liveAfter
+
 /////////////////////////////////////////////////////////////////
 /// Testing
 
@@ -703,7 +764,7 @@ let testAssignHomes s =
                 (cons elem (cons x l))
                 (cons x (insert elem l))))
         (cons elem 1)))))
-    (sort (cons 333 (cons 222 (cons 111 1)))))" |> test
+    (sort (cons 333 (cons 222 (cons 111 1)))))"
 "1"
 "(let ((f (lambda (a) (lambda (b) (+ a b)))))
     ((f 1) 2))"
@@ -731,4 +792,7 @@ let testAssignHomes s =
 runTestsWithName compile "basic" [
     // "1", "1\n"
     // "(+ 1 (- 22 33)))", "-10\n"
+        "(let ((a 1))
+    (let ((b 2))
+        (+ a b)))", "3\n"
 ]

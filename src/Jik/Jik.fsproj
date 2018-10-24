@@ -4,19 +4,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="RuntimeConstants.fs" />
-    <Compile Include="Library.fs" />
     <Compile Include="Base.fs" />
     <Compile Include="Display.fs" />
     <Compile Include="Util.fs" />
     <Compile Include="Compile.fs" />
-    <Compile Include="Conversion.fs" />
-    <Compile Include="ContinuationInterpreter.fs" />
     <Compile Include="TestDriver.fs" />
-    <Compile Include="Optimized.fs" />
-    <Compile Include="Optimized2.fs" />
     <Compile Include="Optimized3.fs" />
-    <Compile Include="Optimized4.fs" />
-    <Compile Include="Cps.fs" />
-    <Compile Include="ConversionDriver.fs" />
   </ItemGroup>
 </Project>
