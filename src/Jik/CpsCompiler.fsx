@@ -643,7 +643,8 @@ let instrsToString instrs =
     out.ToString()
 
 let rec selectInstr cps =
-    let fixNumber n = n <<< fixnumShift |> Int
+    // let fixNumber n = n <<< fixnumShift |> Int
+    let fixNumber n = n |> Int
     let opToOp op = if op = Prim.Add then Add else Sub
 
     let prim dest (op, args) = 
@@ -733,15 +734,26 @@ let collectVars instrs =
 let rec buildInterference (instrs, liveAfter) =
     let vars = collectVars instrs
     let graph = makeGraph vars
+    Seq.iter (fun x -> printfn "buildInterference: %A" x) liveAfter
 
-    let iter = function
-        | (Mov, [Var var1; Var var2]), live ->
-            Set.filter (fun x -> x <> var1 && x <> var2) live
-            |> Set.iter (addEdge graph var2)
-        | (op, [Var var1; Var var2]), live when isArithm op ->
-            Set.filter (fun x -> x <> var2) live
-            |> Set.iter (addEdge graph var2)
-        | _ -> ()
+    let filterAndAddEdges ignore live target =
+        Set.difference live (Set.ofList ignore)
+        |> Set.iter (addEdge graph target)
+
+    let iter ((op, args), live) = 
+        match op with
+        | Mov ->
+            match args with
+            | [Var var1; Var var2] ->
+                filterAndAddEdges [var1; var2] live var2
+            | [_; Var var2] ->
+                filterAndAddEdges [var2] live var2
+            | _ -> ()
+        | op ->
+            match args with
+            | [_; Var var2] ->
+                filterAndAddEdges [var2] live var2
+            | _ -> ()
 
     List.zip instrs liveAfter
     |> List.iter iter
@@ -807,31 +819,22 @@ let allocateRegisters (instrs, graph) =
 
     List.map handleInstr instrs
     
-let rec assignHomes instrs =
-    let mutable count = 0
-    let env = Dictionary<string, int>()
-
+let rec patchInstr instrs =
     let handleArg = function
-        | Var var ->
-            if not <| env.ContainsKey var then
-                count <- count - 8
-                env.Add(var, count)
-            Deref(env.Item var, Rbp)
+        | Int n -> (n <<< fixnumShift) |> Int
         | arg -> arg
 
     let handleInstr(op, args) =
         op, List.map handleArg args
 
-    List.map handleInstr instrs
-
-let rec patchInstr instrs =
     let transform = function
         | op, [Deref(n, Rbp); Deref(m, Rbp)] ->
             [Mov, [Deref(n,  Rbp); Reg Rax];
              op, [Reg Rax; Deref(m,  Rbp)]]
         | e -> [e]
 
-    List.collect transform instrs
+    List.map handleInstr instrs
+    |> List.collect (transform)
 
 let dbg func =
     (fun x -> let y = func x in printfn "%s" (instrsToString y); y)
@@ -919,7 +922,8 @@ let testInterf s =
         |> selectInstr
         |> computeLiveAfter
         |> buildInterference
-    printDot graph "misc/dot.gv"
+    instrsToString instrs |> printfn "%s"
+    printDot graph "../../misc/dot.gv"
 
 "(letrec (
 (sort (lambda (lst)
@@ -959,7 +963,7 @@ let testInterf s =
     (let ((b 2))
         (+ a b)))"
 
-runTestsWithName compile "basic" [
+let tests = [
     "1", "1\n"
     "-1", "-1\n"
     "(+ 1 (- 22 33)))", "-10\n"
@@ -975,20 +979,11 @@ runTestsWithName compile "basic" [
 (+ z (- y)))))))", "20\n"
 ]
 
+// runTestsWithName compile "basic" tests
+
 "(let ([v 1])
 (let ([w 46])
 (let ([x (+ v 7)])
 (let ([y (+ 4 x)])
 (let ([z (+ x w)])
-(+ z (- y)))))))"
-let verts = ["w"; "v"; "x"; "y"; "z"; "t1"; "t2"] |> Set.ofList
-let g = makeGraph verts
-addEdge g "v" "w"
-addEdge g "y" "w"
-addEdge g "z" "w"
-addEdge g "x" "w"
-addEdge g "x" "y"
-addEdge g "z" "t1"
-addEdge g "z" "y"
-addEdge g "t2" "t1"
-// colorGraph g verts |> printfn "%A\n-----\n\n"
+(+ z (- y)))))))" |> testInterf
