@@ -101,7 +101,9 @@ let compile s =
         emitn "  mov %rsp, %r15"
         emitn "  mov %rcx, %rsp"   
         emitn "  mov %rdx, %rbp"
+        emitn "\n\n\n"
         emitExpr env si body
+        emitn "\n\n\n"
         emitn "  mov %r15, %rsp"
         emitn "  pop %r15"
         emitn "  pop %rdi"

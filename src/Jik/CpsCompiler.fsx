@@ -531,8 +531,8 @@ let codesToString = showCodes >> iDisplay
 
 let stringToExpr = stringToSExpr >> sexprToExpr
 
-let stringToCps2 = stringToSExpr >> sexprToExpr >> assignmentConvert >> exprToCps
 
+let stringToCps2 = stringToSExpr >> sexprToExpr >> assignmentConvert >> exprToCps
 ////////////////////////////////////////////////////
 /// Machine code generation section
 
@@ -557,6 +557,8 @@ type InstrName =
     | Sub
     | Neg
     | Mov
+    | Sar
+    | Sal
     | Call
     | Push
     | Pop
@@ -614,7 +616,14 @@ let rec selectInstr cps =
             | Some dest ->
                 [Mov, [Var var1; dest]
                  op, [Var var2; dest]]
-        | _ -> failwith "prim:"
+        | Prim.Sub, [var] ->
+            match dest with
+            | None ->
+                [Neg, [Var var]]
+            | Some dest ->
+                [Mov, [Var var; dest]
+                 Neg, [dest]]
+        | e -> failwithf "prim: %A %A" e (cpsToString cps)
 
     match cps with
     | Const n -> [Mov, [fixNumber n; Reg Rax ]]
@@ -690,24 +699,54 @@ let rec computeLiveAfter instrs =
             | _ -> Set.empty
         | _ -> Set.empty
 
-    let readBy (_, args) =
+    let readBy (op, args) =
         match args with
-        | [Var var1; Var var2] -> Set.ofList [var1; var2]
-        | [_; Var var] -> Set.singleton var
         | [Var var; _] -> Set.singleton var
-        | [Var var] -> Set.singleton var
+        | [Var var] -> 
+            match op with
+            | Sub -> Set.empty
+            | _ -> Set.singleton var
         | _ -> Set.empty
 
     let folder instr (after, liveAfter) =
         let w = writtenBy instr
         let r = readBy instr
         let before = Set.union (Set.difference after w) r
+        printfn "%A after (%A) before (%A)\n" instr after before
         before, after :: liveAfter
 
     let liveAfter = 
         List.foldBack folder instrs (Set.empty, [])
+        |> snd
 
     instrs, liveAfter
+
+type Graph = Dictionary<string, Set<string>>
+
+let makeGraph vertices =
+    let graph = Graph()
+    List.iter (fun vert -> graph.Add(vert, Set.empty)) vertices
+    graph
+
+let addEdge (graph : Graph) u v =
+    graph.Item u <- graph.Item u |> Set.add v
+    graph.Item v <- graph.Item v |> Set.add u
+
+let adjacent (graph : Graph) u = 
+    graph.Item u
+
+let vertices (graph : Graph) =
+    graph.Keys
+
+let printDot (graph : Graph) fileName = 
+    let out = new System.IO.StreamWriter(path=fileName)    
+    fprintfn out "strict graph {"
+    Seq.iter (fun v ->
+        fprintfn out "%s" v) (vertices graph)
+    Seq.iter (fun v ->
+        Seq.iter (fun u ->
+            fprintfn out "%s -- %s" u v) (adjacent graph v)) (vertices graph)
+    fprintfn out "}\n"
 
 /////////////////////////////////////////////////////////////////
 /// Testing
@@ -750,7 +789,20 @@ let testAssignHomes s =
     // |> selectInstr 
     //|> assignHomes 
     |> printfn "%A"
-
+let testLive s = 
+    let cps = stringToCps2 s
+    let instrs, liveAfter =
+        cps
+        |> selectInstr
+        |> computeLiveAfter
+    let s2 = instrsToString instrs
+    printfn "%s" s2
+    List.iteri (fun i live ->
+        printfn "%d)" i
+        Set.iter (fun var ->
+            printf  "%s " var) live
+        printfn "") liveAfter
+    printfn "%s" (cpsToString cps)
 "(letrec (
 (sort (lambda (lst)
     (if (pair? lst)
@@ -791,8 +843,23 @@ let testAssignHomes s =
 
 runTestsWithName compile "basic" [
     // "1", "1\n"
+    // "-1", "-1\n"
     // "(+ 1 (- 22 33)))", "-10\n"
-        "(let ((a 1))
-    (let ((b 2))
-        (+ a b)))", "3\n"
+        // "(let ((a 1))
+    // (let ((b 2))
+        // (+ a b)))", "3\n"
+    // "(let ((b (- 1))) (+ 43 b))", "42\n"
+//     "(let ([v 1])
+// (let ([w 46])
+// (let ([x (+ v 7)])
+// (let ([y (+ 4 x)])
+// (let ([z (+ x w)])
+// (+ z (- y)))))))", "20\n"
 ]
+
+"(let ([v 1])
+(let ([w 46])
+(let ([x (+ v 7)])
+(let ([y (+ 4 x)])
+(let ([z (+ x w)])
+(+ z (- y)))))))" 
