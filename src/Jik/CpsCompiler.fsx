@@ -36,6 +36,40 @@ open System.IO
 ///     - Recursive function calls.
 ///     - Closures.
 
+
+/////////////////////////////////////////////////////////////////////////
+/// Graph
+
+type Graph = Dictionary<string, Set<string>>
+
+let makeGraph vertices =
+    let graph = Graph()
+    Seq.iter (fun vert -> graph.Add(vert, Set.empty)) vertices
+    graph
+
+let addEdge (graph : Graph) u v =
+    graph.Item u <- graph.Item u |> Set.add v
+    graph.Item v <- graph.Item v |> Set.add u
+
+let adjacent (graph : Graph) u = 
+    graph.Item u
+
+let vertices (graph : Graph) =
+    graph.Keys
+
+let printDot (graph : Graph) fileName = 
+    use out = new System.IO.StreamWriter(path=fileName)    
+    fprintfn out "strict graph {"
+    Seq.iter (fun v ->
+        fprintfn out "%s" v) (vertices graph)
+    Seq.iter (fun v ->
+        Seq.iter (fun u ->
+            fprintfn out "%s -- %s" u v) (adjacent graph v)) (vertices graph)
+    fprintfn out "}\n"
+
+//////////////////////////////////////////////////////////////////////////////
+/// Core language
+
 type Prim =
     | BoxRead
     | BoxWrite
@@ -206,6 +240,9 @@ let assignmentConvert expr =
         Lambda(args, body)
     transform alpha
 
+///////////////////////////////////////////////////////////////////////////////////
+/// CPS language
+
 type Var = string
 
 type Cps = 
@@ -341,6 +378,7 @@ let rec replaceVars mapping expr =
     | Expr.App(func, args) -> Expr.App(transf func, List.map transf args)
     | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
 
+/// Conversion Core language -> CPS language
 let rec convert expr cont = 
     match expr with
     | Expr.Ref v -> cont v
@@ -566,6 +604,10 @@ type InstrName =
 
 type Instr = InstrName * Operand list
 
+let isArithm = function
+    | Add | Sub | Neg | Sar | Sal -> true
+    | _ -> false
+
 let showInstrs out instrs =
     let showOp op =
         let s = sprintf "%A" op
@@ -643,6 +685,127 @@ let rec selectInstr cps =
         [Mov, [Var var; Reg Rax]
          Ret, []]
     | e -> failwithf "selectInstr: not implemented %A" e
+
+let rec computeLiveAfter instrs =
+    let writtenBy (op, args)  = 
+        match op with
+        | Add | Sub | Mov -> 
+            match args with
+            | [_; Var var] -> Set.singleton var
+            | _ -> Set.empty
+        | Neg | Pop ->
+            match args with
+            | [Var var] -> Set.singleton var
+            | _ -> Set.empty
+        | _ -> Set.empty
+
+    let readBy (op, args) =
+        match args with
+        | [Var var; _] -> Set.singleton var
+        | [Var var] -> 
+            match op with
+            | Sub -> Set.empty
+            | _ -> Set.singleton var
+        | _ -> Set.empty
+
+    let folder instr (after, liveAfter) =
+        let w = writtenBy instr
+        let r = readBy instr
+        let before = Set.union (Set.difference after w) r
+        before, after :: liveAfter
+
+    let liveAfter = 
+        List.foldBack folder instrs (Set.empty, [])
+        |> snd
+
+    instrs, liveAfter
+
+let collectVars instrs =
+    List.map snd instrs
+    |> List.map (fun args ->
+        List.map (fun arg ->
+            match arg with
+            | Var var -> Set.singleton var
+            | _ -> Set.empty) args
+        |> Set.unionMany)
+    |> Set.unionMany
+
+let rec buildInterference (instrs, liveAfter) =
+    let vars = collectVars instrs
+    let graph = makeGraph vars
+
+    let iter = function
+        | (Mov, [Var var1; Var var2]), live ->
+            Set.filter (fun x -> x <> var1 && x <> var2) live
+            |> Set.iter (addEdge graph var2)
+        | (op, [Var var1; Var var2]), live when isArithm op ->
+            Set.filter (fun x -> x <> var2) live
+            |> Set.iter (addEdge graph var2)
+        | _ -> ()
+
+    List.zip instrs liveAfter
+    |> List.iter iter
+
+    instrs, graph
+
+/// Takes interference graph and all used variables
+/// and returns mapping from variables to their colors
+let colorGraph graph vars =
+    let banned = Dictionary<string, Set<int>>()
+    Seq.iter (fun var -> banned.Add(var, Set.empty)) vars
+
+    let pickNode nodes =
+        Seq.maxBy (fun node -> 
+            banned.Item node |> Seq.length) nodes
+
+    let rec findLowestColor bannedSet =
+        Seq.initInfinite id
+        |> Seq.find (fun x -> Seq.exists ((=) x) bannedSet |> not)
+
+    let updateBanned node color =
+        adjacent graph node
+        |> Seq.iter (fun v -> 
+            banned.Item v <- banned.Item v |> Set.add color)
+
+    let rec loop nodes color =
+        if Set.isEmpty nodes then
+            color
+        else
+            let node = pickNode nodes
+            let lowest = findLowestColor (banned.Item node)
+            let color = Map.add node lowest color
+            updateBanned node lowest
+            loop (Set.remove node nodes) color
+    
+    loop (Set.ofSeq vars) Map.empty
+
+/// Assign registers or stack locations
+/// for variables using graph coloring
+let allocateRegisters (instrs, graph) =
+    let color = colorGraph graph (collectVars instrs)
+    let registers = [Rbx]
+
+    let rec fold (acc, remaining, stackIndex) _ color =
+        match remaining with
+        | reg :: rest ->
+            (Map.add color (Reg reg) acc, rest, stackIndex)
+        | _ ->
+            let stackIndex = stackIndex - wordSize
+            (Map.add color (Deref(stackIndex, Rbp)) acc, [], stackIndex)
+
+    let colorToLocation, _, _ = 
+        Map.fold fold (Map.empty, registers, 0) color
+
+    let handleArg = function
+        | Var var ->
+            let colorValue = Map.find var color
+            Map.find colorValue colorToLocation
+        | arg -> arg
+
+    let handleInstr(op, args) =
+        op, List.map handleArg args
+
+    List.map handleInstr instrs
     
 let rec assignHomes instrs =
     let mutable count = 0
@@ -675,7 +838,14 @@ let dbg func =
 
 let compile s =
     let cps = stringToCps2 s
-    let instrs = cps |> dbg selectInstr |> dbg assignHomes |> dbg patchInstr    
+    let instrs = 
+        cps 
+        |> dbg selectInstr 
+        |> computeLiveAfter 
+        |> buildInterference 
+        |> allocateRegisters 
+        |> dbg patchInstr    
+
     let out = instrsToString instrs
 
     printfn "%s" (cpsToString cps)
@@ -685,68 +855,6 @@ let compile s =
     printfn "----"
 
     out.ToString()
-
-let rec computeLiveAfter instrs =
-    let writtenBy (op, args)  = 
-        match op with
-        | Add | Sub | Mov -> 
-            match args with
-            | [_; Var var] -> Set.singleton var
-            | _ -> Set.empty
-        | Neg | Pop ->
-            match args with
-            | [Var var] -> Set.singleton var
-            | _ -> Set.empty
-        | _ -> Set.empty
-
-    let readBy (op, args) =
-        match args with
-        | [Var var; _] -> Set.singleton var
-        | [Var var] -> 
-            match op with
-            | Sub -> Set.empty
-            | _ -> Set.singleton var
-        | _ -> Set.empty
-
-    let folder instr (after, liveAfter) =
-        let w = writtenBy instr
-        let r = readBy instr
-        let before = Set.union (Set.difference after w) r
-        printfn "%A after (%A) before (%A)\n" instr after before
-        before, after :: liveAfter
-
-    let liveAfter = 
-        List.foldBack folder instrs (Set.empty, [])
-        |> snd
-
-    instrs, liveAfter
-
-type Graph = Dictionary<string, Set<string>>
-
-let makeGraph vertices =
-    let graph = Graph()
-    List.iter (fun vert -> graph.Add(vert, Set.empty)) vertices
-    graph
-
-let addEdge (graph : Graph) u v =
-    graph.Item u <- graph.Item u |> Set.add v
-    graph.Item v <- graph.Item v |> Set.add u
-
-let adjacent (graph : Graph) u = 
-    graph.Item u
-
-let vertices (graph : Graph) =
-    graph.Keys
-
-let printDot (graph : Graph) fileName = 
-    let out = new System.IO.StreamWriter(path=fileName)    
-    fprintfn out "strict graph {"
-    Seq.iter (fun v ->
-        fprintfn out "%s" v) (vertices graph)
-    Seq.iter (fun v ->
-        Seq.iter (fun u ->
-            fprintfn out "%s -- %s" u v) (adjacent graph v)) (vertices graph)
-    fprintfn out "}\n"
 
 /////////////////////////////////////////////////////////////////
 /// Testing
@@ -803,6 +911,16 @@ let testLive s =
             printf  "%s " var) live
         printfn "") liveAfter
     printfn "%s" (cpsToString cps)
+let testInterf s =
+    let cps = stringToCps2 s
+    printfn "%s" (cpsToString cps)
+    let instrs, graph =
+        cps
+        |> selectInstr
+        |> computeLiveAfter
+        |> buildInterference
+    printDot graph "misc/dot.gv"
+
 "(letrec (
 (sort (lambda (lst)
     (if (pair? lst)
@@ -842,19 +960,19 @@ let testLive s =
         (+ a b)))"
 
 runTestsWithName compile "basic" [
-    // "1", "1\n"
-    // "-1", "-1\n"
-    // "(+ 1 (- 22 33)))", "-10\n"
-        // "(let ((a 1))
-    // (let ((b 2))
-        // (+ a b)))", "3\n"
-    // "(let ((b (- 1))) (+ 43 b))", "42\n"
-//     "(let ([v 1])
-// (let ([w 46])
-// (let ([x (+ v 7)])
-// (let ([y (+ 4 x)])
-// (let ([z (+ x w)])
-// (+ z (- y)))))))", "20\n"
+    "1", "1\n"
+    "-1", "-1\n"
+    "(+ 1 (- 22 33)))", "-10\n"
+    "(let ((a 1))
+    (let ((b 2))
+        (+ a b)))", "3\n"
+    "(let ((b (- 1))) (+ 43 b))", "42\n"
+    "(let ([v 1])
+(let ([w 46])
+(let ([x (+ v 7)])
+(let ([y (+ 4 x)])
+(let ([z (+ x w)])
+(+ z (- y)))))))", "20\n"
 ]
 
 "(let ([v 1])
@@ -862,4 +980,15 @@ runTestsWithName compile "basic" [
 (let ([x (+ v 7)])
 (let ([y (+ 4 x)])
 (let ([z (+ x w)])
-(+ z (- y)))))))" 
+(+ z (- y)))))))"
+let verts = ["w"; "v"; "x"; "y"; "z"; "t1"; "t2"] |> Set.ofList
+let g = makeGraph verts
+addEdge g "v" "w"
+addEdge g "y" "w"
+addEdge g "z" "w"
+addEdge g "x" "w"
+addEdge g "x" "y"
+addEdge g "z" "t1"
+addEdge g "z" "y"
+addEdge g "t2" "t1"
+// colorGraph g verts |> printfn "%A\n-----\n\n"
