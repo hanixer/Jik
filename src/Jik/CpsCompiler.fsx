@@ -77,10 +77,16 @@ type Prim =
     | Add
     | Sub
     | Mul
+    | Eq
     | Lt
+    | Le
+    | Gt
+    | Ge
+    | Not
 
 type Expr = 
     | Int of int
+    | Bool of bool
     | Ref of string
     | If of Expr * Expr * Expr
     | Assign of string * Expr
@@ -106,7 +112,12 @@ let stringPrimop = [
     "+", Add
     "-", Sub
     "*", Mul
+    "eq?", Eq
     "<", Lt
+    "<=", Le
+    ">", Gt
+    ">=", Ge
+    "not", Not
 ]
 
 let tryStringToPrimop s =
@@ -177,7 +188,6 @@ let extendMapping vars mapping =
 
 let rec alphaRename mapping = 
     function 
-    | Int _ as e -> e
     | Ref v -> trySubstitute v mapping |> Ref
     | If(cond, thenExpr, elseExpr) -> 
         If
@@ -193,6 +203,7 @@ let rec alphaRename mapping =
         App(alphaRename mapping func, List.map (alphaRename mapping) argsExprs)
     | PrimApp(op, args) ->
         PrimApp(op, List.map (alphaRename mapping) args)
+    | e -> e
 
 let rec findModifiedVars expr =
     let find = findModifiedVars
@@ -215,7 +226,6 @@ let assignmentConvert expr =
     let alpha = alphaRename Map.empty expr
     let modified = findModifiedVars alpha
     let rec transform = function
-        | Int n -> Int n
         | Ref var ->
             if modified.Contains var then
                 PrimApp(BoxRead, [Ref var])
@@ -230,6 +240,7 @@ let assignmentConvert expr =
         | Begin exprs -> Begin(List.map transform exprs)
         | App(func, args) -> App(transform func, List.map transform args)
         | PrimApp(op, args) -> PrimApp(op, List.map transform args)
+        | e -> e
     and boxifyLambda args body =
         let folder var body =
             if modified.Contains var then
@@ -246,7 +257,8 @@ let assignmentConvert expr =
 type Var = string
 
 type Cps = 
-    | Const of int
+    | Int of int
+    | Bool of bool
     | Ref of Var
     | Lambda of CpsLambda
     | LetVal of (Var * Cps) * Cps
@@ -297,7 +309,9 @@ let rec showCps cps =
     
     match cps with
     | Cps.Ref v -> iStr v
-    | Cps.Const n -> iNum n
+    | Cps.Int n -> iNum n
+    | Cps.Bool true -> iStr "#t"
+    | Cps.Bool false -> iStr "#f"
     | Cps.Lambda(free, args, body) -> funclike false "lambda" free args body
     | Cps.LetVal(bindings, body) -> 
         let v, e = bindings
@@ -370,13 +384,13 @@ let rec replaceVars mapping expr =
         | _ -> var
     match expr with
     | Expr.Ref var -> replace var |> Expr.Ref
-    | Expr.Int n -> Expr.Int n
     | Expr.If(cond, conseq, altern) -> Expr.If(transf cond, transf conseq, transf altern)
     | Expr.Assign(var, rhs) -> Expr.Assign(replace var, transf rhs)
     | Expr.Lambda(args, body) -> Expr.Lambda(args, List.map transf body)
     | Expr.Begin(exprs) -> Expr.Begin(List.map transf exprs)
     | Expr.App(func, args) -> Expr.App(transf func, List.map transf args)
     | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
+    | e -> e
 
 /// Conversion Core language -> CPS language
 let rec convert expr cont = 
@@ -385,7 +399,10 @@ let rec convert expr cont =
     | Expr.App(func, args) -> convertApp func args cont
     | Expr.Int n -> 
         let var = freshLabel "num"
-        LetVal((var, Const n), cont var)
+        LetVal((var, Int n), cont var)
+    | Expr.Bool b -> 
+        let var = freshLabel "boo"
+        LetVal((var, Bool b), cont var)
     | Expr.If(cond, ethen, eelse) -> convertIf cond ethen eelse cont
     | Expr.Assign(var, rhs) -> convertAssign var rhs cont
     | Expr.Lambda(args, body) -> convertLambda args body cont
@@ -503,7 +520,7 @@ let rec analyzeFreeVars cps =
     | Call(k, f, args) -> k :: f :: args
     | ContCall(k, args) -> k :: args
     | Ref(v) -> [v]
-    | Const(_) -> []
+    | Int(_) -> []
     | Return(v) -> [v]
     | PrimCall(_, args) -> args
     | e -> failwithf "analyze free: not implemented for %A" e
@@ -547,6 +564,9 @@ let rec cpsToCodes cps : Codes =
 
     codes, e
 
+let rec livenessCps cps =
+    1
+
 let showCommaSep strings =
     iInterleave (iStr ",") (List.map iStr strings)
 
@@ -583,12 +603,21 @@ let stringToCps2 = stringToSExpr >> sexprToExpr >> assignmentConvert >> exprToCp
 type Register =
     | Rsp | Rbp | Rax | Rbx | Rcx | Rdx | Rsi | Rdi 
     | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15
+    | Al | Ah | Bl | Bh | Cl | Ch
 
 type Operand =
     | Int of int
     | Reg of Register
+    | ByteReg of Register
     | Deref of int * Register
     | Var of Var
+
+type Cc =
+    | E
+    | L
+    | Le
+    | G
+    | Ge
 
 type InstrName =
     | Add
@@ -601,6 +630,13 @@ type InstrName =
     | Push
     | Pop
     | Ret
+    | Xor
+    | Cmp
+    | Set
+    | Movzb
+    | Jmp of string
+    | JmpIf of Cc * string
+    | Label of string
 
 type Instr = InstrName * Operand list
 
@@ -622,6 +658,7 @@ let showInstrs out instrs =
         | Reg(r) -> fprintf out "%s" (reg r)
         | Deref(n, r) -> fprintf out "%d(%s)" n (reg r)
         | Var(v) -> fprintf out "[var %s]" v
+        | ByteReg(r) -> fprintf out "%s" (reg r)
         
     let showArgs args =
         List.iteri (fun i arg -> 
@@ -649,8 +686,8 @@ let rec selectInstr cps =
 
     let prim dest (op, args) = 
         match (op, args) with
-        | (Prim.Add, [var1; var2])
-        | (Prim.Sub, [var1; var2]) ->
+        | Prim.Add, [var1; var2]
+        | Prim.Sub, [var1; var2] ->
             let op = opToOp op
             match dest with
             | None ->
@@ -669,9 +706,9 @@ let rec selectInstr cps =
         | e -> failwithf "prim: %A %A" e (cpsToString cps)
 
     match cps with
-    | Const n -> [Mov, [fixNumber n; Reg Rax ]]
+    | Cps.Int n -> [Mov, [fixNumber n; Reg Rax ]]
     | PrimCall(op, args) -> prim None (op, args)
-    | LetVal((var, Cps.Const n), body) ->
+    | LetVal((var, Cps.Int n), body) ->
         let body = selectInstr body
         [Mov, [fixNumber n; Var var]] @ body
     | LetVal((var, PrimCall(op, args)), body) ->
@@ -976,14 +1013,14 @@ let tests = [
 (let ([x (+ v 7)])
 (let ([y (+ 4 x)])
 (let ([z (+ x w)])
-(+ z (- y)))))))", "20\n"
+(+ z (- y)))))))", "42\n"
 ]
 
-// runTestsWithName compile "basic" tests
+runTestsWithName compile "basic" tests
 
 "(let ([v 1])
 (let ([w 46])
 (let ([x (+ v 7)])
 (let ([y (+ 4 x)])
 (let ([z (+ x w)])
-(+ z (- y)))))))" |> testInterf
+(+ z (- y)))))))" //|> testInterf
