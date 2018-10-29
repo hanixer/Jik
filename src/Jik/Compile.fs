@@ -210,7 +210,7 @@ let compile s =
             emitExpr env si expr
             emitfn "  mov %%rax, %d(%%rsp)" si
             si - wordSize
-        let _ = List.fold emitArg (si - wordSize) exprs
+        List.fold emitArg (si - wordSize) exprs |> ignore
         ()
 
     and emitApp env si label exprs = 

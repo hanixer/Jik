@@ -10,5 +10,9 @@
     <Compile Include="Compile.fs" />
     <Compile Include="TestDriver.fs" />
     <Compile Include="Optimized3.fs" />
+    <Compile Include="Graph.fs" />
+    <Compile Include="Core.fs" />
+    <Compile Include="Cps.fs" />
+    <Compile Include="Codegen.fs" />
   </ItemGroup>
 </Project>
