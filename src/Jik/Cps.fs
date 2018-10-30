@@ -3,6 +3,7 @@ module Cps
 open Base
 open Core
 open Display
+open Graph
 
 type Var = string
 
@@ -341,3 +342,58 @@ let stringToExpr = stringToSExpr >> sexprToExpr
 
 
 let stringToCps2 = stringToSExpr >> sexprToExpr >> assignmentConvert >> exprToCps
+
+let liveness cps =
+    let rec loop liveAfter = function
+        | Cps.Int _ -> Set.empty, liveAfter
+        | Cps.Bool(_) -> Set.empty, liveAfter
+        | Cps.Ref var -> Set.singleton var, liveAfter
+        | Cps.LetVal((var, rhs), body) ->
+            let after, liveAfter1 = loop liveAfter body
+            let used, _ = loop liveAfter1 rhs
+            let live = Set.union (Set.remove var after) used
+            live, (Map.add var live liveAfter1)
+        | Cps.PrimCall(_, vars) -> Set.ofList vars, liveAfter
+        | Cps.Return var -> Set.singleton var, liveAfter
+        | Cps.Lambda(_) -> failwith "Not Implemented"
+        | Cps.LetCont(_, _) -> failwith "Not Implemented"
+        | Cps.If(_, _, _) -> failwith "Not Implemented"
+        | Cps.Assign(_, _) -> failwith "Not Implemented"
+        | Cps.Call(_, _, _) -> failwith "Not Implemented"
+        | Cps.ContCall(_, _) -> failwith "Not Implemented"
+        | Cps.MakeClosure(_) -> failwith "Not Implemented"
+        | Cps.ClosureCall(_, _) -> failwith "Not Implemented"
+        | Cps.EnvRef(_) -> failwith "Not Implemented"
+    loop Map.empty cps
+    |> snd
+
+let collectVars includeDef cps =
+    let rec loop = function
+        | Cps.Ref var -> Set.singleton var
+        | Cps.LetVal((var, rhs), body) -> 
+            let res =
+                Set.unionMany [loop rhs; loop body]
+            if includeDef then
+                Set.add var res
+            else 
+                res
+        | Cps.PrimCall(_, vars) -> Set.ofList vars
+        | _ -> Set.empty
+    loop cps
+
+let interference cps liveMap =
+    let graph = makeGraph (collectVars true cps)
+
+    let addEdges live target =
+        Set.iter (addEdge graph target) live
+
+    let rec loop = function
+        | Cps.LetVal((var, rhs), body) ->
+            addEdges (Map.find var liveMap) var
+            // addEdges (collectVars false rhs) var
+            loop body
+        | _ -> ()
+
+    loop cps
+
+    graph

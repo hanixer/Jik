@@ -16,15 +16,6 @@ open Codegen
 open Graph
 open TestDriver
 
-/// TODO:
-/// 1. Code generation.
-///     - For beginning, compile just a simple arithmetic expressions.
-///     - Let-bound variables arithmetic.
-///     - Next, compile conditional.
-///     - Function calls.
-///     - Recursive function calls.
-///     - Closures.
-
 /////////////////////////////////////////////////////////////////
 /// Testing
 
@@ -61,11 +52,14 @@ let testModified s =
     |> printfn "%A"
 let testSelIn s =
     stringToCps2 s |> selectInstr |> printfn "%A"
-let testAssignHomes s =
-    stringToCps2 s 
-    // |> selectInstr 
-    //|> assignHomes 
+let testCps s =
+    stringToCps2 s
+    |> cpsToString
     |> printfn "%A"
+let printLive live =
+    live 
+    |> Map.iter (fun k v ->
+        printfn "%s: %A" k v)
 let testLive s = 
     let cps = stringToCps2 s
     let instrs, liveAfter =
@@ -73,13 +67,17 @@ let testLive s =
         |> selectInstr
         |> computeLiveAfter
     let s2 = instrsToString instrs
+    let liv2 = cps |> liveness
     printfn "%s" s2
+    printfn "%s" (cpsToString cps)
     List.iteri (fun i live ->
         printfn "%d)" i
         Set.iter (fun var ->
             printf  "%s " var) live
         printfn "") liveAfter
-    printfn "%s" (cpsToString cps)
+    printfn "-----------------"
+    liv2 |> printLive
+
 let testInterf s =
     let cps = stringToCps2 s
     printfn "%s" (cpsToString cps)
@@ -90,6 +88,14 @@ let testInterf s =
         |> buildInterference
     instrsToString instrs |> printfn "%s"
     printDot graph "../../misc/dot.gv"
+let testInterf2 s =
+    let cps = stringToCps2 s
+    printfn "%s" (cpsToString cps)
+    let liv = liveness cps
+    let graph = interference cps liv
+    printfn "----------------------"
+    printLive liv
+    printDot graph "../../misc/dot2.gv"
 
 "(letrec (
 (sort (lambda (lst)
@@ -145,11 +151,13 @@ let tests = [
 (+ z (- y)))))))", "42\n"
 ]
 
-runTestsWithName compile "basic" tests
+// runTestsWithName compile "basic" tests
 
-"(let ([v 1])
-(let ([w 46])
-(let ([x (+ v 7)])
-(let ([y (+ 4 x)])
-(let ([z (+ x w)])
-(+ z (- y)))))))" //|> testInterf
+let e = 
+    "(let ([v 1])
+        (let ([w 46])
+        (let ([x (+ v 7)])
+        (let ([y (+ 4 x)])
+        (let ([z (+ x w)])
+        (+ z (- y)))))))"
+e |> testInterf2
