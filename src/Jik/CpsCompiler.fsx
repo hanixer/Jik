@@ -151,7 +151,20 @@ let tests = [
 (+ z (- y)))))))", "42\n"
 ]
 
-// runTestsWithName compile "basic" tests
+let tests2 = [
+    "#t", "#t\n"
+    "#f", "#f\n"
+    "(< 1 2)", "#t\n"
+    "(> 1 2)", "#f\n"
+    "(<= 1 2)", "#t\n"
+    "(>= 1 2)", "#f\n"
+    "(eq? 1 2)", "#f\n"
+    "(eq? 2 2)", "#t\n"
+    "(if 1 2 3)", "2\n"
+    "(if #f 2 3)", "3\n"
+]
+
+// runTestsWithName compile "basic" (List.rev tests2)
 
 let e = 
     "(let ([v 1])
@@ -160,4 +173,6 @@ let e =
         (let ([y (+ 4 x)])
         (let ([z (+ x w)])
         (+ z (- y)))))))"
-e |> testInterf2
+"(if (if 1 2 3) (if 4 5 6) (if 7 8 9))"
+"(if x (let ((x 1)) (+ x 2)) (let ((y 2)) (- y 2)))"
+"(if 1 (if 2 3 4) 5)" |> testCps
