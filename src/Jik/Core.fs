@@ -63,6 +63,7 @@ let rec sexprToExpr sexpr =
     let convertList = List.map sexprToExpr
     match sexpr with
     | SExpr.Number n -> Int n
+    | SExpr.Bool n -> Bool n
     | SExpr.Symbol name -> Ref name
     | List [SExpr.Symbol "if"; cond; conseq; altern] -> 
         If(sexprToExpr cond, sexprToExpr conseq, sexprToExpr altern)

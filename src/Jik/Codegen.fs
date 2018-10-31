@@ -33,19 +33,22 @@ type InstrName =
     | Mov
     | Sar
     | Sal
+    | And
+    | Or
     | Call
     | Push
     | Pop
     | Ret
     | Xor
     | Cmp
-    | Set
+    | Set of Cc
     | Movzb
     | Jmp of string
     | JmpIf of Cc * string
     | Label of string
+    | IfTemp of string * Instr list * Instr list
 
-type Instr = InstrName * Operand list
+and Instr = InstrName * Operand list
 
 let isArithm = function
     | Add | Sub | Neg | Sar | Sal -> true
@@ -53,8 +56,12 @@ let isArithm = function
 
 let showInstrs out instrs =
     let showOp op =
-        let s = sprintf "%A" op
-        fprintf out "%s" (s.ToLower() + "q ")
+        match op with
+        | Set cc ->
+            fprintf out "set%s " ((sprintf "%A" cc).ToLower())
+        | _ ->
+            let s = sprintf "%A" op
+            fprintf out "%s" (s.ToLower() + "q ")
 
     let reg r = 
         let s = sprintf "%%%A" r
@@ -87,9 +94,23 @@ let instrsToString instrs =
     out.ToString()
 
 let rec selectInstr cps =
-    // let fixNumber n = n <<< fixnumShift |> Int
-    let fixNumber n = n |> Int
+    let fixNumber n = n <<< fixnumShift
     let opToOp op = if op = Prim.Add then Add else Sub
+    let moveInt n = [Mov, [Int n; Reg Rax ]]
+
+    let comparison var1 var2 cc dest =
+        let instrs =
+            [Mov, [Var var1; Reg Rax]
+             Cmp, [Var var2; Reg Rax]
+             Set cc, [Reg Al]
+             Movzb, [Reg Al; Reg Rax]
+             Sal, [Int boolBit; Reg Rax]
+             Or, [Int falseLiteral; Reg Rax]]
+        match dest with
+        | None ->
+            instrs
+        | Some dest ->
+            instrs @ [Mov, [Reg Rax; dest]]
 
     let prim dest (op, args) = 
         match (op, args) with
@@ -110,14 +131,21 @@ let rec selectInstr cps =
             | Some dest ->
                 [Mov, [Var var; dest]
                  Neg, [dest]]
+        | Prim.Lt, [var1; var2] -> comparison var1 var2 L dest
+        | Prim.Gt, [var1; var2] -> comparison var1 var2 G dest
+        | Prim.Ge, [var1; var2] -> comparison var1 var2 Ge dest
+        | Prim.Le, [var1; var2] -> comparison var1 var2 Le dest
+        | Prim.Eq, [var1; var2] -> comparison var1 var2 E dest
         | e -> failwithf "prim: %A %A" e (cpsToString cps)
 
     match cps with
-    | Cps.Int n -> [Mov, [fixNumber n; Reg Rax ]]
+    | Cps.Int n -> moveInt (fixNumber n)
+    | Cps.Bool false -> moveInt falseLiteral
+    | Cps.Bool true -> moveInt trueLiteral
     | PrimCall(op, args) -> prim None (op, args)
     | LetVal((var, Cps.Int n), body) ->
         let body = selectInstr body
-        [Mov, [fixNumber n; Var var]] @ body
+        [Mov, [fixNumber n |> Int; Var var]] @ body
     | LetVal((var, PrimCall(op, args)), body) ->
         let rhs = prim (Some (Var var)) (op, args)
         let body = selectInstr body
@@ -129,6 +157,21 @@ let rec selectInstr cps =
     | Return var ->
         [Mov, [Var var; Reg Rax]
          Ret, []]
+    | Cps.If(var, thn, els) ->
+        let elseLabel = freshLabel "L"
+        let endLabel = freshLabel "L"
+        let thns = selectInstr thn
+        let elss = selectInstr thn
+        [Mov, [Var var; Reg Rax]
+         Cmp, [Int falseLiteral; Reg Rax]
+         JmpIf (E, elseLabel), []] @
+        thns @
+        [Jmp endLabel, []
+         Label elseLabel, []] @
+        elss @
+        [Label endLabel, []] 
+    | Cps.LetCont((k, args, contBody), body) ->
+        selectInstr body
     | e -> failwithf "selectInstr: not implemented %A" e
 
 let rec computeLiveAfter instrs =
@@ -239,7 +282,7 @@ let colorGraph graph vars =
 /// for variables using graph coloring
 let allocateRegisters (instrs, graph) =
     let color = colorGraph graph (collectVars instrs)
-    let registers = [Rbx]
+    let registers = []
 
     let rec fold (acc, remaining, stackIndex) _ color =
         match remaining with
@@ -264,20 +307,13 @@ let allocateRegisters (instrs, graph) =
     List.map handleInstr instrs
     
 let rec patchInstr instrs =
-    let handleArg = function
-        | Int n -> (n <<< fixnumShift) |> Int
-        | arg -> arg
-
-    let handleInstr(op, args) =
-        op, List.map handleArg args
-
     let transform = function
         | op, [Deref(n, Rbp); Deref(m, Rbp)] ->
             [Mov, [Deref(n,  Rbp); Reg Rax];
              op, [Reg Rax; Deref(m,  Rbp)]]
         | e -> [e]
 
-    List.map handleInstr instrs
+    instrs
     |> List.collect (transform)
 
 let dbg func =
