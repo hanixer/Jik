@@ -839,4 +839,6 @@ runTest "(cdr (car (cdr (cons 1 (cons (cons 2 ()) (cons 3 ()))))))" "()"
 
 "(let ((x 0))
         (set! x (+ x 1))
-        (if x 1234 4321))" |> compilePrintInstruction
+        (if x 1234 4321))"
+"(+ 8 (if (+ (+ 1 2)) 3 4))"
+"(let ((x 0)) (+ (+ 1 2) x (+ 3 1)))" |> compilePrintInstruction

@@ -178,4 +178,5 @@ let e =
 "(if 1 (if 2 3 4) 5)"
 "(if (<= n 1)
         n
-        (* n  (fact (- n 1))))" |> testCps
+        (* n  (fact (- n 1))))"
+"(+ (+ 1 2) x (+ 3 1))" |> testCps
