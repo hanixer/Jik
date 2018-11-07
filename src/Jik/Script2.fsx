@@ -27,40 +27,56 @@ and Transfer =
     | Call of Var * Var * Var list
     | If of Var * Var * Var
 
-and Decl = Var * Expr
+and Decl = Var * Simple
 
-and Block = Var * Decl list * Transfer
+and Stmt = 
+    | Decl of Decl
+    | Transfer of Transfer
 
-and Function = Var list * Block list * Var
+and Label = Var * Var list * Stmt list
 
-type Term =
-    | PrimCall of Prim * Var list * Var
-    | Int of int * Var
-    | Bool of bool * Var
-    | Call of Var * Var list * Var
-    | If of Var * Var * Var
-    | Return of Var
+and Function = Var list * Label list * Var
 
-type Cont = Var * Var list * Term
-
-let rec convert expr next =
-    match expr with
-    | Expr.If(cond, thn, els) ->
-        let thisLabel = freshLabel "ifk"
-        let thns, thnk = convert thn next
-        let elss, elsk = convert els next
-        match cond with
-        | Expr.Ref var ->
-            thns @ elss @ [thisLabel, If(var, thnk, elsk)], thisLabel
-        | _ ->
-            let condVar = freshLabel "cond"
-            let conds, condk = convert cond thisLabel
-            conds @ thns @ elss @ [thisLabel, If(condVar, thnk, elsk)], condk
-
+let rec convert expr (cont : Var -> Label list * Stmt list) =
+    match expr with            
     | Expr.PrimApp(op, args) ->
-        let thisLabel = freshLabel "pa"
-        let conts, firstLabel = 
-            List.foldBack (fun arg (conts, next) ->
-                let argConts, argLabel = convert arg next
-                argConts @ conts, argLabel) args ([], thisLabel)
-        conts @ [thisLabel, PrimCall(op, )], firstLabel
+        convertMany args (fun vars ->
+            let fresh = freshLabel "v"
+            let blocks, stmts = cont fresh
+            blocks, [Decl(fresh, Prim(op, vars));] @ stmts)
+
+    | Expr.If(exprc, exprt, exprf) ->
+        convert exprc (fun var ->
+            let l1, l2, l3, fresh = freshLabel "L", freshLabel "L", freshLabel "L", freshLabel "v"
+            let blockst, stmtst = convert exprt (fun var -> [], [Transfer(Jump(l3, [var]))])
+            let blocksf, stmtsf = convert exprf (fun var -> [], [Transfer(Jump(l3, [var]))])
+            let blocks, stmts = cont fresh
+            (l1, [], stmtst) :: (l2, [], stmtsf) :: (l3, [fresh], stmts) :: (blockst @ blocksf @ blocks), [Transfer(If(var, l1, l2))])
+
+    | Expr.Ref var -> cont var
+    | Expr.Int n -> 
+        let var = freshLabel "n"
+        let blocks, stmts = cont var
+        blocks, Decl(var, Int n) :: stmts
+
+and convertMany exprs (cont : Var list -> Label list * Stmt list) =
+    let rec loop vars = function
+        | expr :: rest ->
+            convert expr (fun var -> loop (var :: vars) rest)
+        | [] ->
+            cont (List.rev vars)
+    loop [] exprs
+
+let tope expr =
+    let blocks, stmts = convert expr (fun var -> [], [Transfer(Return var)])
+    ("start", [], stmts) :: blocks
+
+let test s =
+    stringToExpr s
+    |> tope
+    |> printfn "%A"
+
+"(if (+ x) (+ y) (+ z))" |> test
+"(if (if a b c) y  z)" |> test
+"(if  y (if a b c) z)" |> test
+"(+ (+ x y) z (+ a b))" |> test
