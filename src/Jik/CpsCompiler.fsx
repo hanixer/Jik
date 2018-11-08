@@ -53,6 +53,8 @@ let testModified s =
 let testSelIn s =
     stringToCps2 s |> selectInstr |> printfn "%A"
 let testCps s =
+    let expr = stringToExpr s
+    printfn "EXPRESSION\n%A\n" expr
     stringToCps2 s
     |> cpsToString
     |> printfn "%A"
@@ -164,7 +166,16 @@ let tests2 = [
     "(if #f 2 3)", "3\n"
 ]
 
-runTestsWithName compile "basic" (List.rev tests2)
+let tests3 = [
+    "(let ([v 1])
+(let ([w 46])
+(let ([x (+ v 7)])
+(let ([y (+ 4 x)])
+(let ([z (+ x w)])
+(+ z (- y)))))))", "42\n"
+]
+
+// runTestsWithName compile "basic" (List.rev tests3)
 
 let e = 
     "(let ([v 1])
@@ -179,4 +190,5 @@ let e =
 "(if (<= n 1)
         n
         (* n  (fact (- n 1))))"
-"(+ (+ 1 2) x (+ 3 1))" |> testCps
+"(+ (+ 1 2) x (+ 3 1))"
+testCps e

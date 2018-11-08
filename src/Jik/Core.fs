@@ -184,3 +184,19 @@ let assignmentConvert expr =
         let body = List.foldBack folder args (List.map transform body)
         Lambda(args, body)
     transform alpha
+
+let rec replaceVars mapping expr =
+    let transf = replaceVars mapping
+    let replace var = 
+        match Map.tryFind var mapping with
+        | Some var2 -> var2
+        | _ -> var
+    match expr with
+    | Expr.Ref var -> replace var |> Expr.Ref
+    | Expr.If(cond, conseq, altern) -> Expr.If(transf cond, transf conseq, transf altern)
+    | Expr.Assign(var, rhs) -> Expr.Assign(replace var, transf rhs)
+    | Expr.Lambda(args, body) -> Expr.Lambda(args, List.map transf body)
+    | Expr.Begin(exprs) -> Expr.Begin(List.map transf exprs)
+    | Expr.App(func, args) -> Expr.App(transf func, List.map transf args)
+    | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
+    | e -> e

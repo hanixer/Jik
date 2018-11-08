@@ -46,7 +46,7 @@ type InstrName =
     | Jmp of string
     | JmpIf of Cc * string
     | Label of string
-    | IfTemp of string * Instr list * Instr list
+    | IfTemp of string * Instr list * string list * Instr list * string list
 
 and Instr = InstrName * Operand list
 
