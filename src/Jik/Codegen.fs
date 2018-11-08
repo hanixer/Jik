@@ -59,6 +59,12 @@ let showInstrs out instrs =
         match op with
         | Set cc ->
             fprintf out "set%s " ((sprintf "%A" cc).ToLower())
+        | Label label ->
+            fprintf out "%s:" label
+        | JmpIf (E, label) ->
+            fprintfn out "je %s" label
+        | Jmp label ->
+            fprintfn out "jmp %s" label
         | _ ->
             let s = sprintf "%A" op
             fprintf out "%s" (s.ToLower() + "q ")

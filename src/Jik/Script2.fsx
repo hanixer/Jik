@@ -39,6 +39,9 @@ and Label = Var * Var list * Stmt list
 and Function = Var list * Label list * Var
 
 let rec convert expr (cont : Var -> Label list * Stmt list) =
+    let makeJumpCont label var =
+        [], [Transfer(Jump(label, [var]))]
+
     match expr with            
     | Expr.PrimApp(op, args) ->
         convertMany args (fun vars ->
@@ -48,11 +51,19 @@ let rec convert expr (cont : Var -> Label list * Stmt list) =
 
     | Expr.If(exprc, exprt, exprf) ->
         convert exprc (fun var ->
-            let l1, l2, l3, fresh = freshLabel "L", freshLabel "L", freshLabel "L", freshLabel "v"
-            let labelst, stmtst = convert exprt (fun var -> [], [Transfer(Jump(l3, [var]))])
-            let labelsf, stmtsf = convert exprf (fun var -> [], [Transfer(Jump(l3, [var]))])
+            let l1, l2, l3, fresh = 
+                freshLabel "L", freshLabel "L", freshLabel "L", freshLabel "v"
+            let jumpCont = (makeJumpCont l3)
+            let labelst, stmtst = 
+                convert exprt jumpCont
+            let labelt = (l1, [], stmtst)
+            let labelsf, stmtsf = 
+                convert exprf jumpCont
+            let labelf = (l2, [], stmtsf)
             let labels, stmts = cont fresh
-            (l1, [], stmtst) :: (l2, [], stmtsf) :: (l3, [fresh], stmts) :: (labelst @ labelsf @ labels), [Transfer(If(var, l1, l2))])
+            let labelJoin = (l3, [fresh], stmts)
+            let restLabels = labelst @ labelsf @ labels
+            labelt :: labelf :: labelJoin :: restLabels, [Transfer(If(var, l1, l2))])
 
     | Expr.Ref var -> cont var
     
@@ -87,6 +98,20 @@ let selectInstructions labels =
     let convertNumber n = n <<< fixnumShift
     let moveInt n var = [Mov, [Operand.Int n; Operand.Var var]]
 
+    let comparison var1 var2 cc dest =
+        let instrs =
+            [Mov, [Var var1; Reg Rax]
+             Cmp, [Var var2; Reg Rax]
+             Set cc, [Reg Al]
+             Movzb, [Reg Al; Reg Rax]
+             Sal, [Operand.Int boolBit; Reg Rax]
+             Or, [Operand.Int falseLiteral; Reg Rax]]
+        match dest with
+        | None ->
+            instrs
+        | Some dest ->
+            instrs @ [Mov, [Reg Rax; dest]]
+
     let handleDecl = function
         | var, Simple.Int n -> moveInt (convertNumber n) var
         | var, Simple.Bool true -> moveInt trueLiteral var
@@ -94,18 +119,34 @@ let selectInstructions labels =
         | var, Simple.Prim(Prim.Add, [var1; var2]) ->
             [InstrName.Mov, [Var var1; Var var]
              InstrName.Add, [Var var2; Var var]]
+        | var, Simple.Prim(Prim.Lt, [var1; var2]) ->
+            comparison var1 var2 Cc.L (Some(Var var))
 
     let handleTransfer = function
         | Return var -> 
             [Mov, [Var var; Reg Rax]
              Ret, []]
+        | Transfer.Jump(label, vars) ->
+            let args = getArgsOfLabel labels label
+            if List.length args <> List.length vars then 
+                failwith "handleTransfer: wrong number of vars"
+            let movArgs =
+                List.zip vars args
+                |> List.map (fun (var, arg) -> Mov, [Var var; Var arg])
+            movArgs @ [InstrName.Jmp label, []]
+        | Transfer.If(varc, labelt, labelf) ->
+            [Mov, [Var varc; Reg Rax]
+             Cmp, [Codegen.Int falseLiteral; Reg Rax]
+             JmpIf (E, labelf), []
+             Jmp labelt, []]
 
     let handleStmt = function
         | Decl decl -> handleDecl decl
         | Transfer tran -> handleTransfer tran
 
     let handleLabel (name, vars, stmts) =
-        List.collect handleStmt stmts
+        let l = [InstrName.Label name, []]
+        l @ List.collect handleStmt stmts
 
     List.collect handleLabel labels
 
@@ -131,14 +172,14 @@ let tests = [
     "(+ 1 2)", "3\n"
     "(+ 1 (+ 2 3))", "6\n"
     "(+ (+ 1 4) (+ 2 3))", "10\n"
-    // "(< 1 2)", "#t\n"
+    "(< 1 2)", "#t\n"
     // "(> 1 2)", "#f\n"
     // "(<= 1 2)", "#t\n"
     // "(>= 1 2)", "#f\n"
     // "(eq? 1 2)", "#f\n"
     // "(eq? 2 2)", "#t\n"
-    // "(if 1 2 3)", "2\n"
-    // "(if #f 2 3)", "3\n"
+    "(if 1 2 3)", "2\n"
+    "(if #f 2 3)", "3\n"
 ]
 
 runTestsWithName compile "basic" tests
