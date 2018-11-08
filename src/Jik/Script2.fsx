@@ -279,7 +279,10 @@ let computeLiveAfter labels : Map<string, Set<string>> =
     let handleLabel liveAfterMap label =
         let stmts = getStmts labels label
         let liveAfter = Map.find label liveAfterMap
-        let liveBefore = liveBeforeStmts liveAfter stmts
+        let liveBefore = 
+            Set.difference
+                (liveBeforeStmts liveAfter stmts)
+                (getArgsOfLabel labels label |> Set.ofList)
         updatePredecessors liveAfterMap liveBefore label
         |> (fun (todo, map) -> printfn "label: %s\ntodo: %A\nmap: %A\n\n" label todo map; (todo, map))
 
