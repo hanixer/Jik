@@ -164,7 +164,7 @@ let tests2 = [
     "(if #f 2 3)", "3\n"
 ]
 
-// runTestsWithName compile "basic" (List.rev tests2)
+runTestsWithName compile "basic" (List.rev tests2)
 
 let e = 
     "(let ([v 1])

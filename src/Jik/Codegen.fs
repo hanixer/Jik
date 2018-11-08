@@ -221,7 +221,6 @@ let collectVars instrs =
 let rec buildInterference (instrs, liveAfter) =
     let vars = collectVars instrs
     let graph = makeGraph vars
-    Seq.iter (fun x -> printfn "buildInterference: %A" x) liveAfter
 
     let filterAndAddEdges ignore live target =
         Set.difference live (Set.ofList ignore)
@@ -319,11 +318,9 @@ let rec patchInstr instrs =
 let dbg func =
     (fun x -> let y = func x in printfn "%s" (instrsToString y); y)
 
-let compile s =
-    let cps = stringToCps2 s
+let compileHelper stringToInstrs s =
     let instrs = 
-        cps 
-        |> dbg selectInstr 
+        stringToInstrs s 
         |> computeLiveAfter 
         |> buildInterference 
         |> allocateRegisters 
@@ -331,10 +328,11 @@ let compile s =
 
     let out = instrsToString instrs
 
-    printfn "%s" (cpsToString cps)
-    printfn "----"
-    printfn "%s" (out.ToString())
+    // printfn "%s" (out.ToString())
     printfn "----"
     printfn "----"
 
     out.ToString()
+
+let compile =
+    compileHelper (stringToCps2 >> selectInstr)

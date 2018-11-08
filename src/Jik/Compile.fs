@@ -453,8 +453,11 @@ let compile s =
         "make-string", 1, emitUnary ``make-string``
         "string-length", 1, emitUnary ``string-length``
         "fx+", 2, emitBinary ``fx+``
+        "+", 2, emitBinary ``fx+``
         "fx-", 2, emitBinary ``fx-``
+        "-", 2, emitBinary ``fx-``
         "fx*", 2, emitBinary ``fx*``
+        "*", 2, emitBinary ``fx*``
         "fxlogor", 2, emitBinary ``fxlogor``
         "fxlogand", 2, emitBinary ``fxlogand``
         "fx=", 2, emitBinary ``fx=``
