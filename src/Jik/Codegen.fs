@@ -62,9 +62,9 @@ let showInstrs out instrs =
         | Label label ->
             fprintf out "%s:" label
         | JmpIf (E, label) ->
-            fprintfn out "je %s" label
+            fprintf out "je %s" label
         | Jmp label ->
-            fprintfn out "jmp %s" label
+            fprintf out "jmp %s" label
         | _ ->
             let s = sprintf "%A" op
             fprintf out "%s" (s.ToLower() + "q ")

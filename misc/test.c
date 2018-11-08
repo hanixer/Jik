@@ -6,8 +6,10 @@
 
 int n;
 int m;
+int o;
+int p;
+int q;
 
-int main() {
-    
-    return (n < m);
+int main() {    
+    return n ? (m ? o : p) : q;
 }

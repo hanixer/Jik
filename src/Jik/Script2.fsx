@@ -62,8 +62,8 @@ let rec convert expr (cont : Var -> Label list * Stmt list) =
             let labelf = (l2, [], stmtsf)
             let labels, stmts = cont fresh
             let labelJoin = (l3, [fresh], stmts)
-            let restLabels = labelst @ labelsf @ labels
-            labelt :: labelf :: labelJoin :: restLabels, [Transfer(If(var, l1, l2))])
+            let restLabels = labels
+            [labelt] @ labelst @ [labelf] @ labelsf @ [labelJoin] @ restLabels, [Transfer(If(var, l1, l2))])
 
     | Expr.Ref var -> cont var
     
@@ -137,8 +137,7 @@ let selectInstructions labels =
         | Transfer.If(varc, labelt, labelf) ->
             [Mov, [Var varc; Reg Rax]
              Cmp, [Codegen.Int falseLiteral; Reg Rax]
-             JmpIf (E, labelf), []
-             Jmp labelt, []]
+             JmpIf (E, labelf), []]
 
     let handleStmt = function
         | Decl decl -> handleDecl decl
@@ -173,13 +172,16 @@ let tests = [
     "(+ 1 (+ 2 3))", "6\n"
     "(+ (+ 1 4) (+ 2 3))", "10\n"
     "(< 1 2)", "#t\n"
-    // "(> 1 2)", "#f\n"
-    // "(<= 1 2)", "#t\n"
-    // "(>= 1 2)", "#f\n"
-    // "(eq? 1 2)", "#f\n"
-    // "(eq? 2 2)", "#t\n"
+    "(> 1 2)", "#f\n"
+    "(<= 1 2)", "#t\n"
+    "(>= 1 2)", "#f\n"
+    "(eq? 1 2)", "#f\n"
+    "(eq? 2 2)", "#t\n"
     "(if 1 2 3)", "2\n"
     "(if #f 2 3)", "3\n"
+    "(if (if 1 2 3) 4 5)", "4\n"
+    "(if 4 (if #f 2 3) 5)", "3\n"
+    "(if 4 (if #t 8 9) (if #f 2 3))", "8\n"
 ]
 
 runTestsWithName compile "basic" tests
