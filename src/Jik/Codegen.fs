@@ -287,18 +287,18 @@ let colorGraph graph vars =
 /// for variables using graph coloring
 let allocateRegisters (instrs, graph) =
     let color = colorGraph graph (collectVars instrs)
-    let registers = []
+    let registers = [Rbx; Rcx]
 
-    let rec fold (acc, remaining, stackIndex) _ color =
+    let rec fold (acc, remaining, stackIndex) color =
         match remaining with
         | reg :: rest ->
             (Map.add color (Reg reg) acc, rest, stackIndex)
         | _ ->
             let stackIndex = stackIndex - wordSize
             (Map.add color (Deref(stackIndex, Rbp)) acc, [], stackIndex)
-
+    
     let colorToLocation, _, _ = 
-        Map.fold fold (Map.empty, registers, 0) color
+        Set.fold fold (Map.empty, registers, 0) (color |> Map.toList |> List.map snd |> Set.ofList)
 
     let handleArg = function
         | Var var ->

@@ -150,23 +150,22 @@ let rec convert expr (cont : Var -> Label list * Stmt list) =
 
     | Expr.If(exprc, exprt, exprf) ->
         convert exprc (fun var ->
-            let l1, l2, l3, fresh = 
-                freshLabel "L", freshLabel "L", freshLabel "L", freshLabel "v"
-            let jumpCont = (makeJumpCont l3)
+            let lt, lf, lj, fresh = 
+                freshLabel "LT", freshLabel "LF", freshLabel "LJ", freshLabel "v"
+            let jumpCont = (makeJumpCont lj)
             let labelst, stmtst = 
                 convert exprt jumpCont
-            let labelt = (l1, [], stmtst)
+            let labelt = (lt, [], stmtst)
             let labelsf, stmtsf = 
                 convert exprf jumpCont
-            let labelf = (l2, [], stmtsf)
+            let labelf = (lf, [], stmtsf)
             let labels, stmts = cont fresh
-            let labelJoin = (l3, [fresh], stmts)
+            let labelJoin = (lj, [fresh], stmts)
             let restLabels = labels
-            [labelt] @ labelst @ [labelf] @ labelsf @ [labelJoin] @ restLabels, [Transfer(If(var, l1, l2))])
+            [labelt] @ labelst @ [labelf] @ labelsf @ [labelJoin] @ restLabels, [Transfer(If(var, lt, lf))])
 
     | Expr.App(Expr.Lambda(formals, body), args) ->
         convertMany args (fun vars ->
-            let vars = List.rev vars
             let mapping = 
                 List.zip formals vars |> Map.ofList
             let body = replaceVars mapping (Begin body)
@@ -193,7 +192,8 @@ let rec convert expr (cont : Var -> Label list * Stmt list) =
 and convertMany exprs (cont : Var list -> Label list * Stmt list) =
     let rec loop vars = function
         | expr :: rest ->
-            convert expr (fun var -> loop (var :: vars) rest)
+            convert expr (fun var -> 
+                loop (var :: vars) rest)
         | [] ->
             cont (List.rev vars)
     loop [] exprs
@@ -273,7 +273,6 @@ let computeLiveAfter labels : Map<string, Set<string>> =
 
     let liveForStmts liveAfter stmts =
         List.fold foldStmt liveAfter (List.rev stmts)
-        // |> (fun l -> printfn "liveForStmts: %A\n  %A\n\n" stmts l; l)
 
     let updatePredecessors liveAfterMap liveBefore label =
         let preds = getPredecessors labels label
@@ -295,7 +294,6 @@ let computeLiveAfter labels : Map<string, Set<string>> =
                 (liveForStmts liveAfter stmts)
                 (getArgsOfLabel labels label |> Set.ofList)
         updatePredecessors liveAfterMap liveBefore label
-        // |> (fun (todo, map) -> printfn "label: %s\ntodo: %A\nmap: %A\n\n" label todo map; (todo, map))
 
     let rec loop todo liveAfterMap =
         if Set.isEmpty todo then
@@ -305,11 +303,6 @@ let computeLiveAfter labels : Map<string, Set<string>> =
             let todo1 = Set.remove label todo
             let todo2, liveAfterMap = handleLabel liveAfterMap label
             loop (Set.union todo1 todo2) liveAfterMap
-
-    let getTransferUsed stmts =
-        match List.tryLast stmts with
-        | Some(Transfer _ as t)  -> getUsed t
-        | _ -> failwithf "getTransferUsed: expected transfer as last stmt"
 
     let liveAfterMap =
         List.fold (fun acc (name, vars, stmts) ->
@@ -331,7 +324,7 @@ let buildInterference labels liveAfterMap =
     let handleStmt stmt liveNow = 
         match stmt with
         | Decl(var, Prim(_, vars)) -> 
-            Set.iter (addEdge var) liveNow
+            Set.iter (addEdge var) (Set.union liveNow (Set.ofList vars))
             Set.union (Set.ofList vars) (Set.remove var liveNow)
         | Decl(var, _) -> 
             Set.iter (addEdge var) liveNow
@@ -357,51 +350,30 @@ let testInterf s =
     let labels = stringToExpr s|> tope
     let live = computeLiveAfter labels
     let graph = buildInterference labels live
+    let allocated = allocateRegisters (selectInstructions labels, graph)
+    printfn "labels:\n%s" (labelsToString labels)
+    printfn "live: %A" live
+    printfn "allocated:\n%s" (instrsToString allocated)
     printDot graph (__SOURCE_DIRECTORY__ + "../../../misc/out3.dot")    
 
 let compile = compileHelper (fun s ->
     let labels = tope (stringToExpr s)
     labels |> dbg selectInstructions)
 
-"(if (+ x) (+ y) (+ z))"
-"(if (if a b c) y  z)"
-"(if  y (if a b c) z)"
-"(+ (+ x y) z (+ a b))"
+let compile2 s =
+    let labels = tope (stringToExpr s) 
+    let live = computeLiveAfter labels
+    let graph = buildInterference labels live
+    let instrs = 
+        allocateRegisters (selectInstructions labels, graph)
+        |> patchInstr
 
-let tests = [
-    // "#t", "#t\n"
-    // "#f", "#f\n"
-    // "1", "1\n"
-    // "-1", "-1\n"
-    // "(+ 1 2)", "3\n"
-    // "(+ 1 (+ 2 3))", "6\n"
-    // "(+ (+ 1 4) (+ 2 3))", "10\n"
-    // "(< 1 2)", "#t\n"
-    // "(if 1 2 3)", "2\n"
-    // "(if #f 2 3)", "3\n"
-    // "(if (if 1 2 3) 4 5)", "4\n"
-    // "(if 4 (if #f 2 3) 5)", "3\n"
-    // "(if 4 (if #t 8 9) (if #f 2 3))", "8\n"    
-//     "
-// (let ([v 1])
-// (let ([w 46])
-// (let ([x (+ v 7)])
-// (let ([y (+ 4 x)])
-// (let ([z (+ x w)])
-// (+ z (- y)))))))", "42\n"
-    "
-(let ([a 1]
-      [b 2]
-      [c 3])
-  (if (< a b)
-    (let ([d 4]
-          [e 5])
-      (+ c (+ d e)))
-    (let ([f 6])
-      (+ a (+ c f)))))", "12\n"
-]
+    let out = instrsToString instrs
 
-// runTestsWithName compile "basic" tests
+    printfn "%s" (labelsToString labels)
+    printfn "%s\n" out
+
+    out
 
 let e ="
 (let ([a 1]
@@ -414,4 +386,46 @@ let e ="
     (let ([f 6])
       (+ a (+ c f)))))"
 
-testInterf e
+let tests = [
+    "#t", "#t\n"
+    "#f", "#f\n"
+    "1", "1\n"
+    "-1", "-1\n"
+    "(+ 1 2)", "3\n"
+    "(+ 1 (+ 2 3))", "6\n"
+    "(+ (+ 1 4) (+ 2 3))", "10\n"
+    "(< 1 2)", "#t\n"
+    "(if 1 2 3)", "2\n"
+    "(if #f 2 3)", "3\n"
+    "(if (< 3 1) 2 3)", "3\n"
+    "(if (if 1 2 3) 4 5)", "4\n"
+    "(if 4 (if #f 2 3) 5)", "3\n"
+    "(if 4 (if #t 8 9) (if #f 2 3))", "8\n"    
+    "
+(let ([v 1])
+(let ([w 46])
+(let ([x (+ v 7)])
+(let ([y (+ 4 x)])
+(let ([z (+ x w)])
+(+ z (- y)))))))", "42\n"
+    "
+(let ([a 1]
+      [b 2]
+      [c 3])
+  (if (< a b)
+    (let ([d 4]
+          [e 5])
+      (+ c (+ d e)))
+    (let ([f 6])
+      (+ a (+ c f)))))", "12\n"
+]
+
+runTestsWithName compile2 "basic" tests
+
+"
+(let ([v 1])
+(let ([w 46])
+(let ([x (+ v 7)])
+(let ([y (+ 4 x)])
+(let ([z (+ x w)])
+(+ z (- y)))))))" //|> testInterf
