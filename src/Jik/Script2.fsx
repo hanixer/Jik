@@ -65,6 +65,28 @@ let getPredecessors labels name =
 
     List.fold fold [] labels
 
+let getUsed = function
+    | Transfer(Return v) -> Set.singleton v
+    | Transfer(Jump(_, args)) -> Set.ofList args
+    | Transfer(Call(_, func, args)) -> Set.ofList (func :: args)
+    | Transfer(If(cond, _, _)) -> Set.singleton cond
+    | Decl(_, Prim(_, args)) -> Set.ofList args
+    | _ -> Set.empty
+    
+let getDefined = function
+    | Decl(var, _) -> Set.singleton var
+    | _ -> Set.empty
+
+let getVars labels =
+    let handleLabel (name, args, stmts) =
+        List.map getUsed stmts @
+        List.map getDefined stmts
+        |> List.fold Set.union Set.empty
+        |> Set.union (Set.ofList args)
+
+    List.map handleLabel labels
+    |> List.fold Set.union Set.empty
+
 let showLabel (name, vars, stmts) =
     let comma = iInterleave (iStr ", ")
 
@@ -243,26 +265,15 @@ let selectInstructions labels =
 let computeLiveAfter labels : Map<string, Set<string>> =
     let st = Set.singleton
     let lt = Set.ofList
-
-    let getUsed = function
-        | Transfer(Return v) -> st v
-        | Transfer(Jump(_, args)) -> Set.ofList args
-        | Transfer(Call(_, func, args)) -> Set.ofList (func :: args)
-        | Transfer(If(cond, _, _)) -> st cond
-        | Decl(_, Prim(_, args)) -> Set.ofList args
-        | _ -> Set.empty
-        
-    let getDefined = function
-        | Decl(var, _) -> Set.singleton var
-        | _ -> Set.empty
     
     let foldStmt liveAfter stmt =
         let used = getUsed stmt
         let defined = getDefined stmt
         Set.union used (Set.difference liveAfter defined)
 
-    let liveBeforeStmts liveAfter stmts =
+    let liveForStmts liveAfter stmts =
         List.fold foldStmt liveAfter (List.rev stmts)
+        // |> (fun l -> printfn "liveForStmts: %A\n  %A\n\n" stmts l; l)
 
     let updatePredecessors liveAfterMap liveBefore label =
         let preds = getPredecessors labels label
@@ -281,10 +292,10 @@ let computeLiveAfter labels : Map<string, Set<string>> =
         let liveAfter = Map.find label liveAfterMap
         let liveBefore = 
             Set.difference
-                (liveBeforeStmts liveAfter stmts)
+                (liveForStmts liveAfter stmts)
                 (getArgsOfLabel labels label |> Set.ofList)
         updatePredecessors liveAfterMap liveBefore label
-        |> (fun (todo, map) -> printfn "label: %s\ntodo: %A\nmap: %A\n\n" label todo map; (todo, map))
+        // |> (fun (todo, map) -> printfn "label: %s\ntodo: %A\nmap: %A\n\n" label todo map; (todo, map))
 
     let rec loop todo liveAfterMap =
         if Set.isEmpty todo then
@@ -295,21 +306,58 @@ let computeLiveAfter labels : Map<string, Set<string>> =
             let todo2, liveAfterMap = handleLabel liveAfterMap label
             loop (Set.union todo1 todo2) liveAfterMap
 
+    let getTransferUsed stmts =
+        match List.tryLast stmts with
+        | Some(Transfer _ as t)  -> getUsed t
+        | _ -> failwithf "getTransferUsed: expected transfer as last stmt"
+
     let liveAfterMap =
         List.fold (fun acc (name, vars, stmts) ->
             Map.add name Set.empty acc) Map.empty labels
-
+    
     let todo = 
         List.map (fun (name, _, _) -> name) labels
         |> Set.ofList
 
     loop todo liveAfterMap
 
+let buildInterference labels liveAfterMap =
+    let graph = makeGraph (getVars labels)
+
+    let addEdge var1 var2 = 
+        if var1 <> var2 then
+            addEdge graph var1 var2
+
+    let handleStmt stmt liveNow = 
+        match stmt with
+        | Decl(var, Prim(_, vars)) -> 
+            Set.iter (addEdge var) liveNow
+            Set.union (Set.ofList vars) (Set.remove var liveNow)
+        | Decl(var, _) -> 
+            Set.iter (addEdge var) liveNow
+            Set.remove var liveNow
+        | _ -> Set.union liveNow (getUsed stmt)
+
+    let handleLabel (name, _, stmts) =
+        let live = Map.find name liveAfterMap
+        List.foldBack handleStmt stmts live
+        |> ignore
+
+    List.iter handleLabel labels
+
+    graph
+
 let test s =
     stringToExpr s
     |> tope
     |> labelsToString
     |> printfn "%s"
+
+let testInterf s =
+    let labels = stringToExpr s|> tope
+    let live = computeLiveAfter labels
+    let graph = buildInterference labels live
+    printDot graph (__SOURCE_DIRECTORY__ + "../../../misc/out3.dot")    
 
 let compile = compileHelper (fun s ->
     let labels = tope (stringToExpr s)
@@ -365,8 +413,5 @@ let e ="
       (+ c (+ d e)))
     (let ([f 6])
       (+ a (+ c f)))))"
-let labels = 
-    stringToExpr e
-    |> tope
-labelsToString labels |> printfn "%s\n\n\n"
-computeLiveAfter labels |> printfn "%A"
+
+testInterf e
