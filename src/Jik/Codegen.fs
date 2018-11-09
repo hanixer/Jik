@@ -1,16 +1,23 @@
 module Codegen
 
-open Cps
 open Core
 open Graph
 open RuntimeConstants
+open Intermediate
 open System.IO
 open System.Collections.Generic
+
+/// Code generation.
+/// Language resembles x86 instruction set.
+/// After conversion from Intermediate, 'Var' operands created.
+/// Later these operands are changed to stack locations or registers.
 
 type Register =
     | Rsp | Rbp | Rax | Rbx | Rcx | Rdx | Rsi | Rdi 
     | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15
     | Al | Ah | Bl | Bh | Cl | Ch
+
+type Var = string
 
 type Operand =
     | Int of int
@@ -46,7 +53,6 @@ type InstrName =
     | Jmp of string
     | JmpIf of Cc * string
     | Label of string
-    | IfTemp of string * Instr list * string list * Instr list * string list
 
 and Instr = InstrName * Operand list
 
@@ -99,10 +105,9 @@ let instrsToString instrs =
     showInstrs out instrs
     out.ToString()
 
-let rec selectInstr cps =
-    let fixNumber n = n <<< fixnumShift
-    let opToOp op = if op = Prim.Add then Add else Sub
-    let moveInt n = [Mov, [Int n; Reg Rax ]]
+let selectInstructions labels =
+    let convertNumber n = n <<< fixnumShift
+    let moveInt n var = [Mov, [Operand.Int n; Operand.Var var]]
 
     let comparison var1 var2 cc dest =
         let instrs =
@@ -110,109 +115,54 @@ let rec selectInstr cps =
              Cmp, [Var var2; Reg Rax]
              Set cc, [Reg Al]
              Movzb, [Reg Al; Reg Rax]
-             Sal, [Int boolBit; Reg Rax]
-             Or, [Int falseLiteral; Reg Rax]]
+             Sal, [Operand.Int boolBit; Reg Rax]
+             Or, [Operand.Int falseLiteral; Reg Rax]]
         match dest with
         | None ->
             instrs
         | Some dest ->
             instrs @ [Mov, [Reg Rax; dest]]
 
-    let prim dest (op, args) = 
-        match (op, args) with
-        | Prim.Add, [var1; var2]
-        | Prim.Sub, [var1; var2] ->
-            let op = opToOp op
-            match dest with
-            | None ->
-                [Mov, [Var var1; Reg Rax]
-                 op, [Var var2; Reg Rax]]
-            | Some dest ->
-                [Mov, [Var var1; dest]
-                 op, [Var var2; dest]]
-        | Prim.Sub, [var] ->
-            match dest with
-            | None ->
-                [Neg, [Var var]]
-            | Some dest ->
-                [Mov, [Var var; dest]
-                 Neg, [dest]]
-        | Prim.Lt, [var1; var2] -> comparison var1 var2 L dest
-        | Prim.Gt, [var1; var2] -> comparison var1 var2 G dest
-        | Prim.Ge, [var1; var2] -> comparison var1 var2 Ge dest
-        | Prim.Le, [var1; var2] -> comparison var1 var2 Le dest
-        | Prim.Eq, [var1; var2] -> comparison var1 var2 E dest
-        | e -> failwithf "prim: %A %A" e (cpsToString cps)
+    let handleDecl = function
+        | var, Simple.Int n -> moveInt (convertNumber n) var
+        | var, Simple.Bool true -> moveInt trueLiteral var
+        | var, Simple.Bool false -> moveInt falseLiteral var
+        | var, Simple.Prim(Prim.Add, [var1; var2]) ->
+            [InstrName.Mov, [Var var1; Var var]
+             InstrName.Add, [Var var2; Var var]]
+        | var, Simple.Prim(Prim.Sub, [var1]) ->
+            [InstrName.Mov, [Var var1; Var var]
+             InstrName.Neg, [Var var]]
+        | var, Simple.Prim(Prim.Lt, [var1; var2]) ->
+            comparison var1 var2 Cc.L (Some(Var var))
+        | var, e -> failwithf "handleDecl: %s %A" var e
 
-    match cps with
-    | Cps.Int n -> moveInt (fixNumber n)
-    | Cps.Bool false -> moveInt falseLiteral
-    | Cps.Bool true -> moveInt trueLiteral
-    | PrimCall(op, args) -> prim None (op, args)
-    | LetVal((var, Cps.Int n), body) ->
-        let body = selectInstr body
-        [Mov, [fixNumber n |> Int; Var var]] @ body
-    | LetVal((var, PrimCall(op, args)), body) ->
-        let rhs = prim (Some (Var var)) (op, args)
-        let body = selectInstr body
-        rhs @ body
-    | LetVal((var, rhs), body) ->
-        let rhs = selectInstr rhs
-        let body = selectInstr body
-        rhs @ [Mov, [Reg Rax; Var var]] @ body
-    | Return var ->
-        [Mov, [Var var; Reg Rax]
-         Ret, []]
-    | Cps.If(var, thn, els) ->
-        let elseLabel = freshLabel "L"
-        let endLabel = freshLabel "L"
-        let thns = selectInstr thn
-        let elss = selectInstr thn
-        [Mov, [Var var; Reg Rax]
-         Cmp, [Int falseLiteral; Reg Rax]
-         JmpIf (E, elseLabel), []] @
-        thns @
-        [Jmp endLabel, []
-         Label elseLabel, []] @
-        elss @
-        [Label endLabel, []] 
-    | Cps.LetCont((k, args, contBody), body) ->
-        selectInstr body
-    | e -> failwithf "selectInstr: not implemented %A" e
+    let handleTransfer = function
+        | Return var -> 
+            [Mov, [Var var; Reg Rax]
+             Ret, []]
+        | Transfer.Jump(label, vars) ->
+            let args = getArgsOfLabel labels label
+            if List.length args <> List.length vars then 
+                failwith "handleTransfer: wrong number of vars"
+            let movArgs =
+                List.zip vars args
+                |> List.map (fun (var, arg) -> Mov, [Var var; Var arg])
+            movArgs @ [InstrName.Jmp label, []]
+        | Transfer.If(varc, labelt, labelf) ->
+            [Mov, [Var varc; Reg Rax]
+             Cmp, [Operand.Int falseLiteral; Reg Rax]
+             JmpIf (E, labelf), []]
 
-let rec computeLiveAfter instrs =
-    let writtenBy (op, args)  = 
-        match op with
-        | Add | Sub | Mov -> 
-            match args with
-            | [_; Var var] -> Set.singleton var
-            | _ -> Set.empty
-        | Neg | Pop ->
-            match args with
-            | [Var var] -> Set.singleton var
-            | _ -> Set.empty
-        | _ -> Set.empty
+    let handleStmt = function
+        | Decl decl -> handleDecl decl
+        | Transfer tran -> handleTransfer tran
 
-    let readBy (op, args) =
-        match args with
-        | [Var var; _] -> Set.singleton var
-        | [Var var] -> 
-            match op with
-            | Sub -> Set.empty
-            | _ -> Set.singleton var
-        | _ -> Set.empty
+    let handleLabel (name, vars, stmts) =
+        let l = [InstrName.Label name, []]
+        l @ List.collect handleStmt stmts
 
-    let folder instr (after, liveAfter) =
-        let w = writtenBy instr
-        let r = readBy instr
-        let before = Set.union (Set.difference after w) r
-        before, after :: liveAfter
-
-    let liveAfter = 
-        List.foldBack folder instrs (Set.empty, [])
-        |> snd
-
-    instrs, liveAfter
+    List.collect handleLabel labels
 
 let collectVars instrs =
     List.map snd instrs
@@ -223,34 +173,6 @@ let collectVars instrs =
             | _ -> Set.empty) args
         |> Set.unionMany)
     |> Set.unionMany
-
-let rec buildInterference (instrs, liveAfter) =
-    let vars = collectVars instrs
-    let graph = makeGraph vars
-
-    let filterAndAddEdges ignore live target =
-        Set.difference live (Set.ofList ignore)
-        |> Set.iter (addEdge graph target)
-
-    let iter ((op, args), live) = 
-        match op with
-        | Mov ->
-            match args with
-            | [Var var1; Var var2] ->
-                filterAndAddEdges [var1; var2] live var2
-            | [_; Var var2] ->
-                filterAndAddEdges [var2] live var2
-            | _ -> ()
-        | op ->
-            match args with
-            | [_; Var var2] ->
-                filterAndAddEdges [var2] live var2
-            | _ -> ()
-
-    List.zip instrs liveAfter
-    |> List.iter iter
-
-    instrs, graph
 
 /// Takes interference graph and all used variables
 /// and returns mapping from variables to their colors
@@ -323,22 +245,18 @@ let rec patchInstr instrs =
 
 let dbg func =
     (fun x -> let y = func x in printfn "%s" (instrsToString y); y)
-
-let compileHelper stringToInstrs s =
+    
+let compile2 s =
+    let labels = tope (stringToExpr s) 
+    let live = computeLiveAfter labels
+    let graph = buildInterference labels live
     let instrs = 
-        stringToInstrs s 
-        |> computeLiveAfter 
-        |> buildInterference 
-        |> allocateRegisters 
-        |> dbg patchInstr    
+        allocateRegisters (selectInstructions labels, graph)
+        |> patchInstr
 
     let out = instrsToString instrs
 
-    // printfn "%s" (out.ToString())
-    printfn "----"
-    printfn "----"
+    printfn "%s" (labelsToString labels)
+    printfn "%s\n" out
 
-    out.ToString()
-
-let compile =
-    compileHelper (stringToCps2 >> selectInstr)
+    out

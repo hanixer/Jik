@@ -12,7 +12,7 @@
     <Compile Include="Optimized3.fs" />
     <Compile Include="Graph.fs" />
     <Compile Include="Core.fs" />
-    <Compile Include="Cps.fs" />
+    <Compile Include="Intermediate.fs" />
     <Compile Include="Codegen.fs" />
   </ItemGroup>
 </Project>

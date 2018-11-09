@@ -200,3 +200,5 @@ let rec replaceVars mapping expr =
     | Expr.App(func, args) -> Expr.App(transf func, List.map transf args)
     | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
     | e -> e
+
+let stringToExpr = stringToSExpr >> sexprToExpr
