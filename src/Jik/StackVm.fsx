@@ -1,9 +1,9 @@
-#load "Base.fs"
+#load "SExpr.fs"
 #load "Util.fs"
 #load "Display.fs"
 
 /// Supported features: 
-/// - core Scheme
+/// - Expr Scheme
 /// - let
 /// - letrec
 /// - integer, booleans, pairs
@@ -11,8 +11,8 @@
 /// - call/cc
 /// - tail calls
 /// - inline primitives (like +, -, etc.)
-/// This interpreter translates s-expressions into core Scheme making 
-/// some desugaring (let, letrec). Then core expression is translated
+/// This interpreter translates s-expressions into Expr Scheme making 
+/// some desugaring (let, letrec). Then Expr expression is translated
 /// into Tree-like instructions for ''VM''.
 /// VM has following state:
 /// - accumulator, holding result value 
@@ -29,7 +29,7 @@
 /// restoring them back as needed.
 
 open System
-open Base
+open SExpr
 open Display
 open System.Text
 

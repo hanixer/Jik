@@ -1,5 +1,5 @@
 #load "RuntimeConstants.fs"
-#load "Base.fs"
+#load "SExpr.fs"
 #load "Util.fs"
 #load "Compile.fs"
 #load "TestDriver.fs"
@@ -12,7 +12,7 @@
 // #load "scripts/test1.9.fsx"
 
 open System
-open Base
+open SExpr
 open System.IO
 open TestDriver
 

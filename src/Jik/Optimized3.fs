@@ -3,7 +3,7 @@ module Optimized3
 /// Change representation of meaning by using combinators.
 /// Now meaning is just a function : () -> Value
 
-open Base
+open SExpr
 
 type Value =
     | Void
@@ -152,7 +152,7 @@ let boolify = function
     | _ -> true
 
 let exprsToBeginForm exprs =
-    SExpr.Cons (Symbol "begin", Base.exprsToList exprs)
+    SExpr.Cons (Symbol "begin", SExpr.exprsToList exprs)
 
 
 /// Combinators

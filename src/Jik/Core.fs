@@ -1,6 +1,6 @@
 module Core
 
-open Base
+open SExpr
 open System.Collections.Generic
 
 type Prim =
@@ -29,6 +29,8 @@ type Expr =
     | PrimApp of Prim * Expr list
 
 and LambdaData = string list * Expr list
+
+type Program = (string * LambdaData) list * Expr
 
 let freshLabel = 
     let mutable dict  = Dictionary<string, int>()
@@ -202,3 +204,22 @@ let rec replaceVars mapping expr =
     | e -> e
 
 let stringToExpr = stringToSExpr >> sexprToExpr
+
+let stringToProgram str : Program =
+    let sexpr = stringToSExpr ("(" + str + ")")
+
+    let parseDefs defs sexpr =
+        match sexpr with
+        | List (Symbol "define" :: List (Symbol name :: args) :: body) ->
+            let args = symbolsToStrings args
+            let body = List.map sexprToExpr body
+            (name, (args, body)) :: defs
+        | _ -> failwith "parseDefs: wrong format"
+
+    match sexpr with
+    | List sexprs when not (sexprs.IsEmpty) ->
+        let sexprs = List.rev sexprs
+        let expr = sexprToExpr (List.head sexprs)
+        let defs = List.fold parseDefs [] (List.tail sexprs)
+        (defs, expr)
+    | _ -> failwith "stringToProgram: parsing failed"

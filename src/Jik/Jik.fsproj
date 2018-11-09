@@ -4,7 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="RuntimeConstants.fs" />
-    <Compile Include="Base.fs" />
+    <Compile Include="SExpr.fs" />
     <Compile Include="Display.fs" />
     <Compile Include="Util.fs" />
     <Compile Include="Compile.fs" />

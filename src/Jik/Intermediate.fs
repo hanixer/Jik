@@ -4,12 +4,12 @@ open Core
 open Graph
 open Display
 
+type Var = string
+
 /// Intermediate language. It is a mix of SSA and CPS.
 /// Labels (blocks) with arguments consist of statements. The last
 /// statement in block is transfer statement.
 /// Other statements are declarations.
-
-type Var = string
 
 type Simple =
     | Prim of Prim * Var list
@@ -30,7 +30,9 @@ and Stmt =
 
 and Label = Var * Var list * Stmt list
 
-and Function = Var list * Label list * Var
+and Function = Var * Var list * Label list
+
+type Program = Function list * Label list
 
 let generalAccess labels name f =
     match List.tryFind (fun (name2, _, _) -> name2 = name) labels with
@@ -130,7 +132,7 @@ let labelsToString labels =
     |> iInterleave (iStr "\n\n")
     |> iDisplay
 
-let rec convert expr (cont : Var -> Label list * Stmt list) =
+let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
     let makeJumpCont label var =
         [], [Transfer(Jump(label, [var]))]
 
@@ -142,15 +144,15 @@ let rec convert expr (cont : Var -> Label list * Stmt list) =
             labels, [Decl(fresh, Prim(op, vars));] @ stmts)
 
     | Expr.If(exprc, exprt, exprf) ->
-        convert exprc (fun var ->
+        convertExpr exprc (fun var ->
             let lt, lf, lj, fresh = 
                 freshLabel "LT", freshLabel "LF", freshLabel "LJ", freshLabel "v"
             let jumpCont = (makeJumpCont lj)
             let labelst, stmtst = 
-                convert exprt jumpCont
+                convertExpr exprt jumpCont
             let labelt = (lt, [], stmtst)
             let labelsf, stmtsf = 
-                convert exprf jumpCont
+                convertExpr exprf jumpCont
             let labelf = (lf, [], stmtsf)
             let labels, stmts = cont fresh
             let labelJoin = (lj, [fresh], stmts)
@@ -162,7 +164,7 @@ let rec convert expr (cont : Var -> Label list * Stmt list) =
             let mapping = 
                 List.zip formals vars |> Map.ofList
             let body = replaceVars mapping (Begin body)
-            convert body cont)
+            convertExpr body cont)
 
     | Expr.Begin(exprs) ->
         convertMany exprs (fun vars ->
@@ -185,15 +187,25 @@ let rec convert expr (cont : Var -> Label list * Stmt list) =
 and convertMany exprs (cont : Var list -> Label list * Stmt list) =
     let rec loop vars = function
         | expr :: rest ->
-            convert expr (fun var -> 
+            convertExpr expr (fun var -> 
                 loop (var :: vars) rest)
         | [] ->
             cont (List.rev vars)
     loop [] exprs
 
+let convertFunction (name, (args, body)) : Function =
+    let freshName = freshLabel name
+    let labels, stmts = 
+        convertExpr (Begin body) (fun var -> [], [Transfer(Return var)])
+    let labels = (freshName, args, stmts) :: labels
+    name, args, labels
+
 let tope expr =
-    let labels, stmts = convert expr (fun var -> [], [Transfer(Return var)])
+    let labels, stmts = convertExpr expr (fun var -> [], [Transfer(Return var)])
     ("start", [], stmts) :: labels
+
+let convertProgram (defs, expr) : Program =
+    List.map convertFunction defs, tope expr
     
 let computeLiveAfter labels : Map<string, Set<string>> =
     let st = Set.singleton

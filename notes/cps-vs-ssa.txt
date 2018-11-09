@@ -10,8 +10,8 @@ following response.
 > from an optimization point of view ... but, the
 > compactness of CPS was just so much easier to process
 > and manipulate symbolically. It seemed much easier
-> to splice trees and move variables around in a tree based
-> CPS form than it was in the traditional CFG based SSA form.
+> to splice trees and move variables around in a tree SExprd
+> CPS form than it was in the traditional CFG SExprd SSA form.
 > Since you've gone both ways, what do you think?
 
 In short, I see no advantages to using CPS instead of SSA, and I see
