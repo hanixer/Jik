@@ -11,6 +11,10 @@ type Var = string
 /// statement in block is transfer statement.
 /// Other statements are declarations.
 
+type CallCont =
+    | NonTail of string
+    | Tail
+
 type Simple =
     | Prim of Prim * Var list
     | Int of int
@@ -19,7 +23,7 @@ type Simple =
 and Transfer =
     | Return of Var
     | Jump of Var * Var list
-    | Call of Var * Var * Var list
+    | Call of CallCont * Var * Var list
     | If of Var * Var * Var
 
 and Decl = Var * Simple
@@ -49,7 +53,7 @@ let getSuccs stmts =
     match List.tryLast stmts with
     | Some(Transfer(Jump (label, _))) -> [label]
     | Some(Transfer(If (_, labelt, labelf))) -> [labelt; labelf]
-    | Some(Transfer(Call (label, _, _))) -> [label]
+    | Some(Transfer(Call (NonTail label, _, _))) -> [label]
     | _ -> []    
 
 let getPredecessors labels name =
@@ -137,52 +141,132 @@ let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
         [], [Transfer(Jump(label, [var]))]
 
     match expr with            
+    | Expr.Ref var -> cont var
+    | Expr.Bool b -> 
+        let var = freshLabel "b"
+        let labels, stmts = cont var
+        labels, Decl(var, Bool b) :: stmts
+    | Expr.Int n -> 
+        let var = freshLabel "n"
+        let labels, stmts = cont var
+        labels, Decl(var, Int n) :: stmts    
+    | Expr.If(exprc, exprt, exprf) ->
+        let join, fresh = freshLabel "LJ", freshLabel "v"
+        let labels, stmts = cont fresh
+        let labelJoin = (join, [fresh], stmts)
+        let labels = labelJoin :: labels
+        convertIf exprc exprt exprf labels join
     | Expr.PrimApp(op, args) ->
         convertMany args (fun vars ->
             let fresh = freshLabel "v"
             let labels, stmts = cont fresh
             labels, [Decl(fresh, Prim(op, vars));] @ stmts)
-
-    | Expr.If(exprc, exprt, exprf) ->
-        convertExpr exprc (fun var ->
-            let lt, lf, lj, fresh = 
-                freshLabel "LT", freshLabel "LF", freshLabel "LJ", freshLabel "v"
-            let jumpCont = (makeJumpCont lj)
-            let labelst, stmtst = 
-                convertExpr exprt jumpCont
-            let labelt = (lt, [], stmtst)
-            let labelsf, stmtsf = 
-                convertExpr exprf jumpCont
-            let labelf = (lf, [], stmtsf)
-            let labels, stmts = cont fresh
-            let labelJoin = (lj, [fresh], stmts)
-            let restLabels = labels
-            [labelt] @ labelst @ [labelf] @ labelsf @ [labelJoin] @ restLabels, [Transfer(If(var, lt, lf))])
-
     | Expr.App(Expr.Lambda(formals, body), args) ->
         convertMany args (fun vars ->
             let mapping = 
                 List.zip formals vars |> Map.ofList
             let body = replaceVars mapping (Begin body)
             convertExpr body cont)
-
     | Expr.Begin(exprs) ->
         convertMany exprs (fun vars ->
             let last = List.last vars
             cont last)
+    | Expr.Assign(_, _) -> failwith "Not Implemented"
+    | Expr.Lambda(_) -> failwith "Not Implemented"
+    | Expr.App(func, args) ->
+        convertExpr func (fun func ->
+            convertMany args (fun args -> 
+                let fresh = freshLabel "r"
+                let labelName = freshLabel "LC"
+                let labels, stmts = cont fresh
+                let label = (labelName, [fresh], stmts)
+                label :: labels, [Transfer(Call(NonTail labelName, func, args))]))
 
-
-    | Expr.Ref var -> cont var
-    
-    | Expr.Int n -> 
-        let var = freshLabel "n"
-        let labels, stmts = cont var
-        labels, Decl(var, Int n) :: stmts
-    
+and convertExprJoin expr (contVar : Var) =
+    let jump var = Transfer(Jump(contVar, [var]))
+    match expr with
     | Expr.Bool b -> 
         let var = freshLabel "b"
-        let labels, stmts = cont var
-        labels, Decl(var, Bool b) :: stmts
+        [], [Decl(var, Bool b); jump var]
+    | Expr.Int n -> 
+        let var = freshLabel "n"
+        [], [Decl(var, Int n); jump var]
+    | Expr.Ref(var) -> [], [jump var]
+    | Expr.If(exprc, exprt, exprf) ->
+        convertIf exprc exprt exprf [] contVar    
+    | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
+    | Expr.Lambda(_) -> failwith "Not Implemented Expr.Lambda"
+    | Expr.Begin(exprs) ->
+        let heads, tail = List.splitAt (List.length exprs - 1) exprs
+        convertMany heads (fun _ ->
+            convertExprJoin tail.Head contVar)
+    | Expr.App(Expr.Lambda(formals, body), args) ->
+        convertMany args (fun vars ->
+            let mapping = 
+                List.zip formals vars |> Map.ofList
+            let body = replaceVars mapping (Begin body)
+            convertExprJoin body contVar)
+    | Expr.App(func, args) ->
+        convertExpr func (fun func ->
+            convertMany args (fun args -> 
+                [], [Transfer(Call(NonTail contVar, func, args))]))
+    | Expr.PrimApp(op, args) ->
+        convertMany args (fun vars ->
+            let fresh = freshLabel "v"
+            [], [Decl(fresh, Prim(op, vars)); Transfer(Jump(contVar, [fresh]))])
+
+and convertExprTail expr =
+    match expr with
+    | Expr.Bool b -> 
+        let var = freshLabel "b"
+        [], [Decl(var, Bool b); Transfer(Return var)]
+    | Expr.Int n -> 
+        let var = freshLabel "n"
+        [], [Decl(var, Int n); Transfer(Return var)]
+    | Expr.Ref(var) -> [], [Transfer(Return var)]
+    | Expr.If(exprc, exprt, exprf) ->
+        convertExpr exprc (fun var ->
+            let lt, lf = 
+                freshLabel "LT", freshLabel "LF"
+            let labelst, stmtst = 
+                convertExprTail exprt 
+            let labelt = (lt, [], stmtst)
+            let labelsf, stmtsf = 
+                convertExprTail exprf
+            let labelf = (lf, [], stmtsf)
+            [labelt] @ labelst @ [labelf] @ labelsf, [Transfer(If(var, lt, lf))])
+    | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
+    | Expr.Lambda(_) -> failwith "Not Implemented Expr.Lambda"
+    | Expr.Begin(exprs) ->
+        let heads, tail = List.splitAt (List.length exprs - 1) exprs
+        convertMany heads (fun _ ->
+            convertExprTail tail.Head)
+    | Expr.App(Expr.Lambda(formals, body), args) ->
+        convertMany args (fun vars ->
+            let mapping = 
+                List.zip formals vars |> Map.ofList
+            let body = replaceVars mapping (Begin body)
+            convertExprTail body)
+    | Expr.App(func, args) ->
+        convertExpr func (fun func ->
+            convertMany args (fun args -> 
+                [], [Transfer(Call(Tail, func, args))]))
+    | Expr.PrimApp(op, args) ->
+        convertMany args (fun vars ->
+            let var = freshLabel "v"
+            [], [Decl(var, Prim(op, vars)); Transfer(Return var)])
+
+and convertIf exprc exprt exprf labels join =
+    convertExpr exprc (fun var ->
+        let lt, lf = 
+            freshLabel "LT", freshLabel "LF"
+        let labelst, stmtst = 
+            convertExprJoin exprt join
+        let labelt = (lt, [], stmtst)
+        let labelsf, stmtsf = 
+            convertExprJoin exprf join
+        let labelf = (lf, [], stmtsf)
+        [labelt] @ labelst @ [labelf] @ labelsf @ labels, [Transfer(If(var, lt, lf))])
 
 and convertMany exprs (cont : Var list -> Label list * Stmt list) =
     let rec loop vars = function
@@ -194,15 +278,30 @@ and convertMany exprs (cont : Var list -> Label list * Stmt list) =
     loop [] exprs
 
 let convertFunction (name, (args, body)) : Function =
-    let freshName = freshLabel name
     let labels, stmts = 
         convertExpr (Begin body) (fun var -> [], [Transfer(Return var)])
-    let labels = (freshName, args, stmts) :: labels
+    let labels = (name, args, stmts) :: labels
     name, args, labels
 
 let tope expr =
-    let labels, stmts = convertExpr expr (fun var -> [], [Transfer(Return var)])
+    let labels, stmts = convertExprTail expr
     ("start", [], stmts) :: labels
+
+let alphatizeFunctionNames (defs, expr) : Core.Program =
+    let newName (name, _) = name, freshLabel name
+
+    let mapping =
+        List.map newName defs
+        |> Map.ofList
+
+    let replaceInDef (name, (args, body)) =
+        let name = 
+            match Map.tryFind name mapping with
+            | Some newName -> newName
+            | _ -> name
+        name, (args, List.map (replaceVars mapping) body)
+
+    List.map replaceInDef defs, replaceVars mapping expr
 
 let convertProgram (defs, expr) : Program =
     List.map convertFunction defs, tope expr
@@ -284,3 +383,4 @@ let buildInterference labels liveAfterMap =
     List.iter handleLabel labels
 
     graph
+ 

@@ -44,27 +44,27 @@ let e ="
       (+ a (+ c f)))))"
 
 let tests = [
-    "#t", "#t\n"
-    "#f", "#f\n"
-    "1", "1\n"
-    "-1", "-1\n"
-    "(+ 1 2)", "3\n"
-    "(+ 1 (+ 2 3))", "6\n"
-    "(+ (+ 1 4) (+ 2 3))", "10\n"
-    "(< 1 2)", "#t\n"
-    "(if 1 2 3)", "2\n"
-    "(if #f 2 3)", "3\n"
-    "(if (< 3 1) 2 3)", "3\n"
-    "(if (if 1 2 3) 4 5)", "4\n"
-    "(if 4 (if #f 2 3) 5)", "3\n"
-    "(if 4 (if #t 8 9) (if #f 2 3))", "8\n"    
-    "
-(let ([v 1])
-(let ([w 46])
-(let ([x (+ v 7)])
-(let ([y (+ 4 x)])
-(let ([z (+ x w)])
-(+ z (- y)))))))", "42\n"
+//     "#t", "#t\n"
+//     "#f", "#f\n"
+//     "1", "1\n"
+//     "-1", "-1\n"
+//     "(+ 1 2)", "3\n"
+//     "(+ 1 (+ 2 3))", "6\n"
+//     "(+ (+ 1 4) (+ 2 3))", "10\n"
+//     "(< 1 2)", "#t\n"
+//     "(if 1 2 3)", "2\n"
+//     "(if #f 2 3)", "3\n"
+//     "(if (< 3 1) 2 3)", "3\n"
+//     "(if (if 1 2 3) 4 5)", "4\n"
+//     "(if 4 (if #f 2 3) 5)", "3\n"
+//     "(if 4 (if #t 8 9) (if #f 2 3))", "8\n"    
+//     "
+// (let ([v 1])
+// (let ([w 46])
+// (let ([x (+ v 7)])
+// (let ([y (+ 4 x)])
+// (let ([z (+ x w)])
+// (+ z (- y)))))))", "42\n"
     "
 (let ([a 1]
       [b 2]
@@ -77,6 +77,11 @@ let tests = [
       (+ a (+ c f)))))", "12\n"
 ]
 
-runTestsWithName compile2 "basic" tests
+// runTestsWithName compile2 "basic" tests
 
-e |> testInterf
+// let e2 = "(define (one) 1)
+// 1"
+// let pr = stringToProgram e2
+// convertProgram pr |> printfn "%A"
+
+"(if (int fun) (call 2) (call 4))" |> test
