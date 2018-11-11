@@ -19,6 +19,7 @@ type Simple =
     | Prim of Prim * Var list
     | Int of int
     | Bool of bool
+    | FunctionRef of string
 
 and Transfer =
     | Return of Var
@@ -86,8 +87,9 @@ let getVars labels =
     List.map handleLabel labels
     |> List.fold Set.union Set.empty
 
+let comma = iInterleave (iStr ", ")
+
 let showLabel (name, vars, stmts) =
-    let comma = iInterleave (iStr ", ")
 
     let showDecl = function
         | var, s ->
@@ -100,6 +102,8 @@ let showLabel (name, vars, stmts) =
                 iConcat [(sprintf "%A" op |> iStr)
                          iStr " "
                          List.map iStr vars |> comma ]
+            | Simple.FunctionRef lab -> 
+                iConcat [iStr "(func-ref "; iStr lab; iStr ")"]
           iConcat [iStr var 
                    iStr " = "
                    s]
@@ -131,10 +135,28 @@ let showLabel (name, vars, stmts) =
              iNewline 
              iInterleave iNewline <| List.map showStmt stmts]
 
+let showDef (name, args, labels) =
+    iConcat [iStr "def "
+             iStr name
+             iStr " ("
+             comma  (List.map iStr args)
+             iStr ")"
+             iNewline
+             iInterleave iNewline (List.map showLabel labels)]
+
+let showProgram (defs, labels) =
+    iConcat [List.map showDef defs |> iConcat
+             iNewline
+             iNewline
+             List.map showLabel labels |> iConcat]
+
 let labelsToString labels =
     List.map showLabel labels
     |> iInterleave (iStr "\n\n")
     |> iDisplay
+
+let programToString prog =
+    showProgram prog |> iDisplay
 
 let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
     let makeJumpCont label var =
@@ -181,6 +203,10 @@ let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
                 let labels, stmts = cont fresh
                 let label = (labelName, [fresh], stmts)
                 label :: labels, [Transfer(Call(NonTail labelName, func, args))]))
+    | Expr.FunctionRef(label) -> 
+        let var = freshLabel "fr"
+        let labels, stmts = cont var
+        labels, Decl(var, FunctionRef label) :: stmts
 
 and convertExprJoin expr (contVar : Var) =
     let jump var = Transfer(Jump(contVar, [var]))
@@ -214,6 +240,9 @@ and convertExprJoin expr (contVar : Var) =
         convertMany args (fun vars ->
             let fresh = freshLabel "v"
             [], [Decl(fresh, Prim(op, vars)); Transfer(Jump(contVar, [fresh]))])
+    | Expr.FunctionRef(label) -> 
+        let var = freshLabel "fr"
+        [], [Decl(var, FunctionRef label); jump var]
 
 and convertExprTail expr =
     match expr with
@@ -255,6 +284,9 @@ and convertExprTail expr =
         convertMany args (fun vars ->
             let var = freshLabel "v"
             [], [Decl(var, Prim(op, vars)); Transfer(Return var)])
+    | Expr.FunctionRef(label) -> 
+        let var = freshLabel "fr"
+        [], [Decl(var, FunctionRef label); Transfer(Return var)]
 
 and convertIf exprc exprt exprf labels join =
     convertExpr exprc (fun var ->
@@ -284,24 +316,8 @@ let convertFunction (name, (args, body)) : Function =
     name, args, labels
 
 let tope expr =
-    let labels, stmts = convertExprTail expr
+    let labels, stmts = convertExpr expr (fun var -> [], [Transfer(Return var)])
     ("start", [], stmts) :: labels
-
-let alphatizeFunctionNames (defs, expr) : Core.Program =
-    let newName (name, _) = name, freshLabel name
-
-    let mapping =
-        List.map newName defs
-        |> Map.ofList
-
-    let replaceInDef (name, (args, body)) =
-        let name = 
-            match Map.tryFind name mapping with
-            | Some newName -> newName
-            | _ -> name
-        name, (args, List.map (replaceVars mapping) body)
-
-    List.map replaceInDef defs, replaceVars mapping expr
 
 let convertProgram (defs, expr) : Program =
     List.map convertFunction defs, tope expr
@@ -358,7 +374,8 @@ let computeLiveAfter labels : Map<string, Set<string>> =
 
     loop todo liveAfterMap
 
-let buildInterference labels liveAfterMap =
+let buildInterference labels =
+    let liveAfterMap = computeLiveAfter labels
     let graph = makeGraph (getVars labels)
 
     let addEdge var1 var2 = 

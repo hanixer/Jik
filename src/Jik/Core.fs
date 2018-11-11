@@ -21,6 +21,7 @@ type Expr =
     | Int of int
     | Bool of bool
     | Ref of string
+    | FunctionRef of string
     | If of Expr * Expr * Expr
     | Assign of string * Expr
     | Lambda of LambdaData
@@ -122,24 +123,76 @@ let extendMapping vars mapping =
     let folder mapping (oldVar, newVar) = Map.add oldVar newVar mapping
     newVars, List.fold folder mapping (List.zip vars newVars)
 
-let rec alphaRename mapping = 
+let rec alphaRename2 mapping = 
     function 
     | Ref v -> trySubstitute v mapping |> Ref
     | If(cond, thenExpr, elseExpr) -> 
         If
-            (alphaRename mapping cond, alphaRename mapping thenExpr, 
-             alphaRename mapping elseExpr)
+            (alphaRename2 mapping cond, alphaRename2 mapping thenExpr, 
+             alphaRename2 mapping elseExpr)
     | Assign(var, rhs) -> 
-        Assign(trySubstitute var mapping, alphaRename mapping rhs)
+        Assign(trySubstitute var mapping, alphaRename2 mapping rhs)
     | Lambda(args, body) -> 
         let newVars, mapping = extendMapping args mapping
-        Lambda(newVars, List.map (alphaRename mapping) body)
-    | Begin exprs -> Begin(List.map (alphaRename mapping) exprs)
+        Lambda(newVars, List.map (alphaRename2 mapping) body)
+    | Begin exprs -> Begin(List.map (alphaRename2 mapping) exprs)
     | App(func, argsExprs) -> 
-        App(alphaRename mapping func, List.map (alphaRename mapping) argsExprs)
+        App(alphaRename2 mapping func, List.map (alphaRename2 mapping) argsExprs)
     | PrimApp(op, args) ->
-        PrimApp(op, List.map (alphaRename mapping) args)
+        PrimApp(op, List.map (alphaRename2 mapping) args)
     | e -> e
+
+let rec replaceVars mapping expr =
+    let transf = replaceVars mapping
+    let replace var = 
+        match Map.tryFind var mapping with
+        | Some var2 -> var2
+        | _ -> var
+    match expr with
+    | Expr.Ref var -> replace var |> Expr.Ref
+    | Expr.If(cond, conseq, altern) -> Expr.If(transf cond, transf conseq, transf altern)
+    | Expr.Assign(var, rhs) -> Expr.Assign(replace var, transf rhs)
+    | Expr.Lambda(args, body) -> Expr.Lambda(args, List.map transf body)
+    | Expr.Begin(exprs) -> Expr.Begin(List.map transf exprs)
+    | Expr.App(func, args) -> Expr.App(transf func, List.map transf args)
+    | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
+    | e -> e
+
+let alphaRename (defs, expr) : Program =
+    let newName (name, _) = name, freshLabel name
+
+    let mapping =
+        List.map newName defs
+        |> Map.ofList
+
+    let replaceInDef (name, (args, body)) =
+        let name = 
+            match Map.tryFind name mapping with
+            | Some newName -> newName
+            | _ -> name
+        name, (args, List.map (alphaRename2 mapping) body)
+
+    List.map replaceInDef defs, alphaRename2 mapping expr
+
+let revealFunctions (prog : Program) : Program =
+    let (defs, expr) = prog
+    let functionNames = 
+        List.map fst defs |> Set.ofList
+    
+    let rec handleExpr = function
+        | If(exprc, exprt, exprf) -> If(handleExpr exprc, handleExpr exprt, handleExpr exprf)
+        | Assign(var, expr) -> Assign(var, handleExpr expr)
+        | Lambda(args, body) -> Lambda(args, List.map handleExpr body)
+        | Begin(exprs) -> Begin(List.map handleExpr exprs)
+        | App(func, args) -> App(handleExpr func, List.map handleExpr args)
+        | PrimApp(op, args) -> PrimApp(op, List.map handleExpr args)
+        | Ref(var) when Set.contains var functionNames -> FunctionRef var
+        | e -> e
+
+    let handleDef (name, (args, expr)) =
+        name, (args, List.map handleExpr expr)
+
+    List.map handleDef defs, handleExpr expr
 
 let rec findModifiedVars expr =
     let find = findModifiedVars
@@ -159,7 +212,7 @@ let rec findModifiedVars expr =
     | _ -> Set.empty
 
 let assignmentConvert expr =
-    let alpha = alphaRename Map.empty expr
+    let alpha = alphaRename2 Map.empty expr
     let modified = findModifiedVars alpha
     let rec transform = function
         | Ref var ->
@@ -186,22 +239,6 @@ let assignmentConvert expr =
         let body = List.foldBack folder args (List.map transform body)
         Lambda(args, body)
     transform alpha
-
-let rec replaceVars mapping expr =
-    let transf = replaceVars mapping
-    let replace var = 
-        match Map.tryFind var mapping with
-        | Some var2 -> var2
-        | _ -> var
-    match expr with
-    | Expr.Ref var -> replace var |> Expr.Ref
-    | Expr.If(cond, conseq, altern) -> Expr.If(transf cond, transf conseq, transf altern)
-    | Expr.Assign(var, rhs) -> Expr.Assign(replace var, transf rhs)
-    | Expr.Lambda(args, body) -> Expr.Lambda(args, List.map transf body)
-    | Expr.Begin(exprs) -> Expr.Begin(List.map transf exprs)
-    | Expr.App(func, args) -> Expr.App(transf func, List.map transf args)
-    | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
-    | e -> e
 
 let stringToExpr = stringToSExpr >> sexprToExpr
 

@@ -22,15 +22,26 @@ let test s =
     |> labelsToString
     |> printfn "%s"
 
-let testInterf s =
-    let labels = stringToExpr s|> tope
-    let live = computeLiveAfter labels
-    let graph = buildInterference labels live
-    let allocated = allocateRegisters (selectInstructions labels, graph)
-    printfn "labels:\n%s" (labelsToString labels)
-    printfn "live: %A" live
-    printfn "allocated:\n%s" (instrsToString allocated)
-    printDot graph (__SOURCE_DIRECTORY__ + "../../../misc/out3.dot")
+// let testInterf s =
+//     let labels = stringToExpr s|> tope
+//     let live = computeLiveAfter labels
+//     let graph = buildInterference labels live
+//     let allocated = allocateRegisters (selectInstructions labels, graph)
+//     printfn "labels:\n%s" (labelsToString labels)
+//     printfn "live: %A" live
+//     printfn "allocated:\n%s" (instrsToString allocated)
+//     printDot graph (__SOURCE_DIRECTORY__ + "../../../misc/out3.dot")
+
+let testAlloc s =
+  s 
+  |> stringToProgram 
+  |> alphaRename
+  |> revealFunctions 
+  |> convertProgram
+  |> selectInstructions
+  |> allocateLocals
+  |> Codegen.programToString
+  |> printfn "%s"
 
 let e ="
 (let ([a 1]
@@ -77,11 +88,11 @@ let tests = [
       (+ a (+ c f)))))", "12\n"
 ]
 
+// "(if (int fun) (call 2) (call 4))" |> test
 // runTestsWithName compile2 "basic" tests
 
-// let e2 = "(define (one) 1)
-// 1"
+let e2 = "(define (one) 1)
+(+ (one) 1)"
+testAlloc e2
 // let pr = stringToProgram e2
-// convertProgram pr |> printfn "%A"
-
-"(if (int fun) (call 2) (call 4))" |> test
+// convertProgram pr |> programToString |> printfn "%s"
