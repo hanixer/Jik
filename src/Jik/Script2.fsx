@@ -40,9 +40,12 @@ let testAlloc s =
   |> convertProgram
   |> selectInstructions
   |> allocateLocals
+  |> addFunctionBeginEnd
+  |> patchInstr
   |> Codegen.programToString
-  |> printfn "%s"
+  |> (fun x -> printfn "%s" x; x)
 
+  
 let e ="
 (let ([a 1]
       [b 2]
@@ -53,6 +56,23 @@ let e ="
       (+ c (+ d e)))
     (let ([f 6])
       (+ a (+ c f)))))"
+let e2 = "(define (one) 1)
+(+ (one) 1)"
+let e3 = "
+(define (one) 
+  (let ([a 1]
+        [b 2]
+        [c 3])
+    (if (< a b)
+      (let ([d 4]
+            [e 5])
+        (+ c (+ d e)))
+      (let ([f 6])
+        (+ a (+ c f))))))
+(+ (one) 1)"
+let e4 = "(define (f) (if 1 2 3)) (f)"
+let e5 = "(+ 1 (if 1 2 3))"
+
 
 let tests = [
 //     "#t", "#t\n"
@@ -86,13 +106,11 @@ let tests = [
       (+ c (+ d e)))
     (let ([f 6])
       (+ a (+ c f)))))", "12\n"
+    e2, "2\n"
 ]
 
 // "(if (int fun) (call 2) (call 4))" |> test
-// runTestsWithName compile2 "basic" tests
-
-let e2 = "(define (one) 1)
-(+ (one) 1)"
-testAlloc e2
+runTestsWithName testAlloc "basic" tests
+// testAlloc e3
 // let pr = stringToProgram e2
 // convertProgram pr |> programToString |> printfn "%s"

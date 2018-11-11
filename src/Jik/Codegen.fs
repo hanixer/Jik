@@ -64,7 +64,7 @@ type FunctionDef =
       Args : string list
       Instrs : Instr list
       Vars : string list ref
-      MaxStack : int ref
+      MaxStack : int
       InterfGraph : Graph }
 
 type Program = FunctionDef list * FunctionDef
@@ -133,7 +133,6 @@ let programToString (defs, main) =
 
     let handleDef def =
         fprintfn out "    .globl %s" def.Name
-        fprintfn out "%s:" def.Name
         showInstrs out def.Instrs
         fprintfn out "\n\n"
 
@@ -152,16 +151,6 @@ let countMaxArgs labels =
 
     List.map handleLabel labels
     |> List.max
-
-let functionBegin =
-    [Push, [Reg Rbp]
-     Mov, [Reg Rsp; Reg Rbp]
-     Push, [Reg R15]
-     Push, [Reg R14]
-     Push, [Reg R13]
-     Push, [Reg R12]
-     Push, [Reg Rbx]
-     Sub, [Operand.Int 0; Reg Rsp]]
 
 let selectInstructions (defs, labels) : Program =
     let convertNumber n = n <<< fixnumShift
@@ -199,10 +188,9 @@ let selectInstructions (defs, labels) : Program =
             [Lea(funcRef), [Var var]]
         | var, e -> failwithf "handleDecl: %s %A" var e
 
-    let handleTransfer = function
+    let handleTransfer labels = function
         | Return var -> 
-            [Mov, [Var var; Reg Rax]
-             Ret, []]
+            [Mov, [Var var; Reg Rax]]
         | Transfer.Jump(label, vars) ->
             let args = getArgsOfLabel labels label
             if List.length args <> List.length vars then 
@@ -235,21 +223,21 @@ let selectInstructions (defs, labels) : Program =
                       InstrName.Jmp label, []]
         | Transfer.Call(_, _, _) -> failwith "Not Implemented"
 
-    let handleStmt = function
+    let handleStmt labels = function
         | Decl decl -> handleDecl decl
-        | Transfer tran -> handleTransfer tran
+        | Transfer tran -> handleTransfer labels tran
 
-    let handleLabel (name, _, stmts) =
-        (InstrName.Label name, []) :: List.collect handleStmt stmts
+    let handleLabel labels (name, _, stmts) =
+        (InstrName.Label name, []) :: List.collect (handleStmt labels) stmts
 
     let handleDef (name, args, labels) =
         let maxArgs = countMaxArgs labels
         { Name = name
           Args = args
           Vars = ref []
-          MaxStack = ref maxArgs
+          MaxStack = maxArgs
           InterfGraph = buildInterference labels
-          Instrs = List.collect handleLabel labels }
+          Instrs = List.collect (handleLabel labels) labels }
 
     List.map handleDef defs, handleDef ("start", [], labels)
 
@@ -315,10 +303,11 @@ let calculateVarToLocEnv graph instrs =
         toLoc    
         
     let varToColor = colorGraph graph (collectVars instrs)
-    let colorToLoc = getColorToLoc varToColor
-        
-    Map.map (fun _ color -> Map.find color colorToLoc) varToColor
+    let colorToLoc = getColorToLoc varToColor        
+    let env = Map.map (fun _ color -> Map.find color colorToLoc) varToColor
+    let numStackLocals = (Map.count colorToLoc) - (List.length registers)
 
+    env, numStackLocals
 
 /// Assign registers or stack locations
 /// for variables using graph coloring
@@ -331,21 +320,57 @@ let allocateLocals (defs, main) =
         op, List.map (handleArg env) args
 
     let handleFunctionDef (def : FunctionDef) =
-        let env = calculateVarToLocEnv def.InterfGraph def.Instrs
+        let env, numStackLocals = calculateVarToLocEnv def.InterfGraph def.Instrs
         let instrs = List.map (handleInstr env) def.Instrs
-        {def with Instrs = instrs}
+        let maxStack = def.MaxStack + numStackLocals
+        {def with Instrs = instrs
+                  MaxStack = maxStack}
 
     List.map handleFunctionDef defs, handleFunctionDef main
+
+let addFunctionBeginEnd (defs, main) =
+    let functionBegin maxStack =
+        let n = maxStack * wordSize
+        [Push, [Reg Rbp]
+         Mov, [Reg Rsp; Reg Rbp]
+         Push, [Reg R15]
+         Push, [Reg R14]
+         Push, [Reg R13]
+         Push, [Reg R12]
+         Push, [Reg Rbx]
+         Sub, [Operand.Int 0; Reg Rsp]]
+
+    let functionEnd maxStack =
+        let n = maxStack * wordSize
+        [Add, [Operand.Int n; Reg Rsp]
+         Pop, [Reg Rbx]
+         Pop, [Reg R12]
+         Pop, [Reg R13]
+         Pop, [Reg R14]
+         Pop, [Reg R15]
+         Pop, [Reg Rbp]
+         Ret, []]
+
+    let handleDef def =
+        let instrs = 
+            (functionBegin def.MaxStack) @ 
+            def.Instrs @ 
+            (functionEnd def.MaxStack)
+        {def with Instrs = instrs}
     
-let rec patchInstr instrs =
+    List.map handleDef defs, handleDef main
+    
+let rec patchInstr (defs, main) =
     let transform = function
         | op, [Deref(n, Rbp); Deref(m, Rbp)] ->
             [Mov, [Deref(n,  Rbp); Reg Rax];
              op, [Reg Rax; Deref(m,  Rbp)]]
         | e -> [e]
 
-    instrs
-    |> List.collect (transform)
+    let handleDef def =
+        {def with Instrs = List.collect transform def.Instrs}
+
+    List.map handleDef defs, handleDef main
 
 let dbg func =
     (fun x -> let y = func x in printfn "%s" (instrsToString y); y)

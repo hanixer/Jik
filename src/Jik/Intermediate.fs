@@ -39,16 +39,16 @@ and Function = Var * Var list * Label list
 
 type Program = Function list * Label list
 
-let generalAccess labels name f =
+let generalAccess labels name f cn =
     match List.tryFind (fun (name2, _, _) -> name2 = name) labels with
     | Some x -> f x
-    | None -> failwithf "generalAccess: name=%s" name
+    | None -> failwithf "%s: name=%s" cn name
 
 let getArgsOfLabel labels name =
-    generalAccess labels name (fun (_, args, _) -> args)
+    generalAccess labels name (fun (_, args, _) -> args) "getArgsOfLabel"
 
 let getStmts labels name =
-    generalAccess labels name (fun (_, _, stmts) -> stmts)
+    generalAccess labels name (fun (_, _, stmts) -> stmts) "getStmts"
 
 let getSuccs stmts =
     match List.tryLast stmts with
@@ -90,7 +90,6 @@ let getVars labels =
 let comma = iInterleave (iStr ", ")
 
 let showLabel (name, vars, stmts) =
-
     let showDecl = function
         | var, s ->
           let s =
@@ -115,7 +114,7 @@ let showLabel (name, vars, stmts) =
                      iStr var
                      iStr " "
                      comma (List.map iStr vars)]
-        | Call _ -> iStr "call "
+        | Call _ -> iStr "call \n"
         | If(a, b, c) -> 
             iConcat [iStr "if "
                      iStr a
