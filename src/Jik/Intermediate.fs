@@ -316,7 +316,7 @@ let convertFunction (name, (args, body)) : Function =
 
 let tope expr =
     let labels, stmts = convertExpr expr (fun var -> [], [Transfer(Return var)])
-    ("start", [], stmts) :: labels
+    ("schemeEntry", [], stmts) :: labels
 
 let convertProgram (defs, expr) : Program =
     List.map convertFunction defs, tope expr

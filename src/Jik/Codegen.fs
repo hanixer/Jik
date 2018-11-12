@@ -79,6 +79,7 @@ let showInstrs out instrs =
         | Set cc ->
             fprintf out "set%s " ((sprintf "%A" cc).ToLower())
         | Label label ->
+            fprintfn out ""
             fprintf out "%s:" label
         | JmpIf (E, label) ->
             fprintf out "je %s" label
@@ -352,12 +353,24 @@ let addFunctionBeginEnd (defs, main) =
          Ret, []]
 
     let handleDef def =
-        let instrs = 
-            (functionBegin def.MaxStack) @ 
-            def.Instrs @ 
-            (functionEnd def.MaxStack)
-        {def with Instrs = instrs}
-    
+        match def.Instrs with
+        | (Label _, []) as i  :: rest->
+            let instrs = 
+                [i] @
+                (functionBegin def.MaxStack) @ 
+                rest @ 
+                (functionEnd def.MaxStack)
+            {def with Instrs = instrs}
+        | _ -> failwith "addFunction...: expected label"
+
+    let main =
+        let i, rest = main.Instrs.Head, main.Instrs.Tail
+        {main with Instrs = [i] @
+                            [Mov, [Reg Rsp; Reg R15]
+                             Mov, [Reg Rcx; Reg Rsp]] @
+                            rest @ 
+                            [Mov, [Reg R15; Reg Rsp]]}
+
     List.map handleDef defs, handleDef main
     
 let rec patchInstr (defs, main) =
