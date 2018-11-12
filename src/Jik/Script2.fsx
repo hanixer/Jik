@@ -34,16 +34,17 @@ let test s =
 
 let testAlloc s =
   s 
-  |> stringToProgram 
+  |> stringToProgram
+  |> fixPrims
   |> alphaRename
   |> revealFunctions 
   |> convertProgram
   |> selectInstructions
+  |> (fun x -> printfn "%s" (Codegen.programToString x); x)
   |> allocateLocals
   |> addFunctionBeginEnd
   |> patchInstr
   |> Codegen.programToString
-  |> (fun x -> printfn "%s" x; x)
 
   
 let e ="
@@ -71,8 +72,14 @@ let e3 = "
         (+ a (+ c f))))))
 (+ (one) 1)"
 let e4 = "(define (f) (if 1 2 3)) (f)"
-let e5 = "(+ 1 (if 1 2 3))"
-
+let e6 = "
+(define (double x) (+ x x))
+(double 2)"
+let e7 = "
+(define (double x) (+ x x))
+(define (manyArgs x1 x2 x3 x4 x5 x6)
+  (+ (double x1) x2 x3 x4 (double x5) x6))
+(manyArgs 1 2 3 4 5 6)"
 
 let tests = [
 //     "#t", "#t\n"
@@ -106,11 +113,10 @@ let tests = [
 //       (+ c (+ d e)))
 //     (let ([f 6])
 //       (+ a (+ c f)))))", "12\n"
-    e2, "2\n"
+    // e2, "2\n"
+    // e4, "2\n"
+    // e6, "4\n"
+    e7, "27\n"
 ]
 
-// "(if (int fun) (call 2) (call 4))" |> test
 runTestsWithName testAlloc "basic" tests
-// testAlloc e3
-// let pr = stringToProgram e2
-// convertProgram pr |> programToString |> printfn "%s"

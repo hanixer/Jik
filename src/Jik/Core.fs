@@ -113,6 +113,24 @@ let rec sexprToExpr sexpr =
     | List(head :: tail) -> App(sexprToExpr head, convertList tail)
     | e -> failwith <| sexprToString e
 
+let rec transform f expr =
+    let rec propagate expr = 
+        match expr with
+        | Expr.If(cond, conseq, altern) -> Expr.If(transform cond, transform conseq, transform altern)
+        | Expr.Assign(var, rhs) -> Expr.Assign(var, transform rhs)
+        | Expr.Lambda(args, body) -> Expr.Lambda(args, List.map transform body)
+        | Expr.Begin(exprs) -> Expr.Begin(List.map transform exprs)
+        | Expr.App(func, args) -> Expr.App(transform func, List.map transform args)
+        | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transform args)
+        | e -> e
+
+    and transform expr =
+        fpt expr
+
+    and fpt = f propagate transform
+    
+    transform expr
+
 let trySubstitute v mapping = 
     match Map.tryFind v mapping with
     | Some(w) -> w
@@ -193,6 +211,28 @@ let revealFunctions (prog : Program) : Program =
         name, (args, List.map handleExpr expr)
 
     List.map handleDef defs, handleExpr expr
+
+let rec fixPrims (prog : Program) : Program =
+    let ops = [Add; Mul;]
+
+    let fold op acc curr =
+        PrimApp(op, [acc; curr])
+
+    let rec handleExpr propagate transform expr =
+        match expr with
+        | Expr.PrimApp(op, args) when (List.contains op ops) && (args.Length > 1) ->
+            let args = List.map transform args
+            List.fold (fold op) args.Head args.Tail
+        | e -> propagate e
+
+    let handleExpr2 = transform handleExpr
+
+    let handleDef (name, (args, expr)) =
+        name, (args, List.map handleExpr2 expr)
+
+    let defs, expr = prog
+
+    List.map handleDef defs, handleExpr2 expr
 
 let rec findModifiedVars expr =
     let find = findModifiedVars

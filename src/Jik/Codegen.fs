@@ -153,11 +153,23 @@ let countMaxArgs labels =
     List.map handleLabel labels
     |> List.max
 
+let argumentToLocation (siStart, siMult) reg args =
+    let registersForArgs = [Rcx; Rdx; R8; R9]
+
+    let fold (regs, index, pairs) arg =
+        match regs with
+        | argReg :: rest -> 
+            rest, index, Map.add arg (Reg argReg) pairs
+        | _ ->
+            let offset = siStart + siMult * index
+            [], index + 1, Map.add arg (Deref(offset, reg)) pairs
+
+    let _, _, result = List.fold fold (registersForArgs, 0, Map.empty) args
+    result
+
 let selectInstructions (defs, labels) : Program =
     let convertNumber n = n <<< fixnumShift
     let moveInt n var = [Mov, [Operand.Int n; Operand.Var var]]
-
-    let registersForArgs = [Rcx; Rdx; R8; R9]
 
     let comparison var1 var2 cc dest =
         let instrs =
@@ -205,14 +217,7 @@ let selectInstructions (defs, labels) : Program =
              Cmp, [Operand.Int falseLiteral; Reg Rax]
              JmpIf (E, labelf), []]
         | Transfer.Call(NonTail label, func, args) ->
-            let _, _, argToLoc = 
-                List.fold (fun (regs, index, pairs) arg ->
-                    match regs with
-                    | reg :: rest -> 
-                        rest, index, Map.add arg (Reg reg) pairs
-                    | _ ->
-                        [], index - wordSize, Map.add arg (Deref(index, Rsp)) pairs
-                    ) (registersForArgs, 0, Map.empty) args
+            let argToLoc = argumentToLocation (0, wordSize) Rsp args
             let instrs =
                 List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
             let argsOfLabel = getArgsOfLabel labels label
@@ -231,14 +236,27 @@ let selectInstructions (defs, labels) : Program =
     let handleLabel labels (name, _, stmts) =
         (InstrName.Label name, []) :: List.collect (handleStmt labels) stmts
 
+    let saveArgs args instrs =
+        let argToLoc = argumentToLocation (2 * wordSize, wordSize) Rbp args
+        let saveInstrs = 
+            List.map (fun arg -> Mov, [Map.find arg argToLoc; Var arg]) args
+        match instrs with
+        | head :: tail -> head :: saveInstrs @ tail
+        | _ -> failwithf "saveArgs: wrong at least one instr expected"
+
     let handleDef (name, args, labels) =
         let maxArgs = countMaxArgs labels
+        let instrs =
+            List.collect (handleLabel labels) labels
+            |> saveArgs args
+        let graph = buildInterference labels
+        printDot graph (__SOURCE_DIRECTORY__ + "/../../misc/graphs/" + name + ".dot")
         { Name = name
           Args = args
           Vars = ref []
           MaxStack = maxArgs
-          InterfGraph = buildInterference labels
-          Instrs = List.collect (handleLabel labels) labels }
+          InterfGraph = graph
+          Instrs = instrs }
 
     List.map handleDef defs, handleDef ("start", [], labels)
 
@@ -284,7 +302,7 @@ let colorGraph graph vars =
     loop (Set.ofSeq vars) Map.empty
 
 let calculateVarToLocEnv graph instrs =
-    let registers = [Rbx; Rcx]
+    let registers = [Rbx; R12; R13; R14; R15]
 
     let rec foldRemaining (acc, remaining, stackIndex) color =
         match remaining with
@@ -330,16 +348,22 @@ let allocateLocals (defs, main) =
     List.map handleFunctionDef defs, handleFunctionDef main
 
 let addFunctionBeginEnd (defs, main) =
-    let functionBegin maxStack =
+    let functionBegin isMain maxStack =
         let n = maxStack * wordSize
+        let additional =
+            if isMain 
+            then [Mov, [Reg Rsp; Reg R15]
+                  Mov, [Reg Rcx; Reg Rsp]] 
+            else []
         [Push, [Reg Rbp]
          Mov, [Reg Rsp; Reg Rbp]
          Push, [Reg R15]
          Push, [Reg R14]
          Push, [Reg R13]
          Push, [Reg R12]
-         Push, [Reg Rbx]
-         Sub, [Operand.Int 0; Reg Rsp]]
+         Push, [Reg Rbx]] @
+         additional @
+         [Sub, [Operand.Int n; Reg Rsp]]
 
     let functionEnd maxStack =
         let n = maxStack * wordSize
@@ -357,27 +381,23 @@ let addFunctionBeginEnd (defs, main) =
         | (Label _, []) as i  :: rest->
             let instrs = 
                 [i] @
-                (functionBegin def.MaxStack) @ 
+                (functionBegin (def.Name = "schemeEntry") def.MaxStack) @ 
                 rest @ 
                 (functionEnd def.MaxStack)
             {def with Instrs = instrs}
         | _ -> failwith "addFunction...: expected label"
 
     let main =
-        let i, rest = main.Instrs.Head, main.Instrs.Tail
-        {main with Instrs = [i] @
-                            [Mov, [Reg Rsp; Reg R15]
-                             Mov, [Reg Rcx; Reg Rsp]] @
-                            rest @ 
+        {main with Instrs = main.Instrs @ 
                             [Mov, [Reg R15; Reg Rsp]]}
 
     List.map handleDef defs, handleDef main
     
 let rec patchInstr (defs, main) =
     let transform = function
-        | op, [Deref(n, Rbp); Deref(m, Rbp)] ->
-            [Mov, [Deref(n,  Rbp); Reg Rax];
-             op, [Reg Rax; Deref(m,  Rbp)]]
+        | op, [Deref(n, reg1); Deref(m, reg2)] ->
+            [Mov, [Deref(n, reg1); Reg Rax];
+             op, [Reg Rax; Deref(m, reg2)]]
         | e -> [e]
 
     let handleDef def =

@@ -391,10 +391,12 @@ let buildInterference labels =
             Set.remove var liveNow
         | _ -> Set.union liveNow (getUsed stmt)
 
-    let handleLabel (name, _, stmts) =
+    let handleLabel (name, args, stmts) =
         let live = Map.find name liveAfterMap
-        List.foldBack handleStmt stmts live
-        |> ignore
+        let liveNow = List.foldBack handleStmt stmts live 
+        List.iter 
+            (fun x -> Set.iter (fun y -> addEdge x y) liveNow)
+            args
 
     List.iter handleLabel labels
 
