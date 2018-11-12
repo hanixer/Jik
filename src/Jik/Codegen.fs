@@ -124,8 +124,8 @@ let showInstrs out instrs =
 
 let instrsToString instrs =
     let out = new StringWriter()
-    fprintfn out "    .globl schemeEntry"
-    fprintfn out "schemeEntry:"
+    fprintfn out "    .globl %s" schemeEntryLabel
+    fprintfn out "%s:" schemeEntryLabel
     showInstrs out instrs
     out.ToString()
 
@@ -138,7 +138,7 @@ let programToString (defs, main) =
         fprintfn out "\n\n"
 
     List.iter handleDef defs
-    handleDef {main with Name = "schemeEntry"}
+    handleDef { main with Name = schemeEntryLabel }
     out.ToString()
 
 let countMaxArgs labels =
@@ -258,7 +258,7 @@ let selectInstructions (defs, labels) : Program =
           InterfGraph = graph
           Instrs = instrs }
 
-    List.map handleDef defs, handleDef ("start", [], labels)
+    List.map handleDef defs, handleDef (schemeEntryLabel, [], labels)
 
 let collectVars instrs =
     List.map snd instrs
@@ -353,8 +353,11 @@ let addFunctionBeginEnd (defs, main) =
         let additional =
             if isMain 
             then [Mov, [Reg Rsp; Reg R15]
-                  Mov, [Reg Rcx; Reg Rsp]] 
+                  Mov, [Reg Rcx; Reg Rsp]
+                  Push, [Reg R15]
+                  Mov, [Reg Rsp; Reg Rbp]] 
             else []
+
         [Push, [Reg Rbp]
          Mov, [Reg Rsp; Reg Rbp]
          Push, [Reg R15]
@@ -365,10 +368,17 @@ let addFunctionBeginEnd (defs, main) =
          additional @
          [Sub, [Operand.Int n; Reg Rsp]]
 
-    let functionEnd maxStack =
+    let functionEnd isMain maxStack =
         let n = maxStack * wordSize
-        [Add, [Operand.Int n; Reg Rsp]
-         Pop, [Reg Rbx]
+        let additional =
+            if isMain 
+            then [Pop, [Reg R15]
+                  Mov, [Reg R15; Reg Rsp]]
+            else []
+
+        [Add, [Operand.Int n; Reg Rsp]] @
+        additional @
+        [Pop, [Reg Rbx]
          Pop, [Reg R12]
          Pop, [Reg R13]
          Pop, [Reg R14]
@@ -379,17 +389,14 @@ let addFunctionBeginEnd (defs, main) =
     let handleDef def =
         match def.Instrs with
         | (Label _, []) as i  :: rest->
+            let isMain = def.Name = schemeEntryLabel
             let instrs = 
                 [i] @
-                (functionBegin (def.Name = "schemeEntry") def.MaxStack) @ 
+                (functionBegin isMain def.MaxStack) @ 
                 rest @ 
-                (functionEnd def.MaxStack)
+                (functionEnd isMain def.MaxStack)
             {def with Instrs = instrs}
         | _ -> failwith "addFunction...: expected label"
-
-    let main =
-        {main with Instrs = main.Instrs @ 
-                            [Mov, [Reg R15; Reg Rsp]]}
 
     List.map handleDef defs, handleDef main
     

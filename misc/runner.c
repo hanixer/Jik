@@ -133,7 +133,6 @@ int main() {
     char* stackHigherAddr = stack + stackSize - wordSize;    
     int heapSize = 32 * 4096;
     char* heap = allocateProtectedSpace(heapSize);
-    printf("s=%x, sh=%x, h=%x\n", stack, stackHigherAddr, heap);
     printPtr(schemeEntry(stackHigherAddr, heap));
     printf("\n");
     deallocateProtectedSpace(stackHigherAddr, stackSize);

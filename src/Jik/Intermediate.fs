@@ -39,6 +39,8 @@ and Function = Var * Var list * Label list
 
 type Program = Function list * Label list
 
+let schemeEntryLabel = "schemeEntry"
+
 let generalAccess labels name f cn =
     match List.tryFind (fun (name2, _, _) -> name2 = name) labels with
     | Some x -> f x
@@ -316,7 +318,7 @@ let convertFunction (name, (args, body)) : Function =
 
 let tope expr =
     let labels, stmts = convertExpr expr (fun var -> [], [Transfer(Return var)])
-    ("schemeEntry", [], stmts) :: labels
+    (schemeEntryLabel, [], stmts) :: labels
 
 let convertProgram (defs, expr) : Program =
     List.map convertFunction defs, tope expr

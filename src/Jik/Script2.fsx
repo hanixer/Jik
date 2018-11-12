@@ -40,7 +40,6 @@ let testAlloc s =
   |> revealFunctions 
   |> convertProgram
   |> selectInstructions
-  |> (fun x -> printfn "%s" (Codegen.programToString x); x)
   |> allocateLocals
   |> addFunctionBeginEnd
   |> patchInstr
@@ -80,6 +79,10 @@ let e7 = "
 (define (manyArgs x1 x2 x3 x4 x5 x6)
   (+ (double x1) x2 x3 x4 (double x5) x6))
 (manyArgs 1 2 3 4 5 6)"
+let e8 = "
+(define (double x) (+ x x))
+(define (twice f x) (f (f x)))
+(twice double -1)"
 
 let tests = [
 //     "#t", "#t\n"
@@ -117,6 +120,7 @@ let tests = [
     // e4, "2\n"
     // e6, "4\n"
     e7, "27\n"
+    e8, "-4\n"
 ]
 
 runTestsWithName testAlloc "basic" tests
