@@ -1,29 +1,32 @@
-#include "scheme.h"
+#include "stdio.h"
 
-/*
-(if #f 1 2)
-*/
+int n = 0;
 
-int n;
-int m;
-int o;
-int p;
-int q;
+int fib(int n) {
+    if (n <= 1) {
+        return n;
+    } 
+    else {
+        return n + fib(n - 1);
+    }
+}
 
-typedef void (*Func)(int);
-
-void testing(int n) {
-    m = n;
+int manyLocals() {
+    int a = n + 1;
+    int b = n + 1;
+    int a1 = a + n + 1;
+    int b1 = b + n + 1;
+    int a2 = a1 + a + n + 1;
+    int b2 = b1 + b + n + 1;
+    int a3 = a2 + a1 + a + n + 1;
+    int b3 = b2 + b1 + b + n + 1;
+    int a4 = a3 + a2 + a1 + a + n + 1;
+    int b4 = b3 + b2 + b1 + b + n + 1;
+    n += a4 + a3 + a2 + a1 + a + n + 1;
+    n += b4 + b3 + b2 + b1 + b + n + 1;
 }
 
 int main() {    
-    Func func;
-    if (m) {
-        func =  testing;
-    }
-    else {
-        func = 0;
-    }
-    func(33);
+    printf("%d\n", fib(100000));
     return 0;
 }

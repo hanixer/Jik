@@ -185,21 +185,32 @@ let selectInstructions (defs, labels) : Program =
         | Some dest ->
             instrs @ [Mov, [Reg Rax; dest]]
 
-    let handleDecl = function
-        | var, Simple.Int n -> moveInt (convertNumber n) var
-        | var, Simple.Bool true -> moveInt trueLiteral var
-        | var, Simple.Bool false -> moveInt falseLiteral var
-        | var, Simple.Prim(Prim.Add, [var1; var2]) ->
+    let handleDecl (var, x) =
+        match x with
+        | Simple.Int n -> moveInt (convertNumber n) var
+        | Simple.Bool true -> moveInt trueLiteral var
+        | Simple.Bool false -> moveInt falseLiteral var
+        | Simple.Prim(Prim.Add, [var1; var2]) ->
             [InstrName.Mov, [Var var1; Var var]
              InstrName.Add, [Var var2; Var var]]
-        | var, Simple.Prim(Prim.Sub, [var1]) ->
+        | Simple.Prim(Prim.Sub, [var1; var2]) ->
+            [InstrName.Mov, [Var var1; Var var]
+             InstrName.Sub, [Var var2; Var var]]
+        | Simple.Prim(Prim.Sub, [var1]) ->
             [InstrName.Mov, [Var var1; Var var]
              InstrName.Neg, [Var var]]
-        | var, Simple.Prim(Prim.Lt, [var1; var2]) ->
+        | Simple.Prim(Prim.Lt, [var1; var2]) ->
             comparison var1 var2 Cc.L (Some(Var var))
-        | var, Simple.FunctionRef(funcRef) ->
+        | Simple.FunctionRef(funcRef) ->
             [Lea(funcRef), [Var var]]
-        | var, e -> failwithf "handleDecl: %s %A" var e
+        | Simple.Prim(Prim.Not, [var1]) ->
+            [Cmp, [Operand.Int falseLiteral; Var var1]
+             Set E, [Reg Al]
+             Movzb, [Reg Al; Reg Rax]
+             Sal, [Operand.Int boolBit; Reg Rax]
+             Or, [Operand.Int falseLiteral; Reg Rax]
+             Mov, [Reg Rax; Var var]]
+        | e -> failwithf "handleDecl: %s %A" var e
 
     let handleTransfer labels = function
         | Return var -> 
@@ -251,6 +262,7 @@ let selectInstructions (defs, labels) : Program =
             |> saveArgs args
         let graph = buildInterference labels
         printDot graph (__SOURCE_DIRECTORY__ + "/../../misc/graphs/" + name + ".dot")
+        printfn "%s:" name
         { Name = name
           Args = args
           Vars = ref []

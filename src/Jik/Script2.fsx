@@ -32,6 +32,9 @@ let test s =
 //     printfn "allocated:\n%s" (instrsToString allocated)
 //     printDot graph (__SOURCE_DIRECTORY__ + "../../../misc/out3.dot")
 
+let saveToFile filename str =
+    System.IO.File.WriteAllText(filename, str)
+
 let testAlloc s =
   s 
   |> stringToProgram
@@ -39,6 +42,7 @@ let testAlloc s =
   |> alphaRename
   |> revealFunctions 
   |> convertProgram
+  |> (fun prog -> prog |> Intermediate.programToString |> saveToFile "test.ir"; prog)
   |> selectInstructions
   |> allocateLocals
   |> addFunctionBeginEnd
@@ -83,6 +87,20 @@ let e8 = "
 (define (double x) (+ x x))
 (define (twice f x) (f (f x)))
 (twice double -1)"
+let e9 = "
+(define (sum n m)
+  (if (< n m)
+    (+ n (sum (+ n 1) m))
+    n))
+(sum 0 1000)"
+let e10 = "
+(define (tak x y z)
+  (if (not (< y x))
+      z
+      (tak (tak (- x 1) y z)
+           (tak (- y 1) z x)
+           (tak (- z 1) x y))))
+(tak 1 2 3)"
 
 let tests = [
 //     "#t", "#t\n"
@@ -117,10 +135,13 @@ let tests = [
 //     (let ([f 6])
 //       (+ a (+ c f)))))", "12\n"
     // e2, "2\n"
+    // e3, "3\n"
     // e4, "2\n"
     // e6, "4\n"
-    e7, "27\n"
-    e8, "-4\n"
+    // e7, "27\n"
+    // e8, "-4\n"
+    // e9, "55\n"
+    e10, "11\n"
 ]
 
 runTestsWithName testAlloc "basic" tests
