@@ -49,6 +49,17 @@ let testAlloc s =
   |> patchInstr
   |> Codegen.programToString
 
+let testNew s =
+    s 
+    |> stringToProgram
+    |> fixPrims
+    |> alphaRename
+    |> revealFunctions 
+    |> convertProgram
+    |> (fun prog -> prog |> Intermediate.programToString |> saveToFile "test.ir"; prog)
+    |> selectInstructions
+    |> Codegen.programToString
+    |> printfn "%s"
   
 let e ="
 (let ([a 1]
@@ -103,37 +114,37 @@ let e10 = "
 (tak 1 2 3)"
 
 let tests = [
-//     "#t", "#t\n"
-//     "#f", "#f\n"
-//     "1", "1\n"
-//     "-1", "-1\n"
-//     "(+ 1 2)", "3\n"
-//     "(+ 1 (+ 2 3))", "6\n"
-//     "(+ (+ 1 4) (+ 2 3))", "10\n"
-//     "(< 1 2)", "#t\n"
-//     "(if 1 2 3)", "2\n"
-//     "(if #f 2 3)", "3\n"
-//     "(if (< 3 1) 2 3)", "3\n"
-//     "(if (if 1 2 3) 4 5)", "4\n"
-//     "(if 4 (if #f 2 3) 5)", "3\n"
-//     "(if 4 (if #t 8 9) (if #f 2 3))", "8\n"    
-//     "
-// (let ([v 1])
-// (let ([w 46])
-// (let ([x (+ v 7)])
-// (let ([y (+ 4 x)])
-// (let ([z (+ x w)])
-// (+ z (- y)))))))", "42\n"
-//     "
-// (let ([a 1]
-//       [b 2]
-//       [c 3])
-//   (if (< a b)
-//     (let ([d 4]
-//           [e 5])
-//       (+ c (+ d e)))
-//     (let ([f 6])
-//       (+ a (+ c f)))))", "12\n"
+    "#t", "#t\n"
+    "#f", "#f\n"
+    "1", "1\n"
+    "-1", "-1\n"
+    "(+ 1 2)", "3\n"
+    "(+ 1 (+ 2 3))", "6\n"
+    "(+ (+ 1 4) (+ 2 3))", "10\n"
+    "(< 1 2)", "#t\n"
+    "(if 1 2 3)", "2\n"
+    "(if #f 2 3)", "3\n"
+    "(if (< 3 1) 2 3)", "3\n"
+    "(if (if 1 2 3) 4 5)", "4\n"
+    "(if 4 (if #f 2 3) 5)", "3\n"
+    "(if 4 (if #t 8 9) (if #f 2 3))", "8\n"    
+    "
+(let ([v 1])
+(let ([w 46])
+(let ([x (+ v 7)])
+(let ([y (+ 4 x)])
+(let ([z (+ x w)])
+(+ z (- y)))))))", "42\n"
+    "
+(let ([a 1]
+      [b 2]
+      [c 3])
+  (if (< a b)
+    (let ([d 4]
+          [e 5])
+      (+ c (+ d e)))
+    (let ([f 6])
+      (+ a (+ c f)))))", "12\n"
     // e2, "2\n"
     // e3, "3\n"
     // e4, "2\n"
@@ -141,7 +152,9 @@ let tests = [
     // e7, "27\n"
     // e8, "-4\n"
     // e9, "55\n"
-    e10, "11\n"
+    // e10, "11\n"
 ]
 
-runTestsWithName testAlloc "basic" tests
+// runTestsWithName testAlloc "basic" tests
+
+testNew e10

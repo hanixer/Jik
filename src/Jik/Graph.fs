@@ -2,29 +2,30 @@ module Graph
 
 open System.Collections.Generic
 
-type Graph = Dictionary<string, Set<string>>
+type Graph<'T when 'T : comparison> = G of Dictionary<'T, Set<'T>>
 
 let makeGraph vertices =
-    let graph = Graph()
+    let graph = Dictionary()
     Seq.iter (fun vert -> graph.Add(vert, Set.empty)) vertices
-    graph
+    G graph
 
-let addEdge (graph : Graph) u v =
+let addEdge (G graph) u v =
     graph.Item u <- graph.Item u |> Set.add v
     graph.Item v <- graph.Item v |> Set.add u
 
-let adjacent (graph : Graph) u = 
+let adjacent (G graph) u = 
     graph.Item u
 
-let vertices (graph : Graph) =
+let vertices (G graph) =
     graph.Keys
 
-let printDot (graph : Graph) fileName = 
+let printDot (G graph as g) fileName = 
     use out = new System.IO.StreamWriter(path=fileName)    
     fprintfn out "strict graph {"
+    fprintfn out "layout=circo"
     Seq.iter (fun v ->
-        fprintfn out "%s" v) (vertices graph)
+        fprintfn out "%s" v) (vertices g)
     Seq.iter (fun v ->
         Seq.iter (fun u ->
-            fprintfn out "%s -- %s" u v) (adjacent graph v)) (vertices graph)
+            fprintfn out "%s -- %s" u v) (adjacent g v)) (vertices g)
     fprintfn out "}\n"

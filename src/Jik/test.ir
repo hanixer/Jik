@@ -1,0 +1,40 @@
+def tak0 (x, y, z)
+tak0 (x, y, z)
+v1 = Lt y, x
+v2 = Not v1
+if v2 LT0 LF0
+LT0 ()
+jump LJ0 z
+LF0 ()
+fr0 = (func-ref tak0)
+fr1 = (func-ref tak0)
+n0 = 1
+v3 = Sub x, n0
+call 
+
+LC0 (r0)
+fr2 = (func-ref tak0)
+n1 = 1
+v4 = Sub y, n1
+call 
+
+LC1 (r1)
+fr3 = (func-ref tak0)
+n2 = 1
+v5 = Sub z, n2
+call 
+
+LC2 (r2)
+call 
+
+LJ0 (v0)
+return v0
+
+schemeEntry ()
+fr4 = (func-ref tak0)
+n3 = 1
+n4 = 2
+n5 = 3
+call 
+LC3 (r3)
+return r3

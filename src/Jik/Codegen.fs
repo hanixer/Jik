@@ -12,6 +12,29 @@ open Display
 /// Language resembles x86 instruction set.
 /// After conversion from Intermediate, 'Var' operands created.
 /// Later these operands are changed to stack locations or registers.
+///
+/// Calling convention:
+/// all arguments are passed via stack.
+/// 
+/// higher address
+/// Caller:
+/// return point
+/// arg1                                               40(rsp)
+/// arg2                                               32(rsp)
+/// local1                                             24(rsp)
+/// local2                                             16(rsp)
+/// local3                                              8(rsp)
+/// ---> place for return point <--- sp points here --- 0(rsp)
+/// Callee-arg1                                        -8(rsp)
+/// Callee-arg2                                       -16(rsp)
+/// ...
+/// lower address
+
+/// N - arguments count
+/// M - locals count
+/// offset for local i(1..M) : (M - i + 1) * 8
+/// offset for argument j(1..N) : (M + N - j + 1) * 8
+
 
 type Register =
     | Rsp | Rbp | Rax | Rbx | Rcx | Rdx | Rsi | Rdi 
@@ -65,7 +88,7 @@ type FunctionDef =
       Instrs : Instr list
       Vars : string list ref
       MaxStack : int
-      InterfGraph : Graph }
+      InterfGraph : Graph<string> }
 
 type Program = FunctionDef list * FunctionDef
 
@@ -153,6 +176,16 @@ let countMaxArgs labels =
     List.map handleLabel labels
     |> List.max
 
+let countVars args labels =
+    let handleStmt = function
+        | Decl(var, _) -> [var]
+        | _ -> []
+    let handleLabel (_, args, stmts) = 
+        args @ (List.collect handleStmt stmts)
+    List.collect handleLabel labels @ args
+    |> List.distinct
+    |> List.length
+
 let argumentToLocation (siStart, siMult) reg args =
     let registersForArgs = [Rcx; Rdx; R8; R9]
 
@@ -214,7 +247,8 @@ let selectInstructions (defs, labels) : Program =
 
     let handleTransfer labels = function
         | Return var -> 
-            [Mov, [Var var; Reg Rax]]
+            [Mov, [Var var; Reg Rax]
+             Ret, []]
         | Transfer.Jump(label, vars) ->
             let args = getArgsOfLabel labels label
             if List.length args <> List.length vars then 
@@ -228,17 +262,25 @@ let selectInstructions (defs, labels) : Program =
              Cmp, [Operand.Int falseLiteral; Reg Rax]
              JmpIf (E, labelf), []]
         | Transfer.Call(NonTail label, func, args) ->
-            let argToLoc = argumentToLocation (0, wordSize) Rsp args
-            let instrs =
-                List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
-            let argsOfLabel = getArgsOfLabel labels label
-            if List.length argsOfLabel <> 1 then 
-                failwith "handleTransfer: wrong number of vars"
-            let argOfLabel = List.head argsOfLabel
-            instrs @ [CallIndirect, [Var func]
-                      Mov, [Reg Rax; Var argOfLabel]
-                      InstrName.Jmp label, []]
-        | Transfer.Call(_, _, _) -> failwith "Not Implemented"
+            let argToLoc = argumentToLocation (-wordSize, -wordSize) Rsp args
+            let moveToArgPositions =
+                List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args                        
+            let afterCall =
+                    let argsOfLabel = getArgsOfLabel labels label
+                    let argOfLabel = List.head argsOfLabel
+                    if List.length argsOfLabel <> 1 then 
+                        failwith "handleTransfer: wrong number of vars"
+                    [Mov, [Reg Rax; Var argOfLabel]
+                     InstrName.Jmp label, []]
+            moveToArgPositions @ [CallIndirect, [Var func]] @ afterCall
+        | Transfer.Call(Tail, func, args) ->
+            // let argToLoc = argumentToLocation (0, -wordSize) Rsp args
+            // let moveToTempPositions =
+            //     List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
+            // let moveToArgPositions =
+            //     List.mapi (fun i arg -> Mov, )
+            failwith ""
+
 
     let handleStmt labels = function
         | Decl decl -> handleDecl decl
@@ -257,12 +299,11 @@ let selectInstructions (defs, labels) : Program =
 
     let handleDef (name, args, labels) =
         let maxArgs = countMaxArgs labels
+        let varsCount = countVars args labels
         let instrs =
             List.collect (handleLabel labels) labels
-            |> saveArgs args
         let graph = buildInterference labels
         printDot graph (__SOURCE_DIRECTORY__ + "/../../misc/graphs/" + name + ".dot")
-        printfn "%s:" name
         { Name = name
           Args = args
           Vars = ref []
@@ -314,7 +355,7 @@ let colorGraph graph vars =
     loop (Set.ofSeq vars) Map.empty
 
 let calculateVarToLocEnv graph instrs =
-    let registers = [Rbx; R12; R13; R14; R15]
+    let registers = []
 
     let rec foldRemaining (acc, remaining, stackIndex) color =
         match remaining with
@@ -343,21 +384,22 @@ let calculateVarToLocEnv graph instrs =
 /// Assign registers or stack locations
 /// for variables using graph coloring
 let allocateLocals (defs, main) =
-    let handleArg env = function
-        | Var var -> Map.find var env
-        | arg -> arg
+    // let handleArg env = function
+    //     | Var var -> Map.find var env
+    //     | arg -> arg
 
-    let handleInstr env (op, args) =
-        op, List.map (handleArg env) args
+    // let handleInstr env (op, args) =
+    //     op, List.map (handleArg env) args
 
-    let handleFunctionDef (def : FunctionDef) =
-        let env, numStackLocals = calculateVarToLocEnv def.InterfGraph def.Instrs
-        let instrs = List.map (handleInstr env) def.Instrs
-        let maxStack = def.MaxStack + numStackLocals
-        {def with Instrs = instrs
-                  MaxStack = maxStack}
+    // let handleFunctionDef (def : FunctionDef) =
+    //     let env, numStackLocals = calculateVarToLocEnv def.InterfGraph def.Instrs
+    //     let instrs = List.map (handleInstr env) def.Instrs
+    //     let maxStack = def.MaxStack + numStackLocals
+    //     {def with Instrs = instrs
+    //               MaxStack = maxStack}
 
-    List.map handleFunctionDef defs, handleFunctionDef main
+    // List.map handleFunctionDef defs, handleFunctionDef main
+    failwith ""
 
 let addFunctionBeginEnd (defs, main) =
     let functionBegin isMain maxStack =
@@ -426,23 +468,63 @@ let rec patchInstr (defs, main) =
 
 let dbg func =
     (fun x -> let y = func x in printfn "%s" (instrsToString y); y)
-    
-// let compile2 s =
-//     let labels = tope (stringToExpr s) 
-//     let live = computeLiveAfter labels
-//     let graph = buildInterference labels live
-//     let instrs = 
-//         allocateLocals (selectInstructions labels, graph)
-//         |> patchInstr
 
-//     let out = instrsToString instrs
+let computePreds instrs = 
+    let labelToIndex = 
+        Seq.mapi (fun i (x, _) -> i, x) instrs
+        |> Seq.collect (fun (i, x) ->
+            match x with
+            | Label s -> [s, i]
+            | _ -> [])
+        |> Map.ofSeq
 
-//     printfn "%s" (labelsToString labels)
-//     printfn "%s\n" out
+    let handleInstr (result, i) (op, _) =
+        match op with
+        | InstrName.Jmp label -> 
+            let index = Map.find label labelToIndex
+            (Map.add index (Map.find index result |> Set.add i) result), i + 1
+        | InstrName.JmpIf(_, label) ->         
+            let index = Map.find label labelToIndex
+            let result = Map.add index (Map.find index result |> Set.add i) result
+            Map.add (i + 1) (Map.find (i + 1) result |> Set.add i) result, i + 1
+        | _ -> 
+            (Map.add (i + 1) (Map.find (i + 1) result |> Set.add i) result), i + 1
 
-//     out
+    Seq.fold handleInstr (Map.empty, 0) instrs
+    |> fst
 
-// let compile3 s =
-//     let prog = stringToProgram s
-//     let out = prog |> selectInstructions |> allocateRegisters |> programToString
+let callerSave = [R10; R11]
 
+let computeLiveAfter2 def =
+    let instrs = def.Instrs |> List.toArray
+    let todo = [0..instrs.Length - 1] |> Set.ofList
+    let preds = computePreds instrs
+
+    let liveIn = System.Collections.Generic.Dictionary()
+    let liveOut = System.Collections.Generic.Dictionary()
+
+    Array.iteri (fun i _ -> 
+        liveIn.Add i (System.Collections.Generic.HashSet())
+        liveOut.Add i (System.Collections.Generic.HashSet())) instrs
+
+    let written (op, args) = 
+        match op with
+        | Add | Sub | Mov | Sar | Sal | And | Or | Xor | Movzb | Cmp ->
+            List.item 1 args
+        | Neg | Set _ | Lea -> List.head args
+        | Call | CallIndirect -> callerSave |> List.map Reg
+        | _ -> []
+
+    let read (op, args) =
+
+    let rec loop todo =
+        if Seq.isEmpty todo then
+            ()
+        else
+            let curr = Seq.head todo
+            let todo = Seq.tail todo
+
+
+
+    Array.rev
+    failwith ""
