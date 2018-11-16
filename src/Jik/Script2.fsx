@@ -1,3 +1,4 @@
+open System.IO
 #load "SExpr.fs"
 #load "Graph.fs"
 #load "Util.fs"
@@ -35,9 +36,12 @@ let test s =
 let saveToFile filename str =
     System.IO.File.WriteAllText(filename, str)
 
-let printIr = (fun prog -> prog |> Intermediate.programToString |> saveToFile ("test.ir"); prog)
+let path = __SOURCE_DIRECTORY__ + "\\..\\..\\misc\\test.ir"
+
+let printIr = (fun prog -> prog |> Intermediate.programToString |> saveToFile (path); prog)
 
 let testInterf s =
+  let ds, m =
     s 
     |> stringToProgram
     |> fixPrims
@@ -48,6 +52,22 @@ let testInterf s =
     |> selectInstructions
     |> computeLiveAfter
     |> buildInterference
+  use out = new StreamWriter(path)
+  let handleDef def =
+    Seq.iteri (fun i instr ->
+      fprintf out "%d) " i
+      showInstr out instr
+      fprintfn out "") def.Instrs
+    Map.iter (fun k v -> 
+      fprintf out "%d) " k
+      Seq.iter (function
+        | Var var -> fprintf out "%s, " var
+        | Reg reg -> fprintf out "%%%s, " (reg.ToString().ToLower())
+        | _ -> ()) v
+      fprintfn out "") def.LiveAfter
+    fprintfn out "\n"
+  List.iter handleDef ds
+  handleDef m
 
 let testAlloc s =
   s 
@@ -126,7 +146,12 @@ let e10 = "
            (tak (- y 1) z x)
            (tak (- z 1) x y))))
 (tak 1 2 3)"
-
+let e11 = "
+(define (polyn x)
+ (+ (* 2 (* x x))
+    (+ (* 3 x)
+       4)))
+(polyn 11)"
 let tests = [
     "#t", "#t\n"
     "#f", "#f\n"
@@ -171,4 +196,4 @@ let tests = [
 
 // runTestsWithName testAlloc "basic" tests
 
-testInterf e8
+testInterf e3

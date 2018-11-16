@@ -89,6 +89,7 @@ type FunctionDef =
       Vars : string list ref
       MaxStack : int
       InterfGraph : Graph<string>
+      LiveBefore : Map<int, Set<Operand>>
       LiveAfter : Map<int, Set<Operand>> }
 
 type Program = FunctionDef list * FunctionDef
@@ -101,7 +102,7 @@ let isArithm = function
     | Add | Sub | Neg | Sar | Sal -> true
     | _ -> false
 
-let showInstrs out instrs =
+let showInstr out (op, args) =
     let showOp op =
         match op with
         | Set cc ->
@@ -134,21 +135,22 @@ let showInstrs out instrs =
             if i <> List.length args - 1 then
                 fprintf out ", ") args
 
-    let showInstr (op, args) =
-        fprintf out "    "
-        match op, args with
-        | CallIndirect, [arg] ->
-            fprintf out "call *"
-            showArg arg
-        | Lea label, [arg] ->
-            fprintf out "leaq %s(%%rip), " label
-            showArg arg
-        | _ ->
-            showOp op
-            showArgs args
-        fprintfn out ""
+    match op, args with
+    | CallIndirect, [arg] ->
+        fprintf out "call *"
+        showArg arg
+    | Lea label, [arg] ->
+        fprintf out "leaq %s(%%rip), " label
+        showArg arg
+    | _ ->
+        showOp op
+        showArgs args
 
-    List.iter showInstr instrs
+let showInstrs out instrs =
+    List.iter (fun instr ->
+        fprintf out "    "
+        showInstr out instr
+        fprintfn out "") instrs
 
 let instrsToString instrs =
     let out = new StringWriter()
@@ -231,6 +233,9 @@ let selectInstructions (defs, labels) : Program =
         | Simple.Prim(Prim.Add, [var1; var2]) ->
             [InstrName.Mov, [Var var1; Var var]
              InstrName.Add, [Var var2; Var var]]
+        | Simple.Prim(Prim.Mul, [var1; var2]) ->
+            [InstrName.Mov, [Var var1; Var var]
+             InstrName.Add, [Var var2; Var var]] // TODO: rework!
         | Simple.Prim(Prim.Sub, [var1; var2]) ->
             [InstrName.Mov, [Var var1; Var var]
              InstrName.Sub, [Var var2; Var var]]
@@ -317,6 +322,7 @@ let selectInstructions (defs, labels) : Program =
           MaxStack = maxArgs
           InterfGraph = graph
           Instrs = instrs
+          LiveBefore = Map.empty
           LiveAfter = Map.empty }
 
     List.map handleDef defs, handleDef (schemeEntryLabel, [], labels)
@@ -567,37 +573,43 @@ let rec computeLiveAfter (defs, main) =
         match op with
         | Call | CallIndirect ->
             Set.ofList callerSave |> Set.map Reg
-        | _ -> Set.empty
-        |> Set.union (Set.ofList args)
+        | Mov | Movzb -> List.head args |> Set.singleton
+        | Set _ -> Set.empty
+        | Ret -> Set.singleton (Reg Rax)
+        | _ -> Set.ofList args
         |> Set.filter isRegVar
 
-    let updatePreds preds liveAfterMap liveBefore =
-        Seq.fold (fun (todo, liveAfterMap) pred ->
-            let liveAfter = Map.find pred liveAfterMap
-            if Set.isSubset liveBefore liveAfter then
-                todo, liveAfterMap
+    let updatePreds preds afterMap beforeMap index =
+        Seq.fold (fun (todo, afterMap) pred ->
+            let after = Map.find pred afterMap
+            let beforeCurr = Map.find index beforeMap
+            if Set.isSubset beforeCurr after then
+                todo, afterMap
             else
-                let map = Map.add pred (Set.union liveAfter liveBefore) liveAfterMap
-                Set.add pred todo, map)
-            (Set.empty, liveAfterMap)
+                let afterMap = Map.add pred (Set.union after beforeCurr) afterMap
+                Set.add pred todo, afterMap)
+            (Set.empty, afterMap)
             preds
 
-    let handleInstr instrs preds liveAfterMap index =
+    let handleInstr instrs preds afterMap beforeMap index =
         let instr = Seq.item index instrs
         let w = writtenBy instr
         let r = readBy instr
-        let liveAfter = Map.find index liveAfterMap
-        let liveBefore = Set.union (Set.difference liveAfter w) r
-        updatePreds (Map.find index preds) liveAfterMap liveBefore
+        let after = Map.find index afterMap
+        let before = Set.union (Set.difference after w) r
+        let afterMap = Map.add index (Set.difference after w) afterMap
+        let beforeMap = Map.add index before beforeMap
+        let todo, afterMap = updatePreds (Map.find index preds) afterMap beforeMap index
+        todo, afterMap, beforeMap
 
-    let rec loop instrs preds todo liveAfterMap =
+    let rec loop instrs preds todo afterMap beforeMap =
         if Set.isEmpty todo then
-            liveAfterMap
+            afterMap, beforeMap
         else
-            let index = Seq.head todo
+            let index = Set.maxElement todo
             let todo1 = Set.remove index todo
-            let todo2, liveAfterMap = handleInstr instrs preds liveAfterMap index
-            loop instrs preds (Set.union todo1 todo2) liveAfterMap
+            let todo2, liveAfterMap, liveBeforeMap = handleInstr instrs preds afterMap beforeMap index
+            loop instrs preds (Set.union todo1 todo2) liveAfterMap liveBeforeMap
 
     let liveAfter instrs = 
         let preds = computePreds instrs
@@ -605,10 +617,11 @@ let rec computeLiveAfter (defs, main) =
         let liveAfterMap =
             Seq.fold (fun (map, i) _ -> Map.add i Set.empty map, i + 1) (Map.empty, 0) instrs 
             |> fst
-        loop instrs preds todo liveAfterMap
+        loop instrs preds todo liveAfterMap liveAfterMap
 
     let handleDef def =
-        { def with LiveAfter = liveAfter def.Instrs }
+        let afterMap, beforeMap = liveAfter def.Instrs
+        { def with LiveAfter = afterMap; LiveBefore = beforeMap }
 
     List.map handleDef defs, handleDef main
 
@@ -698,3 +711,9 @@ let rec buildInterference (defs, main) =
 //         op, List.map handleArg args
 
 //     List.map handleInstr instrs
+
+
+let allocateRegisters (defs, main) =
+    let handleDef def =
+        def
+    List.map handleDef defs, handleDef main
