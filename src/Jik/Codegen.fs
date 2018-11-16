@@ -49,6 +49,7 @@ type Operand =
     | ByteReg of Register
     | Deref of int * Register
     | Var of Var
+    | Slot of int
 
 type Cc =
     | E
@@ -88,7 +89,7 @@ type FunctionDef =
       Instrs : Instr list
       Vars : string list ref
       MaxStack : int
-      InterfGraph : Graph<string>
+      InterfGraph : Graph<Operand>
       LiveBefore : Map<int, Set<Operand>>
       LiveAfter : Map<int, Set<Operand>> }
 
@@ -128,6 +129,7 @@ let showInstr out (op, args) =
         | Deref(n, r) -> fprintf out "%d(%s)" n (reg r)
         | Var(v) -> fprintf out "[var %s]" v
         | ByteReg(r) -> fprintf out "%s" (reg r)
+        | Slot(n) -> fprintfn out "{slot %d}" n
         
     let showArgs args =
         List.iteri (fun i arg -> 
@@ -312,9 +314,7 @@ let selectInstructions (defs, labels) : Program =
         let varsCount = countVars args labels
         let instrs =
             List.collect (handleLabel labels) labels
-        let graph = buildInterference labels
-
-        printDot graph (__SOURCE_DIRECTORY__ + "/../../misc/graphs/" + name + ".dot")
+        let graph = makeGraph []
 
         { Name = name
           Args = args
@@ -336,84 +336,6 @@ let collectVars instrs =
             | _ -> Set.empty) args
         |> Set.unionMany)
     |> Set.unionMany
-
-/// Takes interference graph and all used variables
-/// and returns mapping from variables to their colors
-let colorGraph graph vars =
-    let banned = Dictionary<string, Set<int>>()
-    Seq.iter (fun var -> banned.Add(var, Set.empty)) vars
-
-    let pickNode nodes =
-        Seq.maxBy (fun node -> 
-            banned.Item node |> Seq.length) nodes
-
-    let rec findLowestColor bannedSet =
-        Seq.initInfinite id
-        |> Seq.find (fun x -> Seq.exists ((=) x) bannedSet |> not)
-
-    let updateBanned node color =
-        adjacent graph node
-        |> Seq.iter (fun v -> 
-            banned.Item v <- banned.Item v |> Set.add color)
-
-    let rec loop nodes color =
-        if Set.isEmpty nodes then
-            color
-        else
-            let node = pickNode nodes
-            let lowest = findLowestColor (banned.Item node)
-            let color = Map.add node lowest color
-            updateBanned node lowest
-            loop (Set.remove node nodes) color
-    
-    loop (Set.ofSeq vars) Map.empty
-
-let calculateVarToLocEnv graph instrs =
-    let registers = []
-
-    let rec foldRemaining (acc, remaining, stackIndex) color =
-        match remaining with
-        | reg :: rest ->
-            (Map.add color (Reg reg) acc, rest, stackIndex)
-        | _ ->
-            let stackIndex = stackIndex - wordSize
-            (Map.add color (Deref(stackIndex, Rbp)) acc, [], stackIndex)
-    
-    let getColorToLoc color =
-        let colorSet = 
-            Map.toList color 
-            |> List.map snd 
-            |> Set.ofList
-        let toLoc, _, _ = 
-            Set.fold foldRemaining (Map.empty, registers, 0) colorSet
-        toLoc    
-        
-    let varToColor = colorGraph graph (collectVars instrs)
-    let colorToLoc = getColorToLoc varToColor        
-    let env = Map.map (fun _ color -> Map.find color colorToLoc) varToColor
-    let numStackLocals = (Map.count colorToLoc) - (List.length registers)
-
-    env, numStackLocals
-
-/// Assign registers or stack locations
-/// for variables using graph coloring
-let allocateLocals (defs, main) =
-    // let handleArg env = function
-    //     | Var var -> Map.find var env
-    //     | arg -> arg
-
-    // let handleInstr env (op, args) =
-    //     op, List.map (handleArg env) args
-
-    // let handleFunctionDef (def : FunctionDef) =
-    //     let env, numStackLocals = calculateVarToLocEnv def.InterfGraph def.Instrs
-    //     let instrs = List.map (handleInstr env) def.Instrs
-    //     let maxStack = def.MaxStack + numStackLocals
-    //     {def with Instrs = instrs
-    //               MaxStack = maxStack}
-
-    // List.map handleFunctionDef defs, handleFunctionDef main
-    failwith ""
 
 let addFunctionBeginEnd (defs, main) =
     let functionBegin isMain maxStack =
@@ -517,44 +439,7 @@ let computePreds instrs =
 
 let callerSave = [R10; R11]
 
-let computeLiveAfter2 def =
-    // let instrs = def.Instrs |> List.toArray
-    // let todo = [0..instrs.Length - 1] |> Set.ofList
-    // let preds = computePreds instrs
-
-    // let liveIn = System.Collections.Generic.Dictionary()
-    // let liveOut = System.Collections.Generic.Dictionary()
-
-    // Array.iteri (fun i _ -> 
-    //     liveIn.Add i (System.Collections.Generic.HashSet())
-    //     liveOut.Add i (System.Collections.Generic.HashSet())) instrs
-
-    // let written (op, args) = 
-    //     match op with
-    //     | Add | Sub | Mov | Sar | Sal | And | Or | Xor | Movzb | Cmp ->
-    //         List.item 1 args
-    //     | Neg | Set _ | Lea -> List.head args
-    //     | Call | CallIndirect -> callerSave |> List.map Reg
-    //     | _ -> []
-
-    // let read (op, args) =
-
-    // let rec loop todo =
-    //     if Seq.isEmpty todo then
-    //         ()
-    //     else
-    //         let curr = Seq.head todo
-    //         let todo = Seq.tail todo
-
-
-
-    // Array.rev
-    failwith ""
-
-
-
-
-let rec computeLiveAfter (defs, main) =
+let rec computeLiveness (defs, main) =
     let isRegVar = 
         function 
         | Reg _ | Var _ -> true 
@@ -626,9 +511,20 @@ let rec computeLiveAfter (defs, main) =
     List.map handleDef defs, handleDef main
 
 let rec buildInterference (defs, main) =
+    let registersForUse = 
+        [Rax; Rbx; Rcx; Rdx; Rsi; Rdi; 
+         R8; R9; R10; R11; R12; R13; R14; R15]
+        |> Set.ofList
+                          
+
     let filterAndAddEdges graph ignore live target =
         Set.difference live (Set.ofList ignore)
         |> Set.iter (addEdge graph target)
+
+    let isGoodArg = function
+        | Var _ -> true
+        | Reg reg -> Set.contains reg registersForUse
+        | _ -> false
 
     let iter live graph index (op, args) =
         let live =            
@@ -637,83 +533,126 @@ let rec buildInterference (defs, main) =
             | None _ ->
                 failwithf "buildInterference: iter: index=%d live=%A size=%d" index live (Map.count live)                
         match args with
-        | [_; Var _ as arg] | [_; Reg _ as arg] ->
+        | [_; arg] when isGoodArg arg ->
             filterAndAddEdges graph [] live arg
-        | [Var _ as arg] | [Reg _ as arg] ->
+        | [arg] when isGoodArg arg ->
             filterAndAddEdges graph [] live arg
         | _ -> ()
 
     let handleDef def =
         let vars = collectVars def.Instrs |> Set.map Var
-        let regs = Set.ofList allRegisters |> Set.map Reg
+        let regs = registersForUse |> Set.map Reg
         let graph = makeGraph (Set.union vars regs)
         Seq.iteri (iter def.LiveAfter graph) def.Instrs
         printDotFunc (function | Var var -> var | Reg reg -> reg.ToString().ToLower() | _ -> "ERROR") graph (__SOURCE_DIRECTORY__ + "/../../misc/graphs/" + def.Name + ".dot")
-        def
+        {def with InterfGraph = graph}
 
     List.map handleDef defs, handleDef main
 
 /// Takes interference graph and all used variables
-/// and returns mapping from variables to their colors
-// let colorGraph graph vars =
-//     let banned = Dictionary<string, Set<int>>()
-//     Seq.iter (fun var -> banned.Add(var, Set.empty)) vars
+/// and returns mapping from variables and registers to their colors
+let assignColors graph uncolored initialMap =
+    let banned = Dictionary<Operand, Set<int>>()
+    let addBanned v c =
+        banned.Item v <- banned.Item v |> Set.add c
 
-//     let pickNode nodes =
-//         Seq.maxBy (fun node -> 
-//             banned.Item node |> Seq.length) nodes
+    let initBanned () =
+        banned.Clear()
+        for var in vertices graph do
+            banned.Add(var, Set.empty)
+            for adj in adjacent graph var  do
+                if Map.containsKey adj initialMap then
+                    let color = Map.find adj initialMap
+                    addBanned var color
+                        
 
-//     let rec findLowestColor bannedSet =
-//         Seq.initInfinite id
-//         |> Seq.find (fun x -> Seq.exists ((=) x) bannedSet |> not)
+    let pickNode nodes =
+        Seq.maxBy (fun node -> 
+            if banned.ContainsKey node then
+                banned.Item node |> Seq.length
+            else
+                for kv in banned do printf "%A :: %A ;;;; " kv.Key kv.Value
+                printfn "\n\n"
+                -1 
+            ) nodes
 
-//     let updateBanned node color =
-//         adjacent graph node
-//         |> Seq.iter (fun v -> 
-//             banned.Item v <- banned.Item v |> Set.add color)
+    let rec findLowestColor bannedSet =
+        Seq.initInfinite id
+        |> Seq.find (fun x -> Seq.exists ((=) x) bannedSet |> not)
 
-//     let rec loop nodes color =
-//         if Set.isEmpty nodes then
-//             color
-//         else
-//             let node = pickNode nodes
-//             let lowest = findLowestColor (banned.Item node)
-//             let color = Map.add node lowest color
-//             updateBanned node lowest
-//             loop (Set.remove node nodes) color
-    
-//     loop (Set.ofSeq vars) Map.empty
+    let updateBanned node color =
+        adjacent graph node
+        |> Seq.iter (fun v -> 
+            addBanned v color)
 
-/// Assign registers or stack locations
-/// for variables using graph coloring
-// let allocateRegisters (instrs, graph) =
-//     let color = colorGraph graph (collectVars instrs)
-//     let registers = [Rbx]
+    let rec loop nodes map =
+        if Set.isEmpty nodes then
+            map
+        else
+            let node = pickNode nodes
+            let lowest = findLowestColor (banned.Item node)
+            let color = Map.add node lowest map
+            updateBanned node lowest
+            loop (Set.remove node nodes) color
 
-//     let rec fold (acc, remaining, stackIndex) _ color =
-//         match remaining with
-//         | reg :: rest ->
-//             (Map.add color (Reg reg) acc, rest, stackIndex)
-//         | _ ->
-//             let stackIndex = stackIndex - wordSize
-//             (Map.add color (Deref(stackIndex, Rbp)) acc, [], stackIndex)
+    initBanned()
+    loop (Set.ofSeq uncolored) initialMap
 
-//     let colorToLocation, _, _ = 
-//         Map.fold fold (Map.empty, registers, 0) color
+let isRegister = function | Reg _ -> true | _ -> false
 
-//     let handleArg = function
-//         | Var var ->
-//             let colorValue = Map.find var color
-//             Map.find colorValue colorToLocation
-//         | arg -> arg
+let makeInitialColorMap graph = 
+    vertices graph
+    |> Seq.filter isRegister
+    |> Seq.mapi (fun i reg -> reg, i)
+    |> Map.ofSeq
 
-//     let handleInstr(op, args) =
-//         op, List.map handleArg args
+let getSortedVars graph =
+    vertices graph
+    |> Seq.filter (function | Var _ -> true | _ -> false)
+    |> Seq.map (fun var -> 
+        let l = adjacent graph var
+        var, Seq.length l)
+    |> Seq.sortBy snd
+    |> Seq.rev
+    |> Seq.map fst
 
-//     List.map handleInstr instrs
+let getOperandToLocation operandToColor =
+    let result, _, _ =
+        operandToColor
+        |> Map.fold (fun (result, colorToLocation, slot) operand color ->
+            match operand with
+            | Var _ ->
+                match Map.tryFind color colorToLocation with
+                | Some location ->
+                    Map.add operand location result, colorToLocation, slot
+                | None ->
+                    let colorToLocation = 
+                        Map.add color (Slot slot) colorToLocation
+                    Map.add operand operand result, colorToLocation, slot + 1
+            | Reg _ ->
+                Map.add operand operand result, Map.add color operand colorToLocation, slot
+            | _ -> failwithf "getOperandToLocation: wrong operand %A" operand) 
+            (Map.empty, Map.empty, 0)
+    result
 
-
+/// Takes a program with computed interference graph
+/// and allocates location for variables in the
+/// registers or in the stack
 let allocateRegisters (defs, main) =
+    let handleArg env arg =
+        match Map.tryFind arg env with
+        | Some other -> 
+            other
+        | _ -> arg
+
+    let handleInstr env (op, args) =
+        op, List.map (handleArg env) args
+
     let handleDef def =
-        def
+        let vars = getSortedVars def.InterfGraph
+        let initial = makeInitialColorMap def.InterfGraph
+        let operandToColor = assignColors def.InterfGraph vars initial
+        let operandToLocation = getOperandToLocation operandToColor
+        {def with Instrs = List.map (handleInstr operandToLocation) def.Instrs}
+
     List.map handleDef defs, handleDef main

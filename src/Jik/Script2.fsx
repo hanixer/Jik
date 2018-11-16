@@ -50,7 +50,6 @@ let testInterf s =
     |> convertProgram
     |> printIr
     |> selectInstructions
-    |> computeLiveAfter
     |> buildInterference
   use out = new StreamWriter(path)
   let handleDef def =
@@ -69,7 +68,7 @@ let testInterf s =
   List.iter handleDef ds
   handleDef m
 
-let testAlloc s =
+let testMainTest s =
   s 
   |> stringToProgram
   |> fixPrims
@@ -78,8 +77,9 @@ let testAlloc s =
   |> convertProgram
   |> printIr
   |> selectInstructions
-  |> allocateLocals
-  |> addFunctionBeginEnd
+  |> computeLiveness
+  |> buildInterference
+  |> allocateRegisters
   |> patchInstr
   |> Codegen.programToString
 
@@ -194,6 +194,7 @@ let tests = [
     // e10, "11\n"
 ]
 
-// runTestsWithName testAlloc "basic" tests
+runTestsWithName testMainTest "basic" tests
 
-testInterf e3
+// testMainTest e3 
+// |> printfn "%s"
