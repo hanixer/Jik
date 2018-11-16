@@ -35,6 +35,20 @@ let test s =
 let saveToFile filename str =
     System.IO.File.WriteAllText(filename, str)
 
+let printIr = (fun prog -> prog |> Intermediate.programToString |> saveToFile ("test.ir"); prog)
+
+let testInterf s =
+    s 
+    |> stringToProgram
+    |> fixPrims
+    |> alphaRename
+    |> revealFunctions 
+    |> convertProgram
+    |> printIr
+    |> selectInstructions
+    |> computeLiveAfter
+    |> buildInterference
+
 let testAlloc s =
   s 
   |> stringToProgram
@@ -42,7 +56,7 @@ let testAlloc s =
   |> alphaRename
   |> revealFunctions 
   |> convertProgram
-  |> (fun prog -> prog |> Intermediate.programToString |> saveToFile "test.ir"; prog)
+  |> printIr
   |> selectInstructions
   |> allocateLocals
   |> addFunctionBeginEnd
@@ -56,7 +70,7 @@ let testNew s =
     |> alphaRename
     |> revealFunctions 
     |> convertProgram
-    |> (fun prog -> prog |> Intermediate.programToString |> saveToFile "test.ir"; prog)
+    |> printIr
     |> selectInstructions
     |> Codegen.programToString
     |> printfn "%s"
@@ -157,4 +171,4 @@ let tests = [
 
 // runTestsWithName testAlloc "basic" tests
 
-testNew e10
+testInterf e8

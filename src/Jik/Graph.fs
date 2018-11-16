@@ -10,8 +10,11 @@ let makeGraph vertices =
     G graph
 
 let addEdge (G graph) u v =
-    graph.Item u <- graph.Item u |> Set.add v
-    graph.Item v <- graph.Item v |> Set.add u
+    if graph.ContainsKey(u) && graph.ContainsKey(v) then
+        graph.Item u <- graph.Item u |> Set.add v
+        graph.Item v <- graph.Item v |> Set.add u
+    else
+        failwithf "addEdge: %A or %A is not in the graph" u v
 
 let adjacent (G graph) u = 
     graph.Item u
@@ -28,4 +31,15 @@ let printDot (G graph as g) fileName =
     Seq.iter (fun v ->
         Seq.iter (fun u ->
             fprintfn out "%s -- %s" u v) (adjacent g v)) (vertices g)
+    fprintfn out "}\n"
+
+let printDotFunc func (G graph as g) fileName = 
+    use out = new System.IO.StreamWriter(path=fileName)    
+    fprintfn out "strict graph {"
+    fprintfn out "layout=circo"
+    Seq.iter (fun v ->
+        fprintfn out "%s" (func v)) (vertices g)
+    Seq.iter (fun v ->
+        Seq.iter (fun u ->
+            fprintfn out "%s -- %s" (func u) (func v)) (adjacent g v)) (vertices g)
     fprintfn out "}\n"

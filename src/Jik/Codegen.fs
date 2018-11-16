@@ -88,9 +88,14 @@ type FunctionDef =
       Instrs : Instr list
       Vars : string list ref
       MaxStack : int
-      InterfGraph : Graph<string> }
+      InterfGraph : Graph<string>
+      LiveAfter : Map<int, Set<Operand>> }
 
 type Program = FunctionDef list * FunctionDef
+
+let allRegisters = [Rsp; Rbp; Rax; Rbx; Rcx; Rdx; Rsi; Rdi; 
+                    R8; R9; R10; R11; R12; R13; R14; R15; 
+                    Al; Ah; Bl; Bh; Cl; Ch]
 
 let isArithm = function
     | Add | Sub | Neg | Sar | Sal -> true
@@ -303,13 +308,16 @@ let selectInstructions (defs, labels) : Program =
         let instrs =
             List.collect (handleLabel labels) labels
         let graph = buildInterference labels
+
         printDot graph (__SOURCE_DIRECTORY__ + "/../../misc/graphs/" + name + ".dot")
+
         { Name = name
           Args = args
           Vars = ref []
           MaxStack = maxArgs
           InterfGraph = graph
-          Instrs = instrs }
+          Instrs = instrs
+          LiveAfter = Map.empty }
 
     List.map handleDef defs, handleDef (schemeEntryLabel, [], labels)
 
@@ -478,53 +486,215 @@ let computePreds instrs =
             | _ -> [])
         |> Map.ofSeq
 
-    let handleInstr (result, i) (op, _) =
+    let handleInstr (mapping, i) (op, _) =
+        let add index mapping =
+            if index < Seq.length instrs then
+                (Map.add index (Map.find index mapping |> Set.add i) mapping)
+            else mapping
+
         match op with
         | InstrName.Jmp label -> 
             let index = Map.find label labelToIndex
-            (Map.add index (Map.find index result |> Set.add i) result), i + 1
+            add index mapping, i + 1
         | InstrName.JmpIf(_, label) ->         
             let index = Map.find label labelToIndex
-            let result = Map.add index (Map.find index result |> Set.add i) result
-            Map.add (i + 1) (Map.find (i + 1) result |> Set.add i) result, i + 1
+            add index mapping 
+            |> add (i + 1), i + 1
         | _ -> 
-            (Map.add (i + 1) (Map.find (i + 1) result |> Set.add i) result), i + 1
+            add (i + 1) mapping, i + 1
 
-    Seq.fold handleInstr (Map.empty, 0) instrs
+    let initial = 
+        Seq.fold (fun (mapping, i) _ -> Map.add i Set.empty mapping, i + 1) (Map.empty, 0) instrs
+        |> fst
+    Seq.fold handleInstr (initial, 0) instrs
     |> fst
 
 let callerSave = [R10; R11]
 
 let computeLiveAfter2 def =
-    let instrs = def.Instrs |> List.toArray
-    let todo = [0..instrs.Length - 1] |> Set.ofList
-    let preds = computePreds instrs
+    // let instrs = def.Instrs |> List.toArray
+    // let todo = [0..instrs.Length - 1] |> Set.ofList
+    // let preds = computePreds instrs
 
-    let liveIn = System.Collections.Generic.Dictionary()
-    let liveOut = System.Collections.Generic.Dictionary()
+    // let liveIn = System.Collections.Generic.Dictionary()
+    // let liveOut = System.Collections.Generic.Dictionary()
 
-    Array.iteri (fun i _ -> 
-        liveIn.Add i (System.Collections.Generic.HashSet())
-        liveOut.Add i (System.Collections.Generic.HashSet())) instrs
+    // Array.iteri (fun i _ -> 
+    //     liveIn.Add i (System.Collections.Generic.HashSet())
+    //     liveOut.Add i (System.Collections.Generic.HashSet())) instrs
 
-    let written (op, args) = 
+    // let written (op, args) = 
+    //     match op with
+    //     | Add | Sub | Mov | Sar | Sal | And | Or | Xor | Movzb | Cmp ->
+    //         List.item 1 args
+    //     | Neg | Set _ | Lea -> List.head args
+    //     | Call | CallIndirect -> callerSave |> List.map Reg
+    //     | _ -> []
+
+    // let read (op, args) =
+
+    // let rec loop todo =
+    //     if Seq.isEmpty todo then
+    //         ()
+    //     else
+    //         let curr = Seq.head todo
+    //         let todo = Seq.tail todo
+
+
+
+    // Array.rev
+    failwith ""
+
+
+
+
+let rec computeLiveAfter (defs, main) =
+    let isRegVar = 
+        function 
+        | Reg _ | Var _ -> true 
+        | _ -> false
+
+    let writtenBy (op, args)  = 
         match op with
         | Add | Sub | Mov | Sar | Sal | And | Or | Xor | Movzb | Cmp ->
-            List.item 1 args
-        | Neg | Set _ | Lea -> List.head args
-        | Call | CallIndirect -> callerSave |> List.map Reg
-        | _ -> []
+            List.item 1 args|> Set.singleton
+        | Neg | Set _ | Lea _ -> List.head args |> Set.singleton
+        | Call | CallIndirect -> callerSave |> List.map Reg |> Set.ofList
+        | _ -> Set.empty
+        |> Set.filter isRegVar
 
-    let read (op, args) =
+    let readBy (op, args) =
+        match op with
+        | Call | CallIndirect ->
+            Set.ofList callerSave |> Set.map Reg
+        | _ -> Set.empty
+        |> Set.union (Set.ofList args)
+        |> Set.filter isRegVar
 
-    let rec loop todo =
-        if Seq.isEmpty todo then
-            ()
+    let updatePreds preds liveAfterMap liveBefore =
+        Seq.fold (fun (todo, liveAfterMap) pred ->
+            let liveAfter = Map.find pred liveAfterMap
+            if Set.isSubset liveBefore liveAfter then
+                todo, liveAfterMap
+            else
+                let map = Map.add pred (Set.union liveAfter liveBefore) liveAfterMap
+                Set.add pred todo, map)
+            (Set.empty, liveAfterMap)
+            preds
+
+    let handleInstr instrs preds liveAfterMap index =
+        let instr = Seq.item index instrs
+        let w = writtenBy instr
+        let r = readBy instr
+        let liveAfter = Map.find index liveAfterMap
+        let liveBefore = Set.union (Set.difference liveAfter w) r
+        updatePreds (Map.find index preds) liveAfterMap liveBefore
+
+    let rec loop instrs preds todo liveAfterMap =
+        if Set.isEmpty todo then
+            liveAfterMap
         else
-            let curr = Seq.head todo
-            let todo = Seq.tail todo
+            let index = Seq.head todo
+            let todo1 = Set.remove index todo
+            let todo2, liveAfterMap = handleInstr instrs preds liveAfterMap index
+            loop instrs preds (Set.union todo1 todo2) liveAfterMap
 
+    let liveAfter instrs = 
+        let preds = computePreds instrs
+        let todo = [0..Seq.length instrs - 1] |> Set.ofList
+        let liveAfterMap =
+            Seq.fold (fun (map, i) _ -> Map.add i Set.empty map, i + 1) (Map.empty, 0) instrs 
+            |> fst
+        loop instrs preds todo liveAfterMap
 
+    let handleDef def =
+        { def with LiveAfter = liveAfter def.Instrs }
 
-    Array.rev
-    failwith ""
+    List.map handleDef defs, handleDef main
+
+let rec buildInterference (defs, main) =
+    let filterAndAddEdges graph ignore live target =
+        Set.difference live (Set.ofList ignore)
+        |> Set.iter (addEdge graph target)
+
+    let iter live graph index (op, args) =
+        let live =            
+            match Map.tryFind index live with
+            | Some vl -> vl
+            | None _ ->
+                failwithf "buildInterference: iter: index=%d live=%A size=%d" index live (Map.count live)                
+        match args with
+        | [_; Var _ as arg] | [_; Reg _ as arg] ->
+            filterAndAddEdges graph [] live arg
+        | [Var _ as arg] | [Reg _ as arg] ->
+            filterAndAddEdges graph [] live arg
+        | _ -> ()
+
+    let handleDef def =
+        let vars = collectVars def.Instrs |> Set.map Var
+        let regs = Set.ofList allRegisters |> Set.map Reg
+        let graph = makeGraph (Set.union vars regs)
+        Seq.iteri (iter def.LiveAfter graph) def.Instrs
+        printDotFunc (function | Var var -> var | Reg reg -> reg.ToString().ToLower() | _ -> "ERROR") graph (__SOURCE_DIRECTORY__ + "/../../misc/graphs/" + def.Name + ".dot")
+        def
+
+    List.map handleDef defs, handleDef main
+
+/// Takes interference graph and all used variables
+/// and returns mapping from variables to their colors
+// let colorGraph graph vars =
+//     let banned = Dictionary<string, Set<int>>()
+//     Seq.iter (fun var -> banned.Add(var, Set.empty)) vars
+
+//     let pickNode nodes =
+//         Seq.maxBy (fun node -> 
+//             banned.Item node |> Seq.length) nodes
+
+//     let rec findLowestColor bannedSet =
+//         Seq.initInfinite id
+//         |> Seq.find (fun x -> Seq.exists ((=) x) bannedSet |> not)
+
+//     let updateBanned node color =
+//         adjacent graph node
+//         |> Seq.iter (fun v -> 
+//             banned.Item v <- banned.Item v |> Set.add color)
+
+//     let rec loop nodes color =
+//         if Set.isEmpty nodes then
+//             color
+//         else
+//             let node = pickNode nodes
+//             let lowest = findLowestColor (banned.Item node)
+//             let color = Map.add node lowest color
+//             updateBanned node lowest
+//             loop (Set.remove node nodes) color
+    
+//     loop (Set.ofSeq vars) Map.empty
+
+/// Assign registers or stack locations
+/// for variables using graph coloring
+// let allocateRegisters (instrs, graph) =
+//     let color = colorGraph graph (collectVars instrs)
+//     let registers = [Rbx]
+
+//     let rec fold (acc, remaining, stackIndex) _ color =
+//         match remaining with
+//         | reg :: rest ->
+//             (Map.add color (Reg reg) acc, rest, stackIndex)
+//         | _ ->
+//             let stackIndex = stackIndex - wordSize
+//             (Map.add color (Deref(stackIndex, Rbp)) acc, [], stackIndex)
+
+//     let colorToLocation, _, _ = 
+//         Map.fold fold (Map.empty, registers, 0) color
+
+//     let handleArg = function
+//         | Var var ->
+//             let colorValue = Map.find var color
+//             Map.find colorValue colorToLocation
+//         | arg -> arg
+
+//     let handleInstr(op, args) =
+//         op, List.map handleArg args
+
+//     List.map handleInstr instrs
