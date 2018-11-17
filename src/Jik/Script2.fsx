@@ -81,7 +81,8 @@ let testMainTest s =
   |> computeLiveness
   |> buildInterference
   |> allocateRegisters
-  |> addFunctionBeginEnd
+  |> convertSlots
+  |> stackCorrections
   |> patchInstr
   |> Codegen.programToString
 
@@ -189,12 +190,12 @@ let tests = [
     // e2, "2\n"
     // e3, "3\n"
     // e4, "2\n"
-    e6, "4\n"
+    // e6, "4\n"
     // e7, "27\n"
-    // e8, "-4\n"
-    // e9, "55\n"
-    // e10, "11\n"
+    e8, "-4\n"
+    e9, "55\n"
+    e10, "3\n"
 ]
 
 runTestsWithName testMainTest "basic" tests
-// testInterf e6
+// testInterf e8

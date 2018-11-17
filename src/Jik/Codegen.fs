@@ -80,6 +80,8 @@ type InstrName =
     | JmpIf of Cc * string
     | Label of string
     | Lea of string
+    // intermediate
+    | RestoreStack
 
 and Instr = InstrName * Operand list
 
@@ -91,7 +93,8 @@ type FunctionDef =
       MaxStack : int
       InterfGraph : Graph<Operand>
       LiveBefore : Map<int, Set<Operand>>
-      LiveAfter : Map<int, Set<Operand>> }
+      LiveAfter : Map<int, Set<Operand>>
+      SlotsOccupied : int }
 
 type Program = FunctionDef list * FunctionDef
 
@@ -270,6 +273,7 @@ let selectInstructions (defs, labels) : Program =
     let handleTransfer labels = function
         | Return var -> 
             [Mov, [Var var; Reg Rax]
+             RestoreStack, []
              Ret, []]
         | Transfer.Jump(label, vars) ->
             let args = getArgsOfLabel labels label
@@ -317,11 +321,12 @@ let selectInstructions (defs, labels) : Program =
             List.map (fun arg -> Mov, [Map.find arg argToLoc; Var arg]) args
         match instrs with
         | head :: tail -> head :: saveInstrs @ tail
-        | _ -> failwithf "saveArgs: wrong at least one instr expected"
+        | _ -> instrs
 
     let handleDef (name, args, labels) =
         let instrs =
             List.collect (handleLabel labels) labels
+            |> saveArgs args
         let graph = makeGraph []
         { Name = name
           Args = args
@@ -330,12 +335,13 @@ let selectInstructions (defs, labels) : Program =
           InterfGraph = graph
           Instrs = instrs
           LiveBefore = Map.empty
-          LiveAfter = Map.empty }
+          LiveAfter = Map.empty
+          SlotsOccupied = List.length args - List.length registersForArgs }
 
     let impl = freshLabel "schemeEntryImpl"
     let implLabels =
         match labels with
-        | (schemeEntryLabel, [], stmts) :: rest ->
+        | (_, [], stmts) :: rest ->
             (impl, [], stmts) :: rest
         | _ -> failwith "selectInstructions: wrong entry labels"
     let defs = (impl, [], implLabels) :: defs
@@ -352,102 +358,6 @@ let collectVars instrs =
             | _ -> Set.empty) args
         |> Set.unionMany)
     |> Set.unionMany
-
-let addFunctionBeginEnd (defs, main) =
-    let functionBegin isMain maxStack =
-        let n = maxStack * wordSize
-        let additional =
-            if isMain 
-            then [Mov, [Reg Rsp; Reg R15]
-                  Mov, [Reg Rcx; Reg Rsp]
-                  Push, [Reg R15]
-                  Mov, [Reg Rsp; Reg Rbp]] 
-            else []
-
-        [Push, [Reg Rbp]
-         Mov, [Reg Rsp; Reg Rbp]
-         Push, [Reg R15]
-         Push, [Reg R14]
-         Push, [Reg R13]
-         Push, [Reg R12]
-         Push, [Reg Rbx]] @
-         additional @
-         [Sub, [Operand.Int n; Reg Rsp]]
-
-    let functionEnd isMain maxStack =
-        let n = maxStack * wordSize
-        let additional =
-            if isMain 
-            then [Pop, [Reg R15]
-                  Mov, [Reg R15; Reg Rsp]]
-            else []
-
-        [Add, [Operand.Int n; Reg Rsp]] @
-        additional @
-        [Pop, [Reg Rbx]
-         Pop, [Reg R12]
-         Pop, [Reg R13]
-         Pop, [Reg R14]
-         Pop, [Reg R15]
-         Pop, [Reg Rbp]
-         Ret, []]
-
-    let handleDef def =
-        match def.Instrs with
-        | (Label _, []) as i  :: rest->
-            let isMain = def.Name = schemeEntryLabel
-            let instrs = 
-                [i] @
-                (functionBegin isMain def.MaxStack) @ 
-                rest @ 
-                (functionEnd isMain def.MaxStack)
-            {def with Instrs = instrs}
-        | _ -> failwith "addFunction...: expected label"
-
-    let handleMain def =
-        match def.Instrs with
-        | (Label _, []) as i  :: rest->
-            let n = def.MaxStack * wordSize
-            let freshEntry = freshLabel schemeEntryLabel
-            let instrs = 
-                [i
-                 Push, [Reg R15]
-                 Mov, [Reg Rsp; Reg R15]
-                 Mov, [Reg Rcx; Reg Rsp]
-                 Push, [Reg Rbp]
-                 Push, [Reg R15]
-                 Push, [Reg R14]
-                 Push, [Reg R13]
-                 Push, [Reg R12]
-                 Push, [Reg Rbx]
-                 Call freshEntry, []
-                 Pop, [Reg Rbx]
-                 Pop, [Reg R12]
-                 Pop, [Reg R13]
-                 Pop, [Reg R14]
-                 Pop, [Reg R15]
-                 Pop, [Reg Rbp]
-                 Mov, [Reg R15; Reg Rsp]
-                 Pop, [Reg R15]
-                 Ret, []]
-            {def with Instrs = instrs}, {def with Name = freshEntry; Instrs = (Label freshEntry, []) :: rest}
-        | _ -> failwith "addFunction...: expected label"
-
-    let main, entry = handleMain main
-
-    entry :: defs, main
-    
-let rec patchInstr (defs, main) =
-    let transform = function
-        | op, [Deref(n, reg1); Deref(m, reg2)] ->
-            [Mov, [Deref(n, reg1); Reg Rax];
-             op, [Reg Rax; Deref(m, reg2)]]
-        | e -> [e]
-
-    let handleDef def =
-        {def with Instrs = List.collect transform def.Instrs}
-
-    List.map handleDef defs, handleDef main
 
 let dbg func =
     (fun x -> let y = func x in printfn "%s" (instrsToString y); y)
@@ -494,8 +404,9 @@ let rec computeLiveness (defs, main) =
         match op with
         | Add | Sub | Mov | Sar | Sal | And | Or | Xor | Movzb | Cmp ->
             List.item 1 args|> Set.singleton
-        | Neg | Set _ | Lea _ -> List.head args |> Set.singleton
+        | Neg | Set _ -> List.head args |> Set.singleton
         | Call _ | CallIndirect -> callerSave |> List.map Reg |> Set.ofList
+        | Lea _ -> Set.ofList (Reg Rax :: args)
         | _ -> Set.empty
         |> Set.filter isRegVar
 
@@ -508,7 +419,7 @@ let rec computeLiveness (defs, main) =
             |> Set.union (Set.ofList args)
         | Mov | Movzb -> List.head args |> Set.singleton
         | Set _ -> Set.empty
-        | Ret -> Set.singleton (Reg Rax)
+        | Ret -> Set.ofList (Rax :: calleeSave) |> Set.map Reg
         | _ -> Set.ofList args
         |> Set.filter isRegVar
 
@@ -562,7 +473,7 @@ let rec computeLiveness (defs, main) =
 
 let rec buildInterference (defs, main) =
     let registersForUse = 
-        [Rax; Rbx; Rcx; Rdx; Rsi; Rdi; 
+        [Rax; Rbx; Rcx; Rdx; Rsi; Rdi; Rbp;
          R8; R9; R10; R11; R12; R13; R14; R15]
         |> Set.ofList
                           
@@ -667,7 +578,7 @@ let getSortedVars graph =
     |> Seq.map fst
 
 let getOperandToLocation operandToColor =
-    let result, _, _ =
+    let result, _, slots =
         operandToColor
         |> Map.fold (fun (result, colorToLocation, slot) operand color ->
             match operand with
@@ -678,12 +589,12 @@ let getOperandToLocation operandToColor =
                 | None ->
                     let colorToLocation = 
                         Map.add color (Slot slot) colorToLocation
-                    Map.add operand operand result, colorToLocation, slot + 1
+                    Map.add operand (Slot slot) result, colorToLocation, slot + 1
             | Reg _ ->
                 Map.add operand operand result, Map.add color operand colorToLocation, slot
             | _ -> failwithf "getOperandToLocation: wrong operand %A" operand) 
             (Map.empty, Map.empty, 0)
-    result
+    result, slots
 
 /// Takes a program with computed interference graph
 /// and allocates location for variables in the
@@ -702,7 +613,82 @@ let allocateRegisters (defs, main) =
         let vars = getSortedVars def.InterfGraph
         let initial = makeInitialColorMap def.InterfGraph
         let operandToColor = assignColors def.InterfGraph vars initial
-        let operandToLocation = getOperandToLocation operandToColor
-        {def with Instrs = List.map (handleInstr operandToLocation) def.Instrs}
+        let operandToLocation, slots = getOperandToLocation operandToColor
+        {def with Instrs = List.map (handleInstr operandToLocation) def.Instrs
+                  SlotsOccupied = slots}
+
+    List.map handleDef defs, handleDef main
+
+let convertSlots (defs, main) =
+    let handleArg arg =
+        match arg with
+        | Slot n ->
+            Deref(n * wordSize, Rsp)
+        | _ -> arg
+
+    let handleInstr (op, args) =
+        op, List.map handleArg args
+
+    let handleDef def =
+        {def with Instrs = List.map (handleInstr) def.Instrs}
+
+    List.map handleDef defs, handleDef main
+
+
+let stackCorrections (defs, main) =
+    let restoreStack n = function
+        | RestoreStack, [] -> Add, [Operand.Int n; Reg Rsp]
+        | x -> x
+
+    let handleDef def =
+        let h, rest = List.head def.Instrs, List.tail def.Instrs
+        let n = def.SlotsOccupied * wordSize
+        let rest = List.map (restoreStack n) rest
+        { def with Instrs = h :: (Sub, [Operand.Int n; Reg Rsp]) :: rest }
+
+    let handleMain def =
+        match def.Instrs with
+        | (Label _, []) as i  :: rest->
+            let n = def.MaxStack * wordSize
+            let instrs = 
+                [i
+                 Push, [Reg R15]
+                 Mov, [Reg Rsp; Reg R15]
+                 Mov, [Reg Rcx; Reg Rsp]
+                 Push, [Reg Rbp]
+                 Push, [Reg R15]
+                 Push, [Reg R14]
+                 Push, [Reg R13]
+                 Push, [Reg R12]
+                 Push, [Reg Rbx]] @
+                rest @
+                [Pop, [Reg Rbx]
+                 Pop, [Reg R12]
+                 Pop, [Reg R13]
+                 Pop, [Reg R14]
+                 Pop, [Reg R15]
+                 Pop, [Reg Rbp]
+                 Mov, [Reg R15; Reg Rsp]
+                 Pop, [Reg R15]
+                 Ret, []]
+            {def with Instrs = instrs}
+        | _ -> failwith "addFunction...: expected label"
+
+    List.map handleDef defs, handleMain main
+    
+let rec patchInstr (defs, main) =
+    let transform (op, args) =
+        match op, args with
+        | op, [Deref(n, reg1); Deref(m, reg2)] ->
+            [Mov, [Deref(n, reg1); Reg Rax];
+             op, [Reg Rax; Deref(m, reg2)]]
+        | Lea _, [Reg _] -> [op, args]
+        | Lea s, [arg] ->
+            [Mov, [arg; Reg Rax]
+             Lea s, [Reg Rax]]
+        | e -> [e]
+
+    let handleDef def =
+        {def with Instrs = List.collect transform def.Instrs}
 
     List.map handleDef defs, handleDef main
