@@ -26,6 +26,52 @@ let rec findLowestColor3 bannedSet =
             else n
     loop 0 bannedSet
 
-#time
+let s1 = "something
+go
+there
+now
+yo
+can 
+see 
+what is exactly is the
+lopwerst part in the
+control flow"
+let s2 = "1
+2
+3
+4
+5
+6
+7
+8
+6
+54
+6
+23
+2
+3
+4
+5
+"
+let s3 = "
+!
+@
+#
+$
+%
+^
+&
+*
+&
+^
+&
+^
+&
+*
+&
+^
+%
+^
+"
 
-findLowestColor2 banned
+appendStringsByCol s1 s2 |> appendStringsByCol <| s3 |>  printfn "%s"

@@ -8,7 +8,9 @@ open System.IO
 #load "Core.fs"
 #load "Intermediate.fs"
 #load "Codegen.fs"
+#load "Util.fs"
 
+open Util
 open Core
 open Graph
 open TestDriver
@@ -52,20 +54,28 @@ let testInterf s =
     |> selectInstructions
     |> computeLiveness
     |> buildInterference
-  use out = new StreamWriter(path)
-  let handleDef def =
-    Seq.iteri (fun i instr ->
-      fprintf out "%d) " i
-      showInstr out instr
-      fprintfn out "") def.Instrs
+  use fileOut = new StreamWriter(path)
+  let handleLiv out live =
     Map.iter (fun k v -> 
       fprintf out "%d) " k
       Seq.iter (function
         | Var var -> fprintf out "%s, " var
         | Reg reg -> fprintf out "%%%s, " (reg.ToString().ToLower())
         | _ -> ()) v
-      fprintfn out "") def.LiveAfter
+      fprintfn out "") live
     fprintfn out "\n"
+  let handleDef def =
+    let out = new StringWriter()
+    Seq.iteri (fun i instr ->
+      fprintf out "%d) " i
+      showInstr out instr
+      fprintfn out "") def.Instrs
+    let out1 = new StringWriter()
+    handleLiv out1 def.LiveBefore
+    let out2 = new StringWriter()
+    handleLiv out2 def.LiveAfter
+    // fprintfn fileOut "%s" ((out.ToString()) |> appendStringsByCol <| (out1.ToString())  |> appendStringsByCol <| (out2.ToString()))
+    fprintfn fileOut "%s" ((out.ToString()) + (out1.ToString())  + (out2.ToString()))
   List.iter handleDef ds
   handleDef m
 
@@ -191,11 +201,12 @@ let tests = [
     // e3, "3\n"
     // e4, "2\n"
     // e6, "4\n"
-    // e7, "27\n"
-    e8, "-4\n"
-    e9, "55\n"
-    e10, "3\n"
+    e7, "27\n"
+    // e8, "-4\n"
+    // e9, "55\n"
+    // e10, "3\n"
+    // e11, "33\n"
 ]
 
 runTestsWithName testMainTest "basic" tests
-// testInterf e8
+testInterf e7

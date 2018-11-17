@@ -13,8 +13,6 @@ let addEdge (G graph) u v =
     if graph.ContainsKey(u) && graph.ContainsKey(v) then
         graph.Item u <- graph.Item u |> Set.add v
         graph.Item v <- graph.Item v |> Set.add u
-    else
-        failwithf "addEdge: %A or %A is not in the graph" u v
 
 let adjacent (G graph) u = 
     graph.Item u

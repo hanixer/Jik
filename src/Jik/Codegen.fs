@@ -107,7 +107,7 @@ let registersForArgs =
     [Rcx; Rdx; R8; R9]
 
 let callerSave = 
-    [R10; R11; R8; R9; Rax; Rcx; Rdi; Rdx; Rsi]
+    [R10; R11; R8; R9; Rcx; Rdi; Rdx; Rsi]
 
 let calleeSave =
     [R12; R13; R14; R15; Rbp; Rbx]
@@ -122,7 +122,6 @@ let showInstr out (op, args) =
         | Set cc ->
             fprintf out "set%s " ((sprintf "%A" cc).ToLower())
         | Label label ->
-            fprintfn out ""
             fprintf out "%s:" label
         | JmpIf (E, label) ->
             fprintf out "je %s" label
@@ -328,6 +327,8 @@ let selectInstructions (defs, labels) : Program =
             List.collect (handleLabel labels) labels
             |> saveArgs args
         let graph = makeGraph []
+        let diff = List.length args - List.length registersForArgs
+        let slots = if diff > 0 then diff else 0
         { Name = name
           Args = args
           Vars = ref []
@@ -336,7 +337,7 @@ let selectInstructions (defs, labels) : Program =
           Instrs = instrs
           LiveBefore = Map.empty
           LiveAfter = Map.empty
-          SlotsOccupied = List.length args - List.length registersForArgs }
+          SlotsOccupied = slots }
 
     let impl = freshLabel "schemeEntryImpl"
     let implLabels =
@@ -412,8 +413,7 @@ let rec computeLiveness (defs, main) =
 
     let readBy (op, args) =
         match op with
-        | Call _ ->
-            Set.ofList callerSave |> Set.map Reg
+        | Call _ -> registersForArgs |> Set.ofList |> Set.map Reg            
         | CallIndirect ->
             Set.ofList (callerSave) |> Set.map Reg
             |> Set.union (Set.ofList args)
@@ -473,17 +473,19 @@ let rec computeLiveness (defs, main) =
 
 let rec buildInterference (defs, main) =
     let registersForUse = 
-        [Rax; Rbx; Rcx; Rdx; Rsi; Rdi; Rbp;
+        [Rbx; Rcx; Rdx; Rsi; Rdi; Rbp;
          R8; R9; R10; R11; R12; R13; R14; R15]
         |> Set.ofList
                           
 
     let filterAndAddEdges graph ignore live target =
         Set.difference live (Set.ofList ignore)
-        |> Set.iter (addEdge graph target)
+        |> Set.iter (fun x -> 
+            addEdge graph target x)
 
     let isGoodArg = function
         | Var _ -> true
+        | Reg Rax -> false
         | Reg reg -> Set.contains reg registersForUse
         | _ -> false
 
@@ -493,10 +495,13 @@ let rec buildInterference (defs, main) =
             | Some vl -> vl
             | None _ ->
                 failwithf "buildInterference: iter: index=%d live=%A size=%d" index live (Map.count live)
-        match args with
-        | [_; arg] when isGoodArg arg ->
+        match op, args with
+        | Call _, _ | CallIndirect, _ ->
+            for reg in callerSave do
+                filterAndAddEdges graph [] live (Reg reg)
+        | _, [_; arg] when isGoodArg arg ->
             filterAndAddEdges graph [] live arg
-        | [arg] when isGoodArg arg ->
+        | _, [arg] when isGoodArg arg ->
             filterAndAddEdges graph [] live arg
         | _ -> ()
 
@@ -615,7 +620,7 @@ let allocateRegisters (defs, main) =
         let operandToColor = assignColors def.InterfGraph vars initial
         let operandToLocation, slots = getOperandToLocation operandToColor
         {def with Instrs = List.map (handleInstr operandToLocation) def.Instrs
-                  SlotsOccupied = slots}
+                  SlotsOccupied = def.SlotsOccupied + slots}
 
     List.map handleDef defs, handleDef main
 
@@ -677,6 +682,11 @@ let stackCorrections (defs, main) =
     List.map handleDef defs, handleMain main
     
 let rec patchInstr (defs, main) =
+    let filterMoves =
+        List.filter (function
+            | Mov, [arg1; arg2] when arg1 = arg2 -> false
+            | _ -> true)
+
     let transform (op, args) =
         match op, args with
         | op, [Deref(n, reg1); Deref(m, reg2)] ->
@@ -684,11 +694,11 @@ let rec patchInstr (defs, main) =
              op, [Reg Rax; Deref(m, reg2)]]
         | Lea _, [Reg _] -> [op, args]
         | Lea s, [arg] ->
-            [Mov, [arg; Reg Rax]
-             Lea s, [Reg Rax]]
+            [Lea s, [Reg Rax]
+             Mov, [Reg Rax; arg]]
         | e -> [e]
 
     let handleDef def =
-        {def with Instrs = List.collect transform def.Instrs}
+        {def with Instrs = List.collect transform def.Instrs |> filterMoves}
 
     List.map handleDef defs, handleDef main
