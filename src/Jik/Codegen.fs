@@ -88,6 +88,7 @@ and Instr = InstrName * Operand list
 type FunctionDef = 
     { Name : string
       Args : string list
+      StackArgs : string list
       Instrs : Instr list
       Vars : string list ref
       MaxStack : int
@@ -216,6 +217,7 @@ let argumentToLocation (siStart, siMult) reg args =
             rest, index, Map.add arg (Reg argReg) pairs
         | _ ->
             let offset = siStart + siMult * index
+            printfn "%A ====> %d" arg offset
             [], index + 1, Map.add arg (Deref(offset, reg)) pairs
 
     let _, _, result = List.fold fold (registersForArgs, 0, Map.empty) args
@@ -287,7 +289,7 @@ let selectInstructions (defs, labels) : Program =
              Cmp, [Operand.Int falseLiteral; Reg Rax]
              JmpIf (E, labelf), []]
         | Transfer.Call(NonTail label, func, args) ->
-            let argToLoc = argumentToLocation (-wordSize, -wordSize) Rsp args
+            let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
             let moveToArgPositions =
                 List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args                        
             let afterCall =
@@ -315,7 +317,11 @@ let selectInstructions (defs, labels) : Program =
         (InstrName.Label name, []) :: List.collect (handleStmt labels) stmts
 
     let saveArgs args instrs =
-        let argToLoc = argumentToLocation (2 * wordSize, wordSize) Rbp args
+        let args = 
+            if List.length args > List.length registersForArgs then
+                List.take (List.length registersForArgs) args
+            else args
+        let argToLoc = argumentToLocation (wordSize, wordSize) Rbp args
         let saveInstrs = 
             List.map (fun arg -> Mov, [Map.find arg argToLoc; Var arg]) args
         match instrs with
@@ -329,8 +335,10 @@ let selectInstructions (defs, labels) : Program =
         let graph = makeGraph []
         let diff = List.length args - List.length registersForArgs
         let slots = if diff > 0 then diff else 0
+        let stackArgs = if diff > 0 then List.skip (List.length registersForArgs) args else []
         { Name = name
           Args = args
+          StackArgs = stackArgs
           Vars = ref []
           MaxStack = 0
           InterfGraph = graph
@@ -566,15 +574,22 @@ let assignColors graph uncolored initialMap =
 
 let isRegister = function | Reg _ -> true | _ -> false
 
-let makeInitialColorMap graph = 
-    vertices graph
-    |> Seq.filter isRegister
-    |> Seq.mapi (fun i reg -> reg, i)
+let makeInitialColorMap graph stackArgs = 
+    let regs =
+        vertices graph
+        |> Seq.filter isRegister
+    let count = Seq.length regs
+    let seq1 = Seq.mapi (fun i reg -> reg, i) regs
+    let seq2 = Seq.mapi (fun i arg -> arg, i + count) stackArgs
+    Seq.append seq1 seq2
     |> Map.ofSeq
 
-let getSortedVars graph =
+let getSortedVars graph stackArgs =
     vertices graph
-    |> Seq.filter (function | Var _ -> true | _ -> false)
+    |> Seq.filter (function 
+        | Var var when Seq.contains var stackArgs -> false
+        | Var _ -> true 
+        | _ -> false)
     |> Seq.map (fun var -> 
         let l = adjacent graph var
         var, Seq.length l)
@@ -582,11 +597,14 @@ let getSortedVars graph =
     |> Seq.rev
     |> Seq.map fst
 
-let getOperandToLocation operandToColor =
+let getOperandToLocation operandToColor stackArgs =
     let result, _, slots =
         operandToColor
         |> Map.fold (fun (result, colorToLocation, slot) operand color ->
             match operand with
+            | Var var when Seq.contains var stackArgs ->
+                let index = Seq.findIndex ((=)var) stackArgs
+                Map.add operand (Slot index) result, Map.add color (Slot index) colorToLocation, slot
             | Var _ ->
                 match Map.tryFind color colorToLocation with
                 | Some location ->
@@ -598,7 +616,7 @@ let getOperandToLocation operandToColor =
             | Reg _ ->
                 Map.add operand operand result, Map.add color operand colorToLocation, slot
             | _ -> failwithf "getOperandToLocation: wrong operand %A" operand) 
-            (Map.empty, Map.empty, 0)
+            (Map.empty, Map.empty, Seq.length stackArgs)
     result, slots
 
 /// Takes a program with computed interference graph
@@ -615,27 +633,27 @@ let allocateRegisters (defs, main) =
         op, List.map (handleArg env) args
 
     let handleDef def =
-        let vars = getSortedVars def.InterfGraph
-        let initial = makeInitialColorMap def.InterfGraph
+        let vars = getSortedVars def.InterfGraph def.StackArgs
+        let initial = makeInitialColorMap def.InterfGraph (Seq.map Var def.StackArgs)
         let operandToColor = assignColors def.InterfGraph vars initial
-        let operandToLocation, slots = getOperandToLocation operandToColor
+        let operandToLocation, slots = getOperandToLocation operandToColor def.StackArgs
         {def with Instrs = List.map (handleInstr operandToLocation) def.Instrs
                   SlotsOccupied = def.SlotsOccupied + slots}
 
     List.map handleDef defs, handleDef main
 
 let convertSlots (defs, main) =
-    let handleArg arg =
+    let handleArg slots arg =
         match arg with
         | Slot n ->
-            Deref(n * wordSize, Rsp)
+            Deref((slots - n - 1) * wordSize, Rsp)
         | _ -> arg
 
-    let handleInstr (op, args) =
-        op, List.map handleArg args
+    let handleInstr slots (op, args) =
+        op, List.map (handleArg slots) args
 
     let handleDef def =
-        {def with Instrs = List.map (handleInstr) def.Instrs}
+        {def with Instrs = List.map (handleInstr def.SlotsOccupied) def.Instrs}
 
     List.map handleDef defs, handleDef main
 
