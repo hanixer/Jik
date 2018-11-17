@@ -77,6 +77,7 @@ type InstrName =
     | Set of Cc
     | Movzb
     | Jmp of string
+    | JmpIndirect
     | JmpIf of Cc * string
     | Label of string
     | Lea of string
@@ -156,6 +157,9 @@ let showInstr out (op, args) =
     | CallIndirect, [arg] ->
         fprintf out "call *"
         showArg arg
+    | JmpIndirect, [arg] ->
+        fprintf out "jmp *"
+        showArg arg
     | Lea label, [arg] ->
         fprintf out "leaq %s(%%rip), " label
         showArg arg
@@ -217,7 +221,6 @@ let argumentToLocation (siStart, siMult) reg args =
             rest, index, Map.add arg (Reg argReg) pairs
         | _ ->
             let offset = siStart + siMult * index
-            printfn "%A ====> %d" arg offset
             [], index + 1, Map.add arg (Deref(offset, reg)) pairs
 
     let _, _, result = List.fold fold (registersForArgs, 0, Map.empty) args
@@ -292,21 +295,30 @@ let selectInstructions (defs, labels) : Program =
             let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
             let moveToArgPositions =
                 List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args                        
-            let afterCall =
-                let argsOfLabel = getArgsOfLabel labels label
-                let argOfLabel = List.head argsOfLabel
-                if List.length argsOfLabel <> 1 then 
-                    failwith "handleTransfer: wrong number of vars"
-                [Mov, [Reg Rax; Var argOfLabel]
-                 InstrName.Jmp label, []]
-            moveToArgPositions @ [CallIndirect, [Var func]] @ afterCall
+            let argsOfLabel = getArgsOfLabel labels label
+            let argOfLabel = List.head argsOfLabel
+            if List.length argsOfLabel <> 1 then 
+                failwith "handleTransfer: wrong number of vars"
+            moveToArgPositions @ 
+            [CallIndirect, [Var func]
+             Mov, [Reg Rax; Var argOfLabel]
+             InstrName.Jmp label, []]
         | Transfer.Call(Tail, func, args) ->
-            // let argToLoc = argumentToLocation (0, -wordSize) Rsp args
-            // let moveToTempPositions =
-            //     List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
-            // let moveToArgPositions =
-            //     List.mapi (fun i arg -> Mov, )
-            failwith ""
+            let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
+            let moveToArgPositions =
+                List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
+            let moveStackArgs =
+                if List.length args > List.length registersForArgs then
+                    List.skip (List.length registersForArgs) moveToArgPositions 
+                    |> List.mapi (fun i x ->
+                        match x with
+                        | Mov, [_; arg2] -> Mov, [arg2; Slot(i)]
+                        | _ -> failwith "wrong")
+                else []
+            moveToArgPositions @ 
+            moveStackArgs @ 
+            [RestoreStack, []
+             JmpIndirect, [Var func]]
 
 
     let handleStmt labels = function
@@ -597,7 +609,7 @@ let getSortedVars graph stackArgs =
     |> Seq.rev
     |> Seq.map fst
 
-let getOperandToLocation operandToColor stackArgs =
+let geconvertMainExprsrandToLocation operandToColor stackArgs =
     let result, _, slots =
         operandToColor
         |> Map.fold (fun (result, colorToLocation, slot) operand color ->
@@ -615,7 +627,7 @@ let getOperandToLocation operandToColor stackArgs =
                     Map.add operand (Slot slot) result, colorToLocation, slot + 1
             | Reg _ ->
                 Map.add operand operand result, Map.add color operand colorToLocation, slot
-            | _ -> failwithf "getOperandToLocation: wrong operand %A" operand) 
+            | _ -> failwithf "geconvertMainExprsrandToLocation: wrong operand %A" operand) 
             (Map.empty, Map.empty, Seq.length stackArgs)
     result, slots
 
@@ -636,7 +648,7 @@ let allocateRegisters (defs, main) =
         let vars = getSortedVars def.InterfGraph def.StackArgs
         let initial = makeInitialColorMap def.InterfGraph (Seq.map Var def.StackArgs)
         let operandToColor = assignColors def.InterfGraph vars initial
-        let operandToLocation, slots = getOperandToLocation operandToColor def.StackArgs
+        let operandToLocation, slots = geconvertMainExprsrandToLocation operandToColor def.StackArgs
         {def with Instrs = List.map (handleInstr operandToLocation) def.Instrs
                   SlotsOccupied = def.SlotsOccupied + slots}
 

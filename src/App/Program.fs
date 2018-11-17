@@ -14,12 +14,12 @@ module Program
 
 // let test s =
 //     stringToExpr s
-//     |> tope
+//     |> convertMainExprs
 //     |> labelsToString
 //     |> printfn "%s"
 
 // // let testInterf s =
-// //     let labels = stringToExpr s|> tope
+// //     let labels = stringToExpr s|> convertMainExprs
 // //     let live = computeLiveAfter labels
 // //     let graph = buildInterference labels live
 // //     let allocated = allocateRegisters (selectInstructions labels, graph)

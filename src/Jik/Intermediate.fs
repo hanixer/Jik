@@ -312,16 +312,16 @@ and convertMany exprs (cont : Var list -> Label list * Stmt list) =
 
 let convertFunction (name, (args, body)) : Function =
     let labels, stmts = 
-        convertExpr (Begin body) (fun var -> [], [Transfer(Return var)])
+        convertExprTail (Begin body)
     let labels = (name, args, stmts) :: labels
     name, args, labels
 
-let tope expr =
-    let labels, stmts = convertExpr expr (fun var -> [], [Transfer(Return var)])
+let convertMainExprs expr =
+    let labels, stmts = convertExprTail expr
     (schemeEntryLabel, [], stmts) :: labels
 
 let convertProgram (defs, expr) : Program =
-    List.map convertFunction defs, tope expr
+    List.map convertFunction defs, convertMainExprs expr
     
 let computeLiveAfter labels : Map<string, Set<string>> =
     let st = Set.singleton

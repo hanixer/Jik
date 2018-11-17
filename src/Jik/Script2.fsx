@@ -1,14 +1,15 @@
 open System.IO
-#load "SExpr.fs"
-#load "Graph.fs"
-#load "Util.fs"
-#load "Display.fs"
-#load "TestDriver.fs"
-#load "RuntimeConstants.fs"
-#load "Core.fs"
-#load "Intermediate.fs"
-#load "Codegen.fs"
-#load "Util.fs"
+// #load "SExpr.fs"
+// #load "Graph.fs"
+// #load "Util.fs"
+// #load "Display.fs"
+// #load "TestDriver.fs"
+// #load "RuntimeConstants.fs"
+// #load "Core.fs"
+// #load "Intermediate.fs"
+// #load "Codegen.fs"
+// #load "Util.fs"
+#load "references.fsx"
 
 open Util
 open Core
@@ -21,12 +22,12 @@ open Codegen
 
 let test s =
     stringToExpr s
-    |> tope
+    |> convertMainExprs
     |> labelsToString
     |> printfn "%s"
 
 // let testInterf s =
-//     let labels = stringToExpr s|> tope
+//     let labels = stringToExpr s|> convertMainExprs
 //     let live = computeLiveAfter labels
 //     let graph = buildInterference labels live
 //     let allocated = allocateRegisters (selectInstructions labels, graph)
@@ -146,11 +147,13 @@ let e8 = "
 (define (twice f x) (f (f x)))
 (twice double -1)"
 let e9 = "
-(define (sum n m)
+(define (helper acc n m)
   (if (< n m)
-    (+ n (sum (+ n 1) m))
-    n))
-(sum 0 1000)"
+    (helper (+ acc (+ n 1)) (+ n 1) m)
+    acc))
+(define (sum n m)
+  (helper 0 n m))
+(sum 0 10000)"
 let e10 = "
 (define (tak x y z)
   (if (not (< y x))
@@ -203,7 +206,7 @@ let tests = [
     e6, "4\n"
     e7, "27\n"
     e8, "-4\n"
-    e9, "55\n"
+    e9, "50005000\n"
     e10, "3\n"
     e11, "-2\n"
 ]
