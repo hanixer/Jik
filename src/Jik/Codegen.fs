@@ -67,7 +67,7 @@ type InstrName =
     | Sal
     | And
     | Or
-    | Call
+    | Call of string
     | CallIndirect
     | Push
     | Pop
@@ -95,9 +95,19 @@ type FunctionDef =
 
 type Program = FunctionDef list * FunctionDef
 
-let allRegisters = [Rsp; Rbp; Rax; Rbx; Rcx; Rdx; Rsi; Rdi; 
-                    R8; R9; R10; R11; R12; R13; R14; R15; 
-                    Al; Ah; Bl; Bh; Cl; Ch]
+let allRegisters = 
+    [Rsp; Rbp; Rax; Rbx; Rcx; Rdx; Rsi; Rdi; 
+     R8; R9; R10; R11; R12; R13; R14; R15; 
+     Al; Ah; Bl; Bh; Cl; Ch]
+
+let registersForArgs = 
+    [Rcx; Rdx; R8; R9]
+
+let callerSave = 
+    [R10; R11; R8; R9; Rax; Rcx; Rdi; Rdx; Rsi]
+
+let calleeSave =
+    [R12; R13; R14; R15; Rbp; Rbx]
 
 let isArithm = function
     | Add | Sub | Neg | Sar | Sal -> true
@@ -115,6 +125,8 @@ let showInstr out (op, args) =
             fprintf out "je %s" label
         | Jmp label ->
             fprintf out "jmp %s" label
+        | Call label ->
+            fprintf out "call %s" label
         | _ ->
             let s = sprintf "%A" op
             fprintf out "%s" (s.ToLower() + "q ")
@@ -196,8 +208,6 @@ let countVars args labels =
     |> List.length
 
 let argumentToLocation (siStart, siMult) reg args =
-    let registersForArgs = [Rcx; Rdx; R8; R9]
-
     let fold (regs, index, pairs) arg =
         match regs with
         | argReg :: rest -> 
@@ -278,12 +288,12 @@ let selectInstructions (defs, labels) : Program =
             let moveToArgPositions =
                 List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args                        
             let afterCall =
-                    let argsOfLabel = getArgsOfLabel labels label
-                    let argOfLabel = List.head argsOfLabel
-                    if List.length argsOfLabel <> 1 then 
-                        failwith "handleTransfer: wrong number of vars"
-                    [Mov, [Reg Rax; Var argOfLabel]
-                     InstrName.Jmp label, []]
+                let argsOfLabel = getArgsOfLabel labels label
+                let argOfLabel = List.head argsOfLabel
+                if List.length argsOfLabel <> 1 then 
+                    failwith "handleTransfer: wrong number of vars"
+                [Mov, [Reg Rax; Var argOfLabel]
+                 InstrName.Jmp label, []]
             moveToArgPositions @ [CallIndirect, [Var func]] @ afterCall
         | Transfer.Call(Tail, func, args) ->
             // let argToLoc = argumentToLocation (0, -wordSize) Rsp args
@@ -310,22 +320,28 @@ let selectInstructions (defs, labels) : Program =
         | _ -> failwithf "saveArgs: wrong at least one instr expected"
 
     let handleDef (name, args, labels) =
-        let maxArgs = countMaxArgs labels
-        let varsCount = countVars args labels
         let instrs =
             List.collect (handleLabel labels) labels
         let graph = makeGraph []
-
         { Name = name
           Args = args
           Vars = ref []
-          MaxStack = maxArgs
+          MaxStack = 0
           InterfGraph = graph
           Instrs = instrs
           LiveBefore = Map.empty
           LiveAfter = Map.empty }
 
-    List.map handleDef defs, handleDef (schemeEntryLabel, [], labels)
+    let impl = freshLabel "schemeEntryImpl"
+    let implLabels =
+        match labels with
+        | (schemeEntryLabel, [], stmts) :: rest ->
+            (impl, [], stmts) :: rest
+        | _ -> failwith "selectInstructions: wrong entry labels"
+    let defs = (impl, [], implLabels) :: defs
+    let main = handleDef (schemeEntryLabel, [], [])
+    let main = {main with Instrs = [Label schemeEntryLabel, []; Call impl, []]}
+    List.map handleDef defs, main
 
 let collectVars instrs =
     List.map snd instrs
@@ -388,7 +404,38 @@ let addFunctionBeginEnd (defs, main) =
             {def with Instrs = instrs}
         | _ -> failwith "addFunction...: expected label"
 
-    List.map handleDef defs, handleDef main
+    let handleMain def =
+        match def.Instrs with
+        | (Label _, []) as i  :: rest->
+            let n = def.MaxStack * wordSize
+            let freshEntry = freshLabel schemeEntryLabel
+            let instrs = 
+                [i
+                 Push, [Reg R15]
+                 Mov, [Reg Rsp; Reg R15]
+                 Mov, [Reg Rcx; Reg Rsp]
+                 Push, [Reg Rbp]
+                 Push, [Reg R15]
+                 Push, [Reg R14]
+                 Push, [Reg R13]
+                 Push, [Reg R12]
+                 Push, [Reg Rbx]
+                 Call freshEntry, []
+                 Pop, [Reg Rbx]
+                 Pop, [Reg R12]
+                 Pop, [Reg R13]
+                 Pop, [Reg R14]
+                 Pop, [Reg R15]
+                 Pop, [Reg Rbp]
+                 Mov, [Reg R15; Reg Rsp]
+                 Pop, [Reg R15]
+                 Ret, []]
+            {def with Instrs = instrs}, {def with Name = freshEntry; Instrs = (Label freshEntry, []) :: rest}
+        | _ -> failwith "addFunction...: expected label"
+
+    let main, entry = handleMain main
+
+    entry :: defs, main
     
 let rec patchInstr (defs, main) =
     let transform = function
@@ -437,8 +484,6 @@ let computePreds instrs =
     Seq.fold handleInstr (initial, 0) instrs
     |> fst
 
-let callerSave = [R10; R11]
-
 let rec computeLiveness (defs, main) =
     let isRegVar = 
         function 
@@ -450,14 +495,17 @@ let rec computeLiveness (defs, main) =
         | Add | Sub | Mov | Sar | Sal | And | Or | Xor | Movzb | Cmp ->
             List.item 1 args|> Set.singleton
         | Neg | Set _ | Lea _ -> List.head args |> Set.singleton
-        | Call | CallIndirect -> callerSave |> List.map Reg |> Set.ofList
+        | Call _ | CallIndirect -> callerSave |> List.map Reg |> Set.ofList
         | _ -> Set.empty
         |> Set.filter isRegVar
 
     let readBy (op, args) =
         match op with
-        | Call | CallIndirect ->
+        | Call _ ->
             Set.ofList callerSave |> Set.map Reg
+        | CallIndirect ->
+            Set.ofList (callerSave) |> Set.map Reg
+            |> Set.union (Set.ofList args)
         | Mov | Movzb -> List.head args |> Set.singleton
         | Set _ -> Set.empty
         | Ret -> Set.singleton (Reg Rax)
@@ -484,7 +532,8 @@ let rec computeLiveness (defs, main) =
         let before = Set.union (Set.difference after w) r
         let afterMap = Map.add index (Set.difference after w) afterMap
         let beforeMap = Map.add index before beforeMap
-        let todo, afterMap = updatePreds (Map.find index preds) afterMap beforeMap index
+        let todo, afterMap = 
+            updatePreds (Map.find index preds) afterMap beforeMap index
         todo, afterMap, beforeMap
 
     let rec loop instrs preds todo afterMap beforeMap =
@@ -493,7 +542,8 @@ let rec computeLiveness (defs, main) =
         else
             let index = Set.maxElement todo
             let todo1 = Set.remove index todo
-            let todo2, liveAfterMap, liveBeforeMap = handleInstr instrs preds afterMap beforeMap index
+            let todo2, liveAfterMap, liveBeforeMap = 
+                handleInstr instrs preds afterMap beforeMap index
             loop instrs preds (Set.union todo1 todo2) liveAfterMap liveBeforeMap
 
     let liveAfter instrs = 
@@ -531,7 +581,7 @@ let rec buildInterference (defs, main) =
             match Map.tryFind index live with
             | Some vl -> vl
             | None _ ->
-                failwithf "buildInterference: iter: index=%d live=%A size=%d" index live (Map.count live)                
+                failwithf "buildInterference: iter: index=%d live=%A size=%d" index live (Map.count live)
         match args with
         | [_; arg] when isGoodArg arg ->
             filterAndAddEdges graph [] live arg
