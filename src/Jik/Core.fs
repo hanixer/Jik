@@ -16,6 +16,11 @@ type Prim =
     | Gt
     | Ge
     | Not
+    | MakeVector
+    | IsVector
+    | VectorLength
+    | VectorRef
+    | VectorSet
 
 type Expr = 
     | Int of int
@@ -54,6 +59,11 @@ let stringPrimop = [
     ">", Gt
     ">=", Ge
     "not", Not
+    "make-vector", MakeVector
+    "vector?", IsVector
+    "vector-length", VectorLength
+    "vector-ref", VectorRef
+    "vector-set!", VectorSet
 ]
 
 let tryStringToPrimop s =
@@ -212,7 +222,7 @@ let revealFunctions (prog : Program) : Program =
 
     List.map handleDef defs, handleExpr expr
 
-let rec fixPrims (prog : Program) : Program =
+let rec fixArithmeticPrims (prog : Program) : Program =
     let ops = [Add; Mul;]
 
     let fold op acc curr =

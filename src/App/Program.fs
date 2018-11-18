@@ -39,7 +39,7 @@ module Program
 //   let ds, m =
 //     s 
 //     |> stringToProgram
-//     |> fixPrims
+//     |> fixArithmeticPrims
 //     |> alphaRename
 //     |> revealFunctions 
 //     |> convertProgram
@@ -67,7 +67,7 @@ module Program
 // let testMainTest s =
 //   s 
 //   |> stringToProgram
-//   |> fixPrims
+//   |> fixArithmeticPrims
 //   |> alphaRename
 //   |> revealFunctions 
 //   |> convertProgram
@@ -83,7 +83,7 @@ module Program
 // let testNew s =
 //     s 
 //     |> stringToProgram
-//     |> fixPrims
+//     |> fixArithmeticPrims
 //     |> alphaRename
 //     |> revealFunctions 
 //     |> convertProgram

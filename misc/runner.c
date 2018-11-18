@@ -22,6 +22,8 @@
 #define carOffset 0
 #define cdrOffset wordSize
 
+void* freePointer;
+
 extern int schemeEntry();
 
 typedef uint64_t ptr;
@@ -133,6 +135,7 @@ int main() {
     char* stackHigherAddr = stack + stackSize - wordSize;    
     int heapSize = 32 * 4096;
     char* heap = allocateProtectedSpace(heapSize);
+    freePointer = heap;
     printPtr(schemeEntry(stackHigherAddr, heap));
     printf("\n");
     deallocateProtectedSpace(stackHigherAddr, stackSize);

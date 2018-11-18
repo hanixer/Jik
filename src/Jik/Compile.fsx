@@ -62,7 +62,15 @@ let ts = [
     // "(let ((b (fx< 1 2)))
     //     (if b 2 3))", "2\n"
     // "(+ (+ 1 4) (+ 2 3))", "10\n"
-    "(if 4 5 (if #f 2 3))", "3\n"
+    // "(if 4 5 (if #f 2 3))", "3\n"
+    // "(vector-ref (make-vector 4) 1)", "0\n"
+    "(let ([v0 (make-vector 2)])
+     (let ([v1 (make-vector 2)])
+       (vector-set! v0 0 100)
+       (vector-set! v0 1 200)
+       (vector-set! v1 0 300)
+       (vector-set! v1 1 400))
+     (vector-ref v0 1))", "200\n"
 ]
 
 

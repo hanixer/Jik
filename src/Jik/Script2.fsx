@@ -47,7 +47,7 @@ let testInterf s =
   let ds, m =
     s 
     |> stringToProgram
-    |> fixPrims
+    |> fixArithmeticPrims
     |> alphaRename
     |> revealFunctions 
     |> convertProgram
@@ -83,7 +83,7 @@ let testInterf s =
 let testMainTest s =
   s 
   |> stringToProgram
-  |> fixPrims
+  |> fixArithmeticPrims
   |> alphaRename
   |> revealFunctions 
   |> convertProgram
@@ -100,7 +100,7 @@ let testMainTest s =
 let testNew s =
     s 
     |> stringToProgram
-    |> fixPrims
+    |> fixArithmeticPrims
     |> alphaRename
     |> revealFunctions 
     |> convertProgram
@@ -168,6 +168,20 @@ let e11 = "
     (+ (- 3 x)
        4)))
 (polyn 11)"
+let e12 = "
+(define (foo vec1 vec2)
+  (+ (vector-length vec1) (vector-length vec2)))
+(foo (make-vector 3) (make-vector 100))"
+let e13 = "
+(define (foo vec)
+  (let ([v (make-vector 2)])
+    (vector-set! vec 0 v)
+    (vector-set! v 0 11)
+    (vector-set! v 1 22)))
+(let ([v (make-vector 1)])
+  (foo v)
+  (+ (vector-ref (vector-ref v 0) 0)
+     (vector-ref (vector-ref v 0) 1)))"
 let tests = [
     "#t", "#t\n"
     "#f", "#f\n"
@@ -210,6 +224,14 @@ let tests = [
     e10, "3\n"
     e11, "-2\n"
 ]
+let vectorTests = [
+    "(vector-length (make-vector 4))", "4\n"
+    e12, "103\n"
+    "(vector? (make-vector 3))", "#t\n"
+    "(vector? #t)", "#f\n"
+    e13, "33\n"
+]
 
-runTestsWithName testMainTest "basic" tests
+// runTestsWithName testMainTest "basic" tests
+runTestsWithName testMainTest "vector" vectorTests
 // testInterf e7

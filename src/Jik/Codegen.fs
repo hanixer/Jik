@@ -12,29 +12,14 @@ open Display
 /// Language resembles x86 instruction set.
 /// After conversion from Intermediate, 'Var' operands created.
 /// Later these operands are changed to stack locations or registers.
-///
-/// Calling convention:
-/// all arguments are passed via stack.
 /// 
-/// higher address
-/// Caller:
-/// return point
-/// arg1                                               40(rsp)
-/// arg2                                               32(rsp)
-/// local1                                             24(rsp)
-/// local2                                             16(rsp)
-/// local3                                              8(rsp)
-/// ---> place for return point <--- sp points here --- 0(rsp)
-/// Callee-arg1                                        -8(rsp)
-/// Callee-arg2                                       -16(rsp)
-/// ...
-/// lower address
-
-/// N - arguments count
-/// M - locals count
-/// offset for local i(1..M) : (M - i + 1) * 8
-/// offset for argument j(1..N) : (M + N - j + 1) * 8
-
+/// Vectors:
+/// (make-vector n)
+/// (vector expr ...) - sugar
+/// (vector-ref vec pos)
+/// (vector-set! vec pos value)
+/// (vector-length vec)
+/// (vector? vec)
 
 type Register =
     | Rsp | Rbp | Rax | Rbx | Rcx | Rdx | Rsi | Rdi 
@@ -48,8 +33,10 @@ type Operand =
     | Reg of Register
     | ByteReg of Register
     | Deref of int * Register
+    | Deref4 of int * Register * Register * int
     | Var of Var
     | Slot of int
+    | GlobalValue of string
 
 type Cc =
     | E
@@ -100,6 +87,8 @@ type FunctionDef =
 
 type Program = FunctionDef list * FunctionDef
 
+let freePointer = "freePointer"
+
 let allRegisters = 
     [Rsp; Rbp; Rax; Rbx; Rcx; Rdx; Rsi; Rdi; 
      R8; R9; R10; R11; R12; R13; R14; R15; 
@@ -143,9 +132,11 @@ let showInstr out (op, args) =
         | Int n -> fprintf out "$%d" n
         | Reg(r) -> fprintf out "%s" (reg r)
         | Deref(n, r) -> fprintf out "%d(%s)" n (reg r)
+        | Deref4(n, r1, r2, m) -> fprintf out "%d(%s, %s, %d)" n (reg r1) (reg r2) m
         | Var(v) -> fprintf out "[var %s]" v
         | ByteReg(r) -> fprintf out "%s" (reg r)
         | Slot(n) -> fprintfn out "{slot %d}" n
+        | GlobalValue(v) -> fprintf out "%s(%%rip)" v
         
     let showArgs args =
         List.iteri (fun i arg -> 
@@ -272,6 +263,36 @@ let selectInstructions (defs, labels) : Program =
              Sal, [Operand.Int boolBit; Reg Rax]
              Or, [Operand.Int falseLiteral; Reg Rax]
              Mov, [Reg Rax; Var var]]
+        | Simple.Prim(Prim.MakeVector, [var1]) ->
+            let shift = if wordSize = 8 then 3 else 2
+            [Mov, [GlobalValue(freePointer); Reg R11]
+             Mov, [Var var1; Deref(0, R11)]
+             Or, [Int vectorTag; Reg R11]
+             Mov, [Reg R11; Var var]
+             Mov, [Var var1; Reg R11]
+             Sar, [Int fixnumShift; Reg R11]
+             Add, [Int 1; Reg R11]
+             Sal, [Int shift; Reg R11]
+             Add, [Reg R11; GlobalValue(freePointer)]]
+        | Simple.Prim(Prim.VectorLength, [var1]) ->
+            [Mov, [Var var1; Reg R11]
+             Mov, [Deref(-vectorTag, R11); Var var]]
+        | Simple.Prim(Prim.IsVector, [var1]) ->
+            [And, [Int vectorMask; Var var1]
+             Cmp, [Int vectorTag; Var var1]
+             Set E, [Reg Al]
+             Movzb, [Reg Al; Reg Rax]
+             Sal, [Operand.Int boolBit; Reg Rax]
+             Or, [Operand.Int falseLiteral; Reg Rax]
+             Mov, [Reg Rax; Var var]]
+        | Simple.Prim(Prim.VectorSet, [vec; index; value]) ->
+            [Mov, [Var vec; Reg R11]
+             Mov, [Var index; Reg Rax]
+             Mov, [Var value; Deref4(-vectorTag, R11, Rax, wordSize)]]
+        | Simple.Prim(Prim.VectorRef, [vec; index]) ->
+            [Mov, [Var vec; Reg R11]
+             Mov, [Var index; Reg Rax]
+             Mov, [Deref4(-vectorTag, R11, Rax, wordSize); Var var]]
         | e -> failwithf "handleDecl: %s %A" var e
 
     let handleTransfer labels = function
@@ -719,13 +740,13 @@ let rec patchInstr (defs, main) =
 
     let transform (op, args) =
         match op, args with
-        | op, [Deref(n, reg1); Deref(m, reg2)] ->
-            [Mov, [Deref(n, reg1); Reg Rax];
-             op, [Reg Rax; Deref(m, reg2)]]
         | Lea _, [Reg _] -> [op, args]
         | Lea s, [arg] ->
             [Lea s, [Reg Rax]
              Mov, [Reg Rax; arg]]
+        | op, [arg; arg2] when isRegister arg |> not && isRegister arg2 |> not ->
+            [Mov, [arg; Reg Rax];
+             op, [Reg Rax; arg2]]
         | e -> [e]
 
     let handleDef def =
