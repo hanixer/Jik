@@ -35,7 +35,7 @@ and Stmt =
 
 and Label = Var * Var list * Stmt list
 
-and Function = Var * Var list * Label list
+and Function = Var * Var list * Var list * Label list
 
 type Program = Function list * Label list
 
@@ -116,7 +116,16 @@ let showLabel (name, vars, stmts) =
                      iStr var
                      iStr " "
                      comma (List.map iStr vars)]
-        | Call _ -> iStr "call \n"
+        | Call (tail, func, args) -> 
+            let tail =
+                match tail with
+                | NonTail lab ->
+                    iStr (" => " + lab)
+                | _ -> iNil            
+            iConcat [iStr ("call " + func + " ")
+                     comma (List.map iStr args)
+                     iStr " "
+                     tail]
         | If(a, b, c) -> 
             iConcat [iStr "if "
                      iStr a
@@ -143,7 +152,8 @@ let showDef (name, args, labels) =
              comma  (List.map iStr args)
              iStr ")"
              iNewline
-             iInterleave iNewline (List.map showLabel labels)]
+             iInterleave iNewline (List.map showLabel labels)
+             iNewline]
 
 let showProgram (defs, labels) =
     iConcat [List.map showDef defs |> iConcat
@@ -314,7 +324,7 @@ let convertFunction (name, (args, body)) : Function =
     let labels, stmts = 
         convertExprTail (Begin body)
     let labels = (name, args, stmts) :: labels
-    name, args, labels
+    name, [], args, labels
 
 let convertMainExprs expr =
     let labels, stmts = convertExprTail expr

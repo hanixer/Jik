@@ -59,3 +59,7 @@ runTest "(let ([v 1])
 (let ([y (+ 4 x)])
 (let ([z (+ x w)])
 (+ z (- y)))))))" "30"
+
+runTest "
+(let ((x 5))
+(lambda (y) (lambda () (+ x y))))" ""

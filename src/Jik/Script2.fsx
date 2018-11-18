@@ -187,6 +187,18 @@ let e14 = "(let ([v (make-vector 3)])
 (vector-set! v 1 2)
 (vector-set! v 2 3)
 v)"
+let e15 = "
+(define (helper vec i n m)
+(if (< i n)
+  (begin (vector-set! vec 0 (make-vector m))
+    (helper vec (+ i 1) n m))
+  vec))
+
+(define (lotsvectors n m)
+(let ([v (make-vector n)])
+(helper v 0 n m)))
+
+(vector-length (lotsvectors 1000 1000))"
 let tests = [
     "#t", "#t\n"
     "#f", "#f\n"
@@ -235,9 +247,13 @@ let vectorTests = [
     "(vector? (make-vector 3))", "#t\n"
     "(vector? #t)", "#f\n"
     e13, "33\n"
-    e14, "#(1 2 3)"
+    e14, "#(1 2 3)\n"
+]
+let lambdaTests = [
+    "(procedure? (lambda (x) x))", "#t\n"
 ]
 
 // runTestsWithName testMainTest "basic" tests
 // runTestsWithName testMainTest "vector" vectorTests
-testInterf e14
+runTestsWithName testMainTest "lambda" lambdaTests
+// testInterf e14

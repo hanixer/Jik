@@ -238,7 +238,7 @@ let selectInstructions (defs, labels) : Program =
     let vectorAddress vec index =
         [Mov, [Var vec; Reg R11]
          Mov, [Var index; Reg R12]
-         Sal, [Int fixnumShift; Reg R12]
+         Sar, [Int fixnumShift; Reg R12]
          Add, [Int 1; Reg R12]]
 
     let handleDecl (var, x) =
