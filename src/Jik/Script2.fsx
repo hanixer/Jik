@@ -182,6 +182,11 @@ let e13 = "
   (foo v)
   (+ (vector-ref (vector-ref v 0) 0)
      (vector-ref (vector-ref v 0) 1)))"
+let e14 = "(let ([v (make-vector 3)])
+(vector-set! v 0 1)
+(vector-set! v 1 2)
+(vector-set! v 2 3)
+v)"
 let tests = [
     "#t", "#t\n"
     "#f", "#f\n"
@@ -230,8 +235,9 @@ let vectorTests = [
     "(vector? (make-vector 3))", "#t\n"
     "(vector? #t)", "#f\n"
     e13, "33\n"
+    e14, "#(1 2 3)"
 ]
 
 // runTestsWithName testMainTest "basic" tests
-runTestsWithName testMainTest "vector" vectorTests
-// testInterf e7
+// runTestsWithName testMainTest "vector" vectorTests
+testInterf e14

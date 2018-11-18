@@ -235,6 +235,12 @@ let selectInstructions (defs, labels) : Program =
         | Some dest ->
             instrs @ [Mov, [Reg Rax; dest]]
 
+    let vectorAddress vec index =
+        [Mov, [Var vec; Reg R11]
+         Mov, [Var index; Reg R12]
+         Sal, [Int fixnumShift; Reg R12]
+         Add, [Int 1; Reg R12]]
+
     let handleDecl (var, x) =
         match x with
         | Simple.Int n -> moveInt (convertNumber n) var
@@ -286,13 +292,11 @@ let selectInstructions (defs, labels) : Program =
              Or, [Operand.Int falseLiteral; Reg Rax]
              Mov, [Reg Rax; Var var]]
         | Simple.Prim(Prim.VectorSet, [vec; index; value]) ->
-            [Mov, [Var vec; Reg R11]
-             Mov, [Var index; Reg Rax]
-             Mov, [Var value; Deref4(-vectorTag, R11, Rax, wordSize)]]
+            vectorAddress vec index @
+            [Mov, [Var value; Deref4(-vectorTag, R11, R12, wordSize)]]
         | Simple.Prim(Prim.VectorRef, [vec; index]) ->
-            [Mov, [Var vec; Reg R11]
-             Mov, [Var index; Reg Rax]
-             Mov, [Deref4(-vectorTag, R11, Rax, wordSize); Var var]]
+            vectorAddress vec index @
+            [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var var]]
         | e -> failwithf "handleDecl: %s %A" var e
 
     let handleTransfer labels = function
