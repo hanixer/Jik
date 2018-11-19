@@ -1,5 +1,6 @@
-﻿// // Learn more about F# at http://fsharp.org
-module Program
+﻿open SExpr
+// // Learn more about F# at http://fsharp.org
+// module Program
 // open System
 
 // open System.IO
@@ -195,7 +196,9 @@ module Program
 
 
 
-// [<EntryPoint>]
-// let main argv =
-//     runTestsWithName testMainTest "basic" tests |> printfn "Test run: %d"
-//     0 // return an integer exit code
+[<EntryPoint>]
+let main argv =
+   //  runTestsWithName testMainTest "basic" tests |> printfn "Test run: %d"
+    let s = SExpr.stringToSExpr "(+ 1 2)"
+    printfn "so here there!!! %A" s
+    0 // return an integer exit code
