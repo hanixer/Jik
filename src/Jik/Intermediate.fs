@@ -35,7 +35,7 @@ and Stmt =
 
 and Label = Var * Var list * Stmt list
 
-and Function = Var * Var list * Var list * Label list
+and Function = Var * Var list * Label list
 
 type Program = Function list * Label list
 
@@ -324,7 +324,7 @@ let convertFunction (name, (args, body)) : Function =
     let labels, stmts = 
         convertExprTail (Begin body)
     let labels = (name, args, stmts) :: labels
-    name, [], args, labels
+    name, args, labels
 
 let convertMainExprs expr =
     let labels, stmts = convertExprTail expr
