@@ -353,7 +353,7 @@ let convertProgram (defs, expr) : Program =
     
 
 let analyzeFreeVars (prog : Program) : Program =
-    let (defs, main) = prog
+    let defs, main = prog
 
     let rec transformStmt stmt =
         match stmt with
@@ -386,3 +386,76 @@ let analyzeFreeVars (prog : Program) : Program =
         name, free, args, labels
 
     List.map transformFunction defs, transformFunction main
+
+let replaceClosureRef free var = 
+    match List.tryFindIndex ((=) var) free with
+    | Some i ->
+        let closRef = freshLabel "cr"
+        let closIndex = freshLabel "ci"
+        [Decl(closIndex, Int i)
+         Decl(closRef, Prim(ClosureRef, [closIndex]))], closRef
+     | _ -> [], var
+
+
+let replaceClosureRefs free vars =
+    List.foldBack (fun var (stmts, vars) ->
+        let stmts1, var = replaceClosureRef free var
+        stmts1 @ stmts, var :: vars)
+        vars ([], []) 
+
+let closureConversion (prog : Program) : Program =
+    let rec convertStmt free = function
+        | Decl(var, Prim(op, args)) ->
+            let stmts, args = replaceClosureRefs free args
+            [], stmts @ [Decl(var, Prim(op, args))]
+        | Decl(var, Lambda(free, args, labels)) ->
+            let proc = freshLabel "proc"
+            let procs = convertLambda proc (free, args, labels)
+            procs, [Decl(var, Prim(Prim.MakeClosure, proc :: free))]
+        | Decl(_) as decl ->
+            [], [decl]
+        | Transfer(Transfer.Return(var)) ->
+            let stmts, var = replaceClosureRef free var
+            [], stmts @ [Transfer(Transfer.Return(var))]
+        | Transfer(Transfer.Jump(label, args)) ->
+            let stmts, args = replaceClosureRefs free args
+            [], stmts @ [Transfer(Transfer.Jump(label, args))]
+        | Transfer(Transfer.Call(tail, func, args)) ->
+            let stmts1, func = replaceClosureRef free func
+            let stmts2, args = replaceClosureRefs free args
+            [], stmts1 @ stmts2 @ [Transfer(Transfer.Call(tail, func, args))]
+        | Transfer(Transfer.If(cond, labelt, labelf)) ->
+            let stmts, cond = replaceClosureRef free cond
+            [], stmts @ [Transfer(Transfer.If(cond, labelt, labelf))]
+
+    and convertLabel free (name, args, stmts) =
+        let procs, stmts =
+            List.foldBack (fun stmt (procs, stmts) -> 
+                let procs1, stmts1 = convertStmt free stmt
+                procs1 @ procs, stmts1 @ stmts)
+                stmts ([], [])
+        procs, (name, args, stmts)
+
+    and foldLabels free labels =
+        List.foldBack (fun label (procs, labels) ->
+            let procs1, label = convertLabel free label
+            procs1 @ procs, label :: labels)
+            labels ([], [])
+    
+    and convertLambda proc (free, args, labels) =
+        match labels with
+        | (name, args, stmts) :: restLabels ->
+            let procs, labels = foldLabels free ((proc, args, stmts) :: restLabels)
+            (proc, free, args, labels) :: procs
+        | _ -> failwith "convertLambda: wrong labels format"
+        
+    let convertFunction (name, free, args, labels) =
+        let procs, labels = foldLabels free labels
+        procs, (name, free, args, labels)
+
+    let defs, main = prog
+    let converted = List.map convertFunction defs
+    let procs = List.collect fst converted
+    let defs = List.map snd converted
+    let procs1, main = convertFunction main
+    defs @ procs @ procs1, main

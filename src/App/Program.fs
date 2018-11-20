@@ -89,6 +89,7 @@ let testLambda str =
     let r = revealFunctions r
     let r = Intermediate.convertProgram r
     let r = Intermediate.analyzeFreeVars r
+    let r = Intermediate.closureConversion r
     printIr r |> ignore
 
 let e ="
