@@ -218,7 +218,7 @@ let argumentToLocation (siStart, siMult) reg args =
     let _, _, result = List.fold fold (registersForArgs, 0, Map.empty) args
     result
 
-let selectInstructions (defs, labels) : Program =
+let selectInstructions (defs, main) : Program =
     let convertNumber n = n <<< fixnumShift
     let moveInt n var = [Mov, [Operand.Int n; Operand.Var var]]
 
@@ -387,12 +387,12 @@ let selectInstructions (defs, labels) : Program =
           SlotsOccupied = slots }
 
     let impl = freshLabel "schemeEntryImpl"
-    let implLabels =
-        match labels with
-        | (_, [], stmts) :: rest ->
-            (impl, [], stmts) :: rest
-        | _ -> failwith "selectInstructions: wrong entry labels"
-    let defs = (impl, [], [], implLabels) :: defs
+    let entryImplFunc =
+        match main with
+        | name, free, [], ((_, [], stmts) :: rest) ->
+            (impl, free, [], (impl, [], stmts) :: rest)            
+        | _ -> failwith "selectInstructions: wrong main function"
+    let defs = entryImplFunc :: defs
     let main = handleDef (schemeEntryLabel, [], [], [])
     let main = {main with Instrs = [Label schemeEntryLabel, []; Call impl, []]}
     List.map handleDef defs, main

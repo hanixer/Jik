@@ -38,7 +38,7 @@ and Label = Var * Var list * Stmt list
 
 and Function = Var * Var list * Var list * Label list
 
-type Program = Function list * Label list
+type Program = Function list * Function
 
 let schemeEntryLabel = "schemeEntry"
 
@@ -163,11 +163,11 @@ and showDef (name, free, args, labels) =
              iInterleave iNewline (List.map showLabel labels)
              iNewline]
 
-let showProgram (defs, labels) =
+let showProgram (defs, main) =
     iConcat [List.map showDef defs |> iConcat
              iNewline
              iNewline
-             List.map showLabel labels |> iConcat]
+             showDef main]
 
 let labelsToString labels =
     List.map showLabel labels
@@ -346,7 +346,7 @@ let convertFunction (name, (args, body)) : Function =
 
 let convertMainExprs expr =
     let labels, stmts = convertExprTail expr
-    (schemeEntryLabel, [], stmts) :: labels
+    schemeEntryLabel, [], [], (schemeEntryLabel, [], stmts) :: labels
 
 let convertProgram (defs, expr) : Program =
     List.map convertFunction defs, convertMainExprs expr

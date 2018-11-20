@@ -10,12 +10,6 @@ open Intermediate
 open Codegen
 open System.IO
 
-let test s =
-    stringToExpr s
-    |> convertMainExprs
-    |> labelsToString
-    |> printfn "%s"
-
 let saveToFile filename str =
     System.IO.File.WriteAllText(filename, str)
 
