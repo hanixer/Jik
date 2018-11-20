@@ -247,6 +247,8 @@ let lambdaTests = [
 
 [<EntryPoint>]
 let main argv =
-    // TestDriver.runTestsWithName testMainTest "lambda" lambdaTests |> printfn "main: %d"
+    runTestsWithName testMainTest "basic" tests
+    runTestsWithName testMainTest "vector" vectorTests
+    runTestsWithName testMainTest "lambda" lambdaTests
     testLambda e16
     1

@@ -109,7 +109,7 @@ let rec showLabel (name, vars, stmts) =
             | Simple.Lambda(args, free, labels) ->
                 iConcat [iNewline
                          iStr "  "
-                         showDef ("lam", args, labels) |> iIndent]                
+                         showDef ("lam", free, args, labels) |> iIndent]                
           iConcat [iStr var 
                    iStr " = "
                    s]
@@ -150,9 +150,12 @@ let rec showLabel (name, vars, stmts) =
              iNewline 
              iInterleave iNewline <| List.map showStmt stmts]
 
-and showDef (name, args, labels) =
+and showDef (name, free, args, labels) =
     iConcat [iStr "def "
              iStr name
+             iStr " <"
+             comma  (List.map iStr free)
+             iStr ">"
              iStr " ("
              comma  (List.map iStr args)
              iStr ")"
@@ -348,16 +351,39 @@ let convertMainExprs expr =
 let convertProgram (defs, expr) : Program =
     List.map convertFunction defs, convertMainExprs expr
     
-let getDefined (name, _, args, labels) = 
-    let inStmt = function
-        | Decl(var, _) -> Set.singleton var
-        | _ -> Set.empty
 
-    let inLabel (name, args, stmts) =
-        name :: args :: Seq.collect inStmt stmts
-        |> Set.ofList
-    
-    name :: args @ List.map inLabel labels
-    |> Set.ofList
+// let analyzeFreeVars (defs, main) =
+//     let getUsedInLabel (name, args, stmts) =
+//         List.map getUsed stmts
+//         |> Set.unionMany
 
-let analyzeFreeVars (defs, main) =
+//     let getDefinedInStmt = function
+//             | Decl(var, _) -> [var]
+//             | _ -> []
+
+//     let getDefinedInLabel (name, args, stmts) =
+//         name :: args :: List.collect getDefinedInStmt stmts
+
+//     let getDefinedVarsInFunc (name, _, args, labels) =         
+//         name :: args @ List.collect getDefinedInLabel labels
+//         |> Set.ofList
+
+//     let transformFunction ((name, _, args, labels) as func) =
+//         let defined = getDefinedVarsInFunc func
+//         let used = 
+//             List.map getUsedInLabel labels 
+//             |> Set.unionMany
+//         let free = Set.difference used defined
+//         name, free, args, labels
+
+//     let transformMain labels =
+//         let defined = 
+//             List.map getDefinedInLabel labels
+//             |> Set.unionMany
+//         let used =
+//             List.map getUsedInLabel labels 
+//             |> Set.unionMany
+//         let free = Set.difference used defined
+
+
+//     List.map transformFunction defs, 

@@ -75,6 +75,7 @@ and Instr = InstrName * Operand list
 
 type FunctionDef = 
     { Name : string
+      Free : string list
       Args : string list
       StackArgs : string list
       Instrs : Instr list
@@ -365,7 +366,7 @@ let selectInstructions (defs, labels) : Program =
         | head :: tail -> head :: saveInstrs @ tail
         | _ -> instrs
 
-    let handleDef (name, args, labels) =
+    let handleDef (name, free, args, labels) =
         let instrs =
             List.collect (handleLabel labels) labels
             |> saveArgs args
@@ -374,6 +375,7 @@ let selectInstructions (defs, labels) : Program =
         let slots = if diff > 0 then diff else 0
         let stackArgs = if diff > 0 then List.skip (List.length registersForArgs) args else []
         { Name = name
+          Free = free
           Args = args
           StackArgs = stackArgs
           Vars = ref []
@@ -390,8 +392,8 @@ let selectInstructions (defs, labels) : Program =
         | (_, [], stmts) :: rest ->
             (impl, [], stmts) :: rest
         | _ -> failwith "selectInstructions: wrong entry labels"
-    let defs = (impl, [], implLabels) :: defs
-    let main = handleDef (schemeEntryLabel, [], [])
+    let defs = (impl, [], [], implLabels) :: defs
+    let main = handleDef (schemeEntryLabel, [], [], [])
     let main = {main with Instrs = [Label schemeEntryLabel, []; Call impl, []]}
     List.map handleDef defs, main
 
