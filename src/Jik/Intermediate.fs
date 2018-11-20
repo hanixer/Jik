@@ -20,6 +20,7 @@ type Simple =
     | Int of int
     | Bool of bool
     | FunctionRef of string
+    | Lambda of Var list * Var list * Label list
 
 and Transfer =
     | Return of Var
@@ -35,7 +36,7 @@ and Stmt =
 
 and Label = Var * Var list * Stmt list
 
-and Function = Var * Var list * Label list
+and Function = Var * Var list * Var list * Label list
 
 type Program = Function list * Label list
 
@@ -91,7 +92,7 @@ let getVars labels =
 
 let comma = iInterleave (iStr ", ")
 
-let showLabel (name, vars, stmts) =
+let rec showLabel (name, vars, stmts) =
     let showDecl = function
         | var, s ->
           let s =
@@ -105,6 +106,10 @@ let showLabel (name, vars, stmts) =
                          List.map iStr vars |> comma ]
             | Simple.FunctionRef lab -> 
                 iConcat [iStr "(func-ref "; iStr lab; iStr ")"]
+            | Simple.Lambda(args, free, labels) ->
+                iConcat [iNewline
+                         iStr "  "
+                         showDef ("lam", args, labels) |> iIndent]                
           iConcat [iStr var 
                    iStr " = "
                    s]
@@ -145,7 +150,7 @@ let showLabel (name, vars, stmts) =
              iNewline 
              iInterleave iNewline <| List.map showStmt stmts]
 
-let showDef (name, args, labels) =
+and showDef (name, args, labels) =
     iConcat [iStr "def "
              iStr name
              iStr " ("
@@ -204,8 +209,12 @@ let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
         convertMany exprs (fun vars ->
             let last = List.last vars
             cont last)
-    | Expr.Assign(_, _) -> failwith "Not Implemented"
-    | Expr.Lambda(_) -> failwith "Not Implemented"
+    | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
+    | Expr.Lambda(args, body) ->
+        let var = freshLabel "lam"
+        let labels, stmts = cont var
+        let lamLabels, lamStmts = convertExprTail (Begin body)
+        labels, (Decl(var, Lambda([], args, (var, args, lamStmts) :: lamLabels))) :: stmts
     | Expr.App(func, args) ->
         convertExpr func (fun func ->
             convertMany args (fun args -> 
@@ -232,7 +241,10 @@ and convertExprJoin expr (contVar : Var) =
     | Expr.If(exprc, exprt, exprf) ->
         convertIf exprc exprt exprf [] contVar    
     | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
-    | Expr.Lambda(_) -> failwith "Not Implemented Expr.Lambda"
+    | Expr.Lambda(args, body) -> 
+        let var = freshLabel "lam"
+        let labels, stmts = convertExprTail (Begin body)
+        [], [Decl(var, Lambda([], args, (var, args, stmts) :: labels)); jump var]
     | Expr.Begin(exprs) ->
         let heads, tail = List.splitAt (List.length exprs - 1) exprs
         convertMany heads (fun _ ->
@@ -276,7 +288,10 @@ and convertExprTail expr =
             let labelf = (lf, [], stmtsf)
             [labelt] @ labelst @ [labelf] @ labelsf, [Transfer(If(var, lt, lf))])
     | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
-    | Expr.Lambda(_) -> failwith "Not Implemented Expr.Lambda"
+    | Expr.Lambda(args, body) -> 
+        let var = freshLabel "lam"
+        let labels, stmts = convertExprTail (Begin body)
+        [], [Decl(var, Lambda([], args, (var, args, stmts) :: labels))]
     | Expr.Begin(exprs) ->
         let heads, tail = List.splitAt (List.length exprs - 1) exprs
         convertMany heads (fun _ ->
@@ -324,7 +339,7 @@ let convertFunction (name, (args, body)) : Function =
     let labels, stmts = 
         convertExprTail (Begin body)
     let labels = (name, args, stmts) :: labels
-    name, args, labels
+    name, [], args, labels
 
 let convertMainExprs expr =
     let labels, stmts = convertExprTail expr
@@ -333,3 +348,16 @@ let convertMainExprs expr =
 let convertProgram (defs, expr) : Program =
     List.map convertFunction defs, convertMainExprs expr
     
+let getDefined (name, _, args, labels) = 
+    let inStmt = function
+        | Decl(var, _) -> Set.singleton var
+        | _ -> Set.empty
+
+    let inLabel (name, args, stmts) =
+        name :: args :: Seq.collect inStmt stmts
+        |> Set.ofList
+    
+    name :: args @ List.map inLabel labels
+    |> Set.ofList
+
+let analyzeFreeVars (defs, main) =

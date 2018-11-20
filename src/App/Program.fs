@@ -87,7 +87,15 @@ let testNew s =
     |> selectInstructions
     |> Codegen.programToString
     |> printfn "%s"
-  
+
+let testLambda str =
+    let r = stringToProgram str
+    let r = fixArithmeticPrims r
+    let r = alphaRename r
+    let r = revealFunctions r
+    let r = Intermediate.convertProgram r
+    printIr r |> ignore
+
 let e ="
 (let ([a 1]
       [b 2]
@@ -178,6 +186,11 @@ let e15 = "
 (helper v 0 n m)))
 
 (vector-length (lotsvectors 1000 1000))"
+let e16 = "
+(define (foo x)
+  (lambda (y) (+ x y)))
+((foo 1) 2)"
+
 let tests = [
     "#t", "#t\n"
     "#f", "#f\n"
@@ -234,5 +247,6 @@ let lambdaTests = [
 
 [<EntryPoint>]
 let main argv =
-    TestDriver.runTestsWithName testMainTest "lambda" lambdaTests |> printfn "main: %d"
+    // TestDriver.runTestsWithName testMainTest "lambda" lambdaTests |> printfn "main: %d"
+    testLambda e16
     1
