@@ -88,6 +88,7 @@ let testLambda str =
     let r = alphaRename r
     let r = revealFunctions r
     let r = Intermediate.convertProgram r
+    let r = Intermediate.analyzeFreeVars r
     printIr r |> ignore
 
 let e ="
@@ -241,8 +242,8 @@ let lambdaTests = [
 
 [<EntryPoint>]
 let main argv =
-    runTestsWithName testMainTest "basic" tests
-    runTestsWithName testMainTest "vector" vectorTests
-    runTestsWithName testMainTest "lambda" lambdaTests
+    // runTestsWithName testMainTest "basic" tests
+    // runTestsWithName testMainTest "vector" vectorTests
+    // runTestsWithName testMainTest "lambda" lambdaTests
     testLambda e16
     1

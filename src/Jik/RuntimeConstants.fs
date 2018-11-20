@@ -23,3 +23,6 @@ let vectorTag = 0x05
 let vectorMask = 0x07
 let stringTag = 0x06
 let stringMask = 0x07
+
+let closureTag = 0x02
+let closureMask = 0x07

@@ -106,7 +106,7 @@ let rec showLabel (name, vars, stmts) =
                          List.map iStr vars |> comma ]
             | Simple.FunctionRef lab -> 
                 iConcat [iStr "(func-ref "; iStr lab; iStr ")"]
-            | Simple.Lambda(args, free, labels) ->
+            | Simple.Lambda(free, args, labels) ->
                 iConcat [iNewline
                          iStr "  "
                          showDef ("lam", free, args, labels) |> iIndent]                
@@ -174,7 +174,7 @@ let labelsToString labels =
     |> iInterleave (iStr "\n\n")
     |> iDisplay
 
-let programToString prog =
+let programToString (prog : Program) =
     showProgram prog |> iDisplay
 
 let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
@@ -344,7 +344,7 @@ let convertFunction (name, (args, body)) : Function =
     let labels = (name, args, stmts) :: labels
     name, [], args, labels
 
-let convertMainExprs expr =
+let convertMainExprs expr : Function =
     let labels, stmts = convertExprTail expr
     schemeEntryLabel, [], [], (schemeEntryLabel, [], stmts) :: labels
 
@@ -352,38 +352,37 @@ let convertProgram (defs, expr) : Program =
     List.map convertFunction defs, convertMainExprs expr
     
 
-// let analyzeFreeVars (defs, main) =
-//     let getUsedInLabel (name, args, stmts) =
-//         List.map getUsed stmts
-//         |> Set.unionMany
+let analyzeFreeVars (prog : Program) : Program =
+    let (defs, main) = prog
 
-//     let getDefinedInStmt = function
-//             | Decl(var, _) -> [var]
-//             | _ -> []
+    let rec transformStmt stmt =
+        match stmt with
+        | Decl(var, Lambda(free, args, labels)) ->
+            let free, args, labels = transformLambda (free, args, labels)
+            Set.singleton var, Set.remove var (Set.ofList free), Decl(var, Lambda(free, args, labels))
+        | Decl(var, _) -> Set.singleton var, getUsed stmt, stmt
+        | _ -> Set.empty, getUsed stmt, stmt
 
-//     let getDefinedInLabel (name, args, stmts) =
-//         name :: args :: List.collect getDefinedInStmt stmts
+    and transformLabel (name, args, stmts) =
+        let defined, free, stmts =
+            List.fold (fun (defined, free, stmts) stmt ->
+                let defined1, free1, stmt = transformStmt stmt
+                Set.union defined defined1, Set.union free free1, stmt :: stmts)
+                (Set.empty, Set.empty, []) stmts
+        Set.union defined (Set.ofList args), free, (name, args, List.rev stmts)
 
-//     let getDefinedVarsInFunc (name, _, args, labels) =         
-//         name :: args @ List.collect getDefinedInLabel labels
-//         |> Set.ofList
+    and transformLambda ((free, args, labels) as func) =
+        let defined, free, labels =
+            List.fold (fun (defined, free, labels) label ->
+                let defined1, free1, label = transformLabel label
+                Set.union defined defined1, (Set.union free (Set.ofSeq free1)), label :: labels) 
+                (Set.empty, Set.empty, []) labels
+        let labels = List.rev labels
+        let free = Set.difference free (Set.union defined (Set.ofList args)) |> Set.toList
+        free, args, labels
 
-//     let transformFunction ((name, _, args, labels) as func) =
-//         let defined = getDefinedVarsInFunc func
-//         let used = 
-//             List.map getUsedInLabel labels 
-//             |> Set.unionMany
-//         let free = Set.difference used defined
-//         name, free, args, labels
+    and transformFunction (name, free, args, labels) =
+        let free, args, labels = transformLambda (free, args, labels)
+        name, free, args, labels
 
-//     let transformMain labels =
-//         let defined = 
-//             List.map getDefinedInLabel labels
-//             |> Set.unionMany
-//         let used =
-//             List.map getUsedInLabel labels 
-//             |> Set.unionMany
-//         let free = Set.difference used defined
-
-
-//     List.map transformFunction defs, 
+    List.map transformFunction defs, transformFunction main

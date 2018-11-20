@@ -21,6 +21,8 @@ type Prim =
     | VectorLength
     | VectorRef
     | VectorSet
+    | MakeClosure
+    | ClosureRef
 
 type Expr = 
     | Int of int
