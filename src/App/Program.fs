@@ -60,6 +60,7 @@ let testMainTest s =
   |> stringToProgram
   |> fixArithmeticPrims
   |> alphaRename
+  |> assignmentConvert333
   |> revealFunctions 
   |> convertProgram
   |> Intermediate.analyzeFreeVars
@@ -197,7 +198,7 @@ let tests = [
 //     "(* 1 5)", "5\n"
 //     "(* -1 5)", "-5\n"
 //     "(* 2 2)", "4\n"
-//     "#t", "#t\n"
+    "#t", "#t\n"
 //     "#f", "#f\n"
 //     "1", "1\n"
 //     "-1", "-1\n"
@@ -228,7 +229,7 @@ let tests = [
 //       (+ c (+ d e)))
 //     (let ([f 6])
 //       (+ a (+ c f)))))", "12\n"
-    e2, "2\n"
+    // e2, "2\n"
 //     e3, "13\n"
 //     e4, "2\n"
 //     e6, "4\n"
@@ -257,11 +258,15 @@ let lambdaTests = [
     @"(let ((f (lambda () (let ((f (lambda () (+ 2 3)))) (* (f) (f)))))) (+ (f) (f)))", "50\n"
     @"(let ((f (if (vector? (lambda () 12)) (lambda () 13) (lambda () 14)))) (f))", "14\n"
 ]
+let assignmentTests = [
+    "(let ((x 0)) (set! x 1) x)", "1\n"
+]
 
 [<EntryPoint>]
 let main argv =
-    runTestsWithName testMainTest "basic" tests
+    // runTestsWithName testMainTest "basic" tests
     // runTestsWithName testMainTest "vector" vectorTests
     // runTestsWithName testMainTest "lambda" lambdaTests
+    runTestsWithName testMainTest "assignment" assignmentTests
     // testLambda e16
     1

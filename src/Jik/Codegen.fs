@@ -249,13 +249,25 @@ let selectInstructions (prog : Intermediate.Program) : Program =
         | Some dest ->
             instrs @ [Mov, [Reg Rax; dest]]
 
+    let makeVector size var =
+        let shift = if wordSize = 8 then 3 else 2
+        [Mov, [GlobalValue(freePointer); Reg R11]
+         Mov, [size; Deref(0, R11)]
+         Or, [Int vectorTag; Reg R11]
+         Mov, [Reg R11; Var var]
+         Mov, [size; Reg R11]
+         Sar, [Int fixnumShift; Reg R11]
+         Add, [Int 1; Reg R11]
+         Sal, [Int shift; Reg R11]
+         Add, [Reg R11; GlobalValue(freePointer)]]
+
     let vectorAddress vec index =
         [Mov, [Var vec; Reg R11]
-         Mov, [Var index; Reg R12]
+         Mov, [index; Reg R12]
          Sar, [Int fixnumShift; Reg R12]
          Add, [Int 1; Reg R12]]
 
-    let handleDecl (var, x) =
+    let rec handleDecl (var, x) =
         match x with
         | Simple.Int n -> moveInt (convertNumber n) var
         | Simple.Bool true -> moveInt trueLiteral var
@@ -285,26 +297,17 @@ let selectInstructions (prog : Intermediate.Program) : Program =
              Or, [Operand.Int falseLiteral; Reg Rax]
              Mov, [Reg Rax; Var var]]
         | Simple.Prim(Prim.MakeVector, [var1]) ->
-            let shift = if wordSize = 8 then 3 else 2
-            [Mov, [GlobalValue(freePointer); Reg R11]
-             Mov, [Var var1; Deref(0, R11)]
-             Or, [Int vectorTag; Reg R11]
-             Mov, [Reg R11; Var var]
-             Mov, [Var var1; Reg R11]
-             Sar, [Int fixnumShift; Reg R11]
-             Add, [Int 1; Reg R11]
-             Sal, [Int shift; Reg R11]
-             Add, [Reg R11; GlobalValue(freePointer)]]
+            makeVector (Var var1) var
         | Simple.Prim(Prim.VectorLength, [var1]) ->
             [Mov, [Var var1; Reg R11]
              Mov, [Deref(-vectorTag, R11); Var var]]
         | Simple.Prim(Prim.IsVector, [var1]) ->
             isOfTypeInstrs var var1 vectorMask vectorTag
         | Simple.Prim(Prim.VectorSet, [vec; index; value]) ->
-            vectorAddress vec index @
+            vectorAddress vec (Var index) @
             [Mov, [Var value; Deref4(-vectorTag, R11, R12, wordSize)]]
         | Simple.Prim(Prim.VectorRef, [vec; index]) ->
-            vectorAddress vec index @
+            vectorAddress vec (Var index) @
             [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var var]]
         | Simple.Prim(Prim.MakeClosure, label :: args) ->
             let offset = (List.length args + 1) * wordSize
@@ -320,6 +323,17 @@ let selectInstructions (prog : Intermediate.Program) : Program =
              Mov, [Deref4(-closureTag, Rsi, Rax, 1); Var var]]
         | Simple.Prim(Prim.IsProcedure, [var1]) ->
             isOfTypeInstrs var var1 closureMask closureTag
+        | Simple.Prim(Prim.BoxCreate, [var1]) ->
+            makeVector (Int (1 <<< fixnumShift)) var @
+            vectorAddress var (Int 0) @
+            [Mov, [Var var1; Deref4(-vectorTag, R11, R12, wordSize)]
+             Mov, [Var var; Var var1]]
+        | Simple.Prim(Prim.BoxRead, [var1]) ->
+            vectorAddress var1 (Int 0) @
+            [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var var]]
+        | Simple.Prim(Prim.BoxWrite, [box; value]) ->
+            vectorAddress box (Int 0) @
+            [Mov, [Var value; Deref4(-vectorTag, R11, R12, wordSize)]]
         | e -> failwithf "handleDecl: %s %A" var e
 
     let handleTransfer labels = function

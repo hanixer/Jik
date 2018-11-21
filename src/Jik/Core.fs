@@ -265,34 +265,46 @@ let rec findModifiedVars expr =
         findMany exprs
     | _ -> Set.empty
 
-let assignmentConvert expr =
-    let alpha = alphaRename2 Map.empty expr
-    let modified = findModifiedVars alpha
-    let rec transform = function
+let assignmentConvert333 (prog : Program) : Program =
+    let rec convertRefs (modified : Set<string>) expr =
+        let conv = convertRefs modified
+        match expr with
         | Ref var ->
             if modified.Contains var then
                 PrimApp(BoxRead, [Ref var])
             else
                 Ref var
         | If(cond, conseq, altern) ->
-            If(transform cond, transform conseq, transform altern)
+            If(conv cond, conv conseq, conv altern)
         | Assign(var, rhs) -> 
-            PrimApp(BoxWrite, [Ref var; transform rhs])
+            PrimApp(BoxWrite, [Ref var; conv rhs])
         | Lambda(args, body) -> 
-            boxifyLambda args body
-        | Begin exprs -> Begin(List.map transform exprs)
-        | App(func, args) -> App(transform func, List.map transform args)
-        | PrimApp(op, args) -> PrimApp(op, List.map transform args)
+            let body = convertLambda modified args body
+            Lambda(args, body)
+        | Begin exprs -> Begin(List.map conv exprs)
+        | App(func, args) -> App(conv func, List.map conv args)
+        | PrimApp(op, args) -> PrimApp(op, List.map conv args)
         | e -> e
-    and boxifyLambda args body =
-        let folder var body =
-            if modified.Contains var then
-                PrimApp(BoxCreate, [Ref var]) :: body
+
+    and convertLambda modified args body = 
+        let body = List.map (convertRefs modified) body
+        List.foldBack (fun arg body ->
+            if Set.contains arg modified then
+                PrimApp(BoxCreate, [Ref arg]) :: body
             else
-                body
-        let body = List.foldBack folder args (List.map transform body)
-        Lambda(args, body)
-    transform alpha
+                body) 
+            args body            
+
+    let convertFunc (name, (args, body)) =
+        let modified = findModifiedVars (Begin body)
+        let body = convertLambda modified args body
+        name, (args, body)
+
+    let defs, main = prog
+    let defs = List.map convertFunc defs
+    let modified = findModifiedVars main
+    let main = convertRefs modified main
+    defs, main
 
 let stringToExpr = stringToSExpr >> sexprToExpr
 
