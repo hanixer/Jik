@@ -38,7 +38,10 @@ and Label = Var * Var list * Stmt list
 
 and Function = Var * Var list * Var list * Label list
 
-type Program = Function list * Function
+type Program = 
+    { Procedures : Function list
+      Main : Function 
+      Globals : string list }
 
 let schemeEntryLabel = "schemeEntry"
 
@@ -163,11 +166,11 @@ and showDef (name, free, args, labels) =
              iInterleave iNewline (List.map showLabel labels)
              iNewline]
 
-let showProgram (defs, main) =
-    iConcat [List.map showDef defs |> iConcat
+let showProgram prog =
+    iConcat [List.map showDef prog.Procedures |> iConcat
              iNewline
              iNewline
-             showDef main]
+             showDef prog.Main]
 
 let labelsToString labels =
     List.map showLabel labels
@@ -349,12 +352,15 @@ let convertMainExprs expr : Function =
     schemeEntryLabel, [], [], (schemeEntryLabel, [], stmts) :: labels
 
 let convertProgram (defs, expr) : Program =
-    List.map convertFunction defs, convertMainExprs expr
+    let procs = List.map convertFunction defs
+    let main = convertMainExprs expr
+    let globals = List.map fst defs
+    { Procedures = procs
+      Main = main
+      Globals = globals }
     
 
 let analyzeFreeVars (prog : Program) : Program =
-    let defs, main = prog
-
     let rec transformStmt stmt =
         match stmt with
         | Decl(var, Lambda(free, args, labels)) ->
@@ -385,7 +391,8 @@ let analyzeFreeVars (prog : Program) : Program =
         let free, args, labels = transformLambda (free, args, labels)
         name, free, args, labels
 
-    List.map transformFunction defs, transformFunction main
+    { prog with Procedures = List.map transformFunction prog.Procedures
+                Main = transformFunction prog.Main }
 
 let replaceClosureRef free var = 
     match List.tryFindIndex ((=) var) free with
@@ -453,9 +460,9 @@ let closureConversion (prog : Program) : Program =
         let procs, labels = foldLabels free labels
         procs, (name, free, args, labels)
 
-    let defs, main = prog
-    let converted = List.map convertFunction defs
+    let converted = List.map convertFunction prog.Procedures
     let procs = List.collect fst converted
     let defs = List.map snd converted
-    let procs1, main = convertFunction main
-    defs @ procs @ procs1, main
+    let procs1, main = convertFunction prog.Main
+    { prog with Procedures = defs @ procs @ procs1 
+                Main = main }

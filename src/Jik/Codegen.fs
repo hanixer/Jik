@@ -82,7 +82,10 @@ type FunctionDef =
       LiveAfter : Map<int, Set<Operand>>
       SlotsOccupied : int }
 
-type Program = FunctionDef list * FunctionDef
+type Program = 
+    { Procedures : FunctionDef list
+      Main : FunctionDef
+      Globals : string list }
 
 let freePointer = "freePointer"
 
@@ -168,7 +171,7 @@ let instrsToString instrs =
     showInstrs out instrs
     out.ToString()
 
-let programToString (defs, main) =   
+let programToString (prog : Program) =   
     let out = new StringWriter()  
 
     let handleDef def =
@@ -176,8 +179,8 @@ let programToString (defs, main) =
         showInstrs out def.Instrs
         fprintfn out "\n\n"
 
-    List.iter handleDef defs
-    handleDef { main with Name = schemeEntryLabel }
+    List.iter handleDef prog.Procedures
+    handleDef { prog.Main with Name = schemeEntryLabel }
     out.ToString()
 
 let countMaxArgs labels =
@@ -215,7 +218,7 @@ let argumentToLocation (siStart, siMult) reg args =
     result
 
 
-let selectInstructions (defs, main) : Program =
+let selectInstructions (prog : Intermediate.Program) : Program =
     let convertNumber n = n <<< fixnumShift
     let moveInt n var = [Mov, [Operand.Int n; Operand.Var var]]
 
@@ -413,14 +416,31 @@ let selectInstructions (defs, main) : Program =
 
     let impl = freshLabel "schemeEntryImpl"
     let entryImplFunc =
-        match main with
+        match prog.Main with
         | name, free, [], ((_, [], stmts) :: rest) ->
             (impl, free, [], (impl, [], stmts) :: rest)            
         | _ -> failwith "selectInstructions: wrong main function"
-    let defs = entryImplFunc :: defs
+    let procs = entryImplFunc :: prog.Procedures
     let main = handleDef (schemeEntryLabel, [], [], [])
     let main = {main with Instrs = [Label schemeEntryLabel, []; Call impl, []]}
-    List.map handleDef defs, main
+    { Procedures = List.map handleDef procs 
+      Main = main
+      Globals = prog.Globals }
+
+let revealGlobals (prog : Program) =
+    let convertArg = function
+        | Var var when List.contains var prog.Globals ->
+            GlobalValue var
+        | arg -> arg
+    
+    let convertInstr (op, args) =
+        op, List.map convertArg args
+    
+    let convertProc proc =
+        { proc with Instrs = List.map convertInstr proc.Instrs }
+    
+    { prog with Procedures = List.map convertProc prog.Procedures 
+                Main = convertProc prog.Main}
 
 let collectVars instrs =
     List.map snd instrs
@@ -467,7 +487,7 @@ let computePreds instrs =
     Seq.fold handleInstr (initial, 0) instrs
     |> fst
 
-let rec computeLiveness (defs, main) =
+let rec computeLiveness (prog : Program) =
     let isRegVar = 
         function 
         | Reg _ | Var _ -> true 
@@ -541,9 +561,10 @@ let rec computeLiveness (defs, main) =
         let afterMap, beforeMap = liveAfter def.Instrs
         { def with LiveAfter = afterMap; LiveBefore = beforeMap }
 
-    List.map handleDef defs, handleDef main
+    { prog with Procedures = List.map handleDef prog.Procedures
+                Main = handleDef prog.Main }
 
-let rec buildInterference (defs, main) =
+let rec buildInterference (prog : Program) : Program =
     let registersForUse = 
         [Rbx; Rcx; Rdx; Rsi; Rdi; Rbp;
          R8; R9; R10; R11; R12; R13; R14; R15]
@@ -585,7 +606,8 @@ let rec buildInterference (defs, main) =
         printDotFunc (function | Var var -> var | Reg reg -> reg.ToString().ToLower() | _ -> "ERROR") graph (__SOURCE_DIRECTORY__ + "/../../misc/graphs/" + def.Name + ".dot")
         {def with InterfGraph = graph}
 
-    List.map handleDef defs, handleDef main
+    { prog with Procedures = List.map handleDef prog.Procedures
+                Main = handleDef prog.Main }
 
 /// Takes interference graph and all used variables
 /// and returns mapping from variables and registers to their colors
@@ -686,7 +708,7 @@ let geconvertMainExprsrandToLocation operandToColor stackArgs =
 /// Takes a program with computed interference graph
 /// and allocates location for variables in the
 /// registers or in the stack
-let allocateRegisters (defs, main) =
+let allocateRegisters (prog : Program) =
     let handleArg env arg =
         match Map.tryFind arg env with
         | Some other -> 
@@ -704,9 +726,10 @@ let allocateRegisters (defs, main) =
         {def with Instrs = List.map (handleInstr operandToLocation) def.Instrs
                   SlotsOccupied = def.SlotsOccupied + slots}
 
-    List.map handleDef defs, handleDef main
+    { prog with Procedures = List.map handleDef prog.Procedures
+                Main = handleDef prog.Main }
 
-let convertSlots (defs, main) =
+let convertSlots (prog : Program) =
     let handleArg slots arg =
         match arg with
         | Slot n ->
@@ -719,10 +742,10 @@ let convertSlots (defs, main) =
     let handleDef def =
         {def with Instrs = List.map (handleInstr def.SlotsOccupied) def.Instrs}
 
-    List.map handleDef defs, handleDef main
+    { prog with Procedures = List.map handleDef prog.Procedures
+                Main = handleDef prog.Main }
 
-
-let stackCorrections (defs, main) =
+let stackCorrections (prog : Program) =
     let restoreStack n = function
         | RestoreStack, [] -> Add, [Operand.Int n; Reg Rsp]
         | x -> x
@@ -761,9 +784,10 @@ let stackCorrections (defs, main) =
             {def with Instrs = instrs}
         | _ -> failwith "addFunction...: expected label"
 
-    List.map handleDef defs, handleMain main
-    
-let rec patchInstr (defs, main) =
+    { prog with Procedures = List.map handleDef prog.Procedures
+                Main = handleMain prog.Main }
+
+let rec patchInstr (prog : Program) =
     let filterMoves =
         List.filter (function
             | Mov, [arg1; arg2] when arg1 = arg2 -> false
@@ -783,4 +807,5 @@ let rec patchInstr (defs, main) =
     let handleDef def =
         {def with Instrs = List.collect transform def.Instrs |> filterMoves}
 
-    List.map handleDef defs, handleDef main
+    { prog with Procedures = List.map handleDef prog.Procedures
+                Main = handleDef prog.Main }

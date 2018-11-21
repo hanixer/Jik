@@ -2,6 +2,8 @@
 
 int n = 0;
 
+int reallyGlobality = 293871;
+
 int fib(int n) {
     if (n <= 1) {
         return n;

@@ -28,7 +28,9 @@ let testInterf s =
     |> printIr
     |> selectInstructions
     |> computeLiveness
-    |> buildInterference
+    // |> buildInterference
+    |> failwithf "nothing more %A"
+    
   use fileOut = new StreamWriter(path)
   let handleLiv out live =
     Map.iter (fun k v -> 
@@ -64,6 +66,7 @@ let testMainTest s =
   |> Intermediate.closureConversion
   |> printIr
   |> selectInstructions
+  |> revealGlobals
   |> computeLiveness
   |> buildInterference
   |> allocateRegisters
@@ -190,50 +193,50 @@ let e16 = "
 ((foo 1) 2)"
 
 let tests = [
-    "(* 1 0)", "0\n"
-    "(* 1 5)", "5\n"
-    "(* -1 5)", "-5\n"
-    "(* 2 2)", "4\n"
-    "#t", "#t\n"
-    "#f", "#f\n"
-    "1", "1\n"
-    "-1", "-1\n"
-    "(+ 1 2)", "3\n"
-    "(+ 1 (+ 2 3))", "6\n"
-    "(+ (+ 1 4) (+ 2 3))", "10\n"
-    "(< 1 2)", "#t\n"
-    "(if 1 2 3)", "2\n"
-    "(if #f 2 3)", "3\n"
-    "(if (< 3 1) 2 3)", "3\n"
-    "(if (if 1 2 3) 4 5)", "4\n"
-    "(if 4 (if #f 2 3) 5)", "3\n"
-    "(if 4 (if #t 8 9) (if #f 2 3))", "8\n"    
-    "
-(let ([v 1])
-(let ([w 46])
-(let ([x (+ v 7)])
-(let ([y (+ 4 x)])
-(let ([z (+ x w)])
-(+ z (- y)))))))", "42\n"
-    "
-(let ([a 1]
-      [b 2]
-      [c 3])
-  (if (< a b)
-    (let ([d 4]
-          [e 5])
-      (+ c (+ d e)))
-    (let ([f 6])
-      (+ a (+ c f)))))", "12\n"
+//     "(* 1 0)", "0\n"
+//     "(* 1 5)", "5\n"
+//     "(* -1 5)", "-5\n"
+//     "(* 2 2)", "4\n"
+//     "#t", "#t\n"
+//     "#f", "#f\n"
+//     "1", "1\n"
+//     "-1", "-1\n"
+//     "(+ 1 2)", "3\n"
+//     "(+ 1 (+ 2 3))", "6\n"
+//     "(+ (+ 1 4) (+ 2 3))", "10\n"
+//     "(< 1 2)", "#t\n"
+//     "(if 1 2 3)", "2\n"
+//     "(if #f 2 3)", "3\n"
+//     "(if (< 3 1) 2 3)", "3\n"
+//     "(if (if 1 2 3) 4 5)", "4\n"
+//     "(if 4 (if #f 2 3) 5)", "3\n"
+//     "(if 4 (if #t 8 9) (if #f 2 3))", "8\n"    
+//     "
+// (let ([v 1])
+// (let ([w 46])
+// (let ([x (+ v 7)])
+// (let ([y (+ 4 x)])
+// (let ([z (+ x w)])
+// (+ z (- y)))))))", "42\n"
+//     "
+// (let ([a 1]
+//       [b 2]
+//       [c 3])
+//   (if (< a b)
+//     (let ([d 4]
+//           [e 5])
+//       (+ c (+ d e)))
+//     (let ([f 6])
+//       (+ a (+ c f)))))", "12\n"
     e2, "2\n"
-    e3, "13\n"
-    e4, "2\n"
-    e6, "4\n"
-    e7, "27\n"
-    e8, "-4\n"
-    e9, "50005000\n"
-    e10, "3\n"
-    e11, "-2\n"
+//     e3, "13\n"
+//     e4, "2\n"
+//     e6, "4\n"
+//     e7, "27\n"
+//     e8, "-4\n"
+//     e9, "50005000\n"
+//     e10, "3\n"
+//     e11, "-2\n"
 ]
 let vectorTests = [
     "(vector-length (make-vector 4))", "4\n"
