@@ -45,6 +45,7 @@ type InstrName =
     | Sub
     | Neg
     | Mov
+    | IMul
     | Sar
     | Sal
     | And
@@ -261,7 +262,8 @@ let selectInstructions (defs, main) : Program =
              InstrName.Add, [Var var2; Var var]]
         | Simple.Prim(Prim.Mul, [var1; var2]) ->
             [InstrName.Mov, [Var var1; Var var]
-             InstrName.Add, [Var var2; Var var]] // TODO: rework!
+             InstrName.IMul, [Var var2; Var var]
+             InstrName.Sar, [Int fixnumShift; Var var]]
         | Simple.Prim(Prim.Sub, [var1; var2]) ->
             [InstrName.Mov, [Var var1; Var var]
              InstrName.Sub, [Var var2; Var var]]
@@ -312,7 +314,7 @@ let selectInstructions (defs, main) : Program =
              Mov, [Reg R11; Var var]]
         | Simple.Prim(Prim.ClosureRef, [var1]) ->
             [Mov, [Var var1; Reg Rax]
-             Mov, [Deref4(-closureTag, Rsi, Rax, 0); Var var]]
+             Mov, [Deref4(-closureTag, Rsi, Rax, 1); Var var]]
         | Simple.Prim(Prim.IsProcedure, [var1]) ->
             isOfTypeInstrs var var1 closureMask closureTag
         | e -> failwithf "handleDecl: %s %A" var e
