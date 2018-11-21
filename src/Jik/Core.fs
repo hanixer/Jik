@@ -23,6 +23,7 @@ type Prim =
     | VectorSet
     | MakeClosure
     | ClosureRef
+    | IsProcedure
 
 type Expr = 
     | Int of int
@@ -66,6 +67,7 @@ let stringPrimop = [
     "vector-length", VectorLength
     "vector-ref", VectorRef
     "vector-set!", VectorSet
+    "procedure?", IsProcedure
 ]
 
 let tryStringToPrimop s =

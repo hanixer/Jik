@@ -60,6 +60,8 @@ let testMainTest s =
   |> alphaRename
   |> revealFunctions 
   |> convertProgram
+  |> Intermediate.analyzeFreeVars
+  |> Intermediate.closureConversion
   |> printIr
   |> selectInstructions
   |> computeLiveness
@@ -238,13 +240,21 @@ let vectorTests = [
     e14, "#(1 2 3)\n"
 ]
 let lambdaTests = [
-    "(procedure? (lambda (x) x))", "#t\n"
+    // "(procedure? (lambda (x) x))", "#t\n"
+    // "(procedure? ((lambda ()
+                  // (lambda () 1))))", "#t\n"
+    // @"(let ((f (lambda () 12))) (f))", "12\n"
+    // @"(let ((f (lambda () (+ 12 13)))) (f))", "25\n"
+    // @"(let ((f (lambda () 13))) (+ (f) (f)))", "26\n"
+    @"(let ((f (lambda () (let ((g (lambda () (+ 2 3)))) (* (g) (g)))))) (+ (f) (f)))", "50\n"
+    // @"(let ((f (lambda () (let ((f (lambda () (+ 2 3)))) (* (f) (f)))))) (+ (f) (f)))", "50\n"
+    // @"(let ((f (if (boolean? (lambda () 12)) (lambda () 13) (lambda () 14)))) (f))", "14\n"
 ]
 
 [<EntryPoint>]
 let main argv =
     // runTestsWithName testMainTest "basic" tests
     // runTestsWithName testMainTest "vector" vectorTests
-    // runTestsWithName testMainTest "lambda" lambdaTests
-    testLambda e16
+    runTestsWithName testMainTest "lambda" lambdaTests
+    // testLambda e16
     1

@@ -74,5 +74,5 @@ let ts = [
 ]
 
 
-runTestsWithName Compile.compile "my" ts
+// runTestsWithName Compile.compile "my" ts
 // runAllTests() 

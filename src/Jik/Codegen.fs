@@ -13,13 +13,8 @@ open Display
 /// After conversion from Intermediate, 'Var' operands created.
 /// Later these operands are changed to stack locations or registers.
 /// 
-/// Vectors:
-/// (make-vector n)
-/// (vector expr ...) - sugar
-/// (vector-ref vec pos)
-/// (vector-set! vec pos value)
-/// (vector-length vec)
-/// (vector? vec)
+/// Register %rsi is used as closure pointer.
+/// It is saved and restored at each function call.
 
 type Register =
     | Rsp | Rbp | Rax | Rbx | Rcx | Rdx | Rsi | Rdi 
@@ -99,7 +94,7 @@ let registersForArgs =
     [Rcx; Rdx; R8; R9]
 
 let callerSave = 
-    [R10; R11; R8; R9; Rcx; Rdi; Rdx; Rsi]
+    [R10; R11; R8; R9; Rcx; Rdi; Rdx]
 
 let calleeSave =
     [R12; R13; R14; R15; Rbp; Rbx]
@@ -218,10 +213,24 @@ let argumentToLocation (siStart, siMult) reg args =
     let _, _, result = List.fold fold (registersForArgs, 0, Map.empty) args
     result
 
+
 let selectInstructions (defs, main) : Program =
     let convertNumber n = n <<< fixnumShift
     let moveInt n var = [Mov, [Operand.Int n; Operand.Var var]]
 
+    let moveClosureArgs args =
+        List.mapi (fun i arg ->
+            Mov, [Var arg; Deref((i + 1) * wordSize, R11)]) args
+
+    let isOfTypeInstrs var var1 mask tag =
+        [And, [Int mask; Var var1]
+         Cmp, [Int tag; Var var1]
+         Set E, [Reg Al]
+         Movzb, [Reg Al; Reg Rax]
+         Sal, [Operand.Int boolBit; Reg Rax]
+         Or, [Operand.Int falseLiteral; Reg Rax]
+         Mov, [Reg Rax; Var var]]
+    
     let comparison var1 var2 cc dest =
         let instrs =
             [Mov, [Var var1; Reg Rax]
@@ -285,19 +294,27 @@ let selectInstructions (defs, main) : Program =
             [Mov, [Var var1; Reg R11]
              Mov, [Deref(-vectorTag, R11); Var var]]
         | Simple.Prim(Prim.IsVector, [var1]) ->
-            [And, [Int vectorMask; Var var1]
-             Cmp, [Int vectorTag; Var var1]
-             Set E, [Reg Al]
-             Movzb, [Reg Al; Reg Rax]
-             Sal, [Operand.Int boolBit; Reg Rax]
-             Or, [Operand.Int falseLiteral; Reg Rax]
-             Mov, [Reg Rax; Var var]]
+            isOfTypeInstrs var var1 vectorMask vectorTag
         | Simple.Prim(Prim.VectorSet, [vec; index; value]) ->
             vectorAddress vec index @
             [Mov, [Var value; Deref4(-vectorTag, R11, R12, wordSize)]]
         | Simple.Prim(Prim.VectorRef, [vec; index]) ->
             vectorAddress vec index @
             [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var var]]
+        | Simple.Prim(Prim.MakeClosure, label :: args) ->
+            let offset = (List.length args + 1) * wordSize
+            [Mov, [GlobalValue(freePointer); Reg R11]
+             Lea(label), [Deref(0, R11)]] @
+            moveClosureArgs args @
+            [Mov, [Int offset; Reg R12]
+             Add, [Reg R12; GlobalValue(freePointer)]
+             Or, [Int closureTag; Reg R11]
+             Mov, [Reg R11; Var var]]
+        | Simple.Prim(Prim.ClosureRef, [var1]) ->
+            [Mov, [Var var1; Reg Rax]
+             Mov, [Deref4(-closureTag, Rsi, Rax, 0); Var var]]
+        | Simple.Prim(Prim.IsProcedure, [var1]) ->
+            isOfTypeInstrs var var1 closureMask closureTag
         | e -> failwithf "handleDecl: %s %A" var e
 
     let handleTransfer labels = function
@@ -326,7 +343,11 @@ let selectInstructions (defs, main) : Program =
             if List.length argsOfLabel <> 1 then 
                 failwith "handleTransfer: wrong number of vars"
             moveToArgPositions @ 
-            [CallIndirect, [Var func]
+            [Mov, [Reg Rsi; Deref(0, Rsp)]
+             Mov, [Var func; Reg Rax]
+             Mov, [Deref(-closureTag, Rax); Reg Rax]
+             CallIndirect, [Reg Rax]
+             Mov, [Deref(0, Rsp); Reg Rsi]
              Mov, [Reg Rax; Var argOfLabel]
              InstrName.Jmp label, []]
         | Transfer.Call(Tail, func, args) ->
@@ -343,8 +364,10 @@ let selectInstructions (defs, main) : Program =
                 else []
             moveToArgPositions @ 
             moveStackArgs @ 
-            [RestoreStack, []
-             JmpIndirect, [Var func]]
+            [Mov, [Var func; Reg Rax]
+             Mov, [Deref(-closureTag, Rax); Reg Rax]
+             RestoreStack, []
+             JmpIndirect, [Reg Rax]]
 
 
     let handleStmt labels = function
@@ -685,7 +708,7 @@ let convertSlots (defs, main) =
     let handleArg slots arg =
         match arg with
         | Slot n ->
-            Deref((slots - n - 1) * wordSize, Rsp)
+            Deref((slots - n) * wordSize, Rsp)
         | _ -> arg
 
     let handleInstr slots (op, args) =
@@ -704,7 +727,7 @@ let stackCorrections (defs, main) =
 
     let handleDef def =
         let h, rest = List.head def.Instrs, List.tail def.Instrs
-        let n = def.SlotsOccupied * wordSize
+        let n = (def.SlotsOccupied + 1) * wordSize
         let rest = List.map (restoreStack n) rest
         { def with Instrs = h :: (Sub, [Operand.Int n; Reg Rsp]) :: rest }
 
