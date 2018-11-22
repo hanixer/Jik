@@ -24,6 +24,8 @@ type Prim =
     | MakeClosure
     | ClosureRef
     | IsProcedure
+    | GlobalRef
+    | GlobalSet
 
 type Expr = 
     | Int of int
@@ -39,7 +41,9 @@ type Expr =
 
 and LambdaData = string list * Expr list
 
-type Program = (string * LambdaData) list * Expr
+type Program = 
+    { Main : Expr list
+      Globals : string list }
 
 let freshLabel = 
     let mutable dict  = Dictionary<string, int>()
@@ -127,6 +131,28 @@ let rec sexprToExpr sexpr =
     | List(head :: tail) -> App(sexprToExpr head, convertList tail)
     | e -> failwith <| sexprToString e
 
+let stringToProgram str : Program =
+    let sexpr = stringToSExpr ("(" + str + ")")
+
+    let parseSExpr (globals, sexprs) sexpr =
+        match sexpr with
+        | List (Symbol "define" :: List (Symbol name :: args) :: body) ->
+            let lambda = exprsToList (Symbol "lambda" :: exprsToList args :: body)
+            let sexpr = exprsToList [Symbol "set!"; Symbol name; lambda]
+            name :: globals, sexpr :: sexprs
+        | List [Symbol "define"; Symbol name; sexpr] ->
+            let sexpr = exprsToList [Symbol "set!"; Symbol name; sexpr]
+            name :: globals, sexpr :: sexprs
+        | sexpr ->
+            globals, sexpr :: sexprs
+
+    match sexpr with
+    | List sexprs when not (sexprs.IsEmpty) ->
+        let globals, sexprs = List.fold parseSExpr ([], []) sexprs
+        { Main = List.map sexprToExpr sexprs |> List.rev
+          Globals = List.rev globals }
+    | _ -> failwith "stringToProgram: parsing failed"
+
 let rec transform f expr =
     let rec propagate expr = 
         match expr with
@@ -144,6 +170,19 @@ let rec transform f expr =
     and fpt = f propagate transform
     
     transform expr
+
+let convertGlobalRefs (prog : Program) : Program =
+    let convertHelper propagate transform expr =
+        match expr with
+        | Expr.Ref var when List.contains var prog.Globals ->
+            PrimApp(GlobalRef, [Ref var])
+        | Expr.Assign(var, rhs) when List.contains var prog.Globals ->
+            PrimApp(GlobalSet, [Ref var; rhs])
+        | _ -> propagate expr
+    
+    let convertExpr expr = transform convertHelper expr
+
+    { prog with Main = List.map convertExpr prog.Main }
 
 let trySubstitute v mapping = 
     match Map.tryFind v mapping with
@@ -174,6 +213,9 @@ let rec alphaRename2 mapping =
         PrimApp(op, List.map (alphaRename2 mapping) args)
     | e -> e
 
+let alphaRename (prog : Program) : Program =
+    { prog with Main = List.map (alphaRename2 Map.empty) prog.Main }
+
 let rec replaceVars mapping expr =
     let transf = replaceVars mapping
     let replace var = 
@@ -190,41 +232,26 @@ let rec replaceVars mapping expr =
     | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
     | e -> e
 
-let alphaRename (defs, expr) : Program =
-    let newName (name, _) = name, freshLabel name
-
-    let mapping =
-        List.map newName defs
-        |> Map.ofList
-
-    let replaceInDef (name, (args, body)) =
-        let name = 
-            match Map.tryFind name mapping with
-            | Some newName -> newName
-            | _ -> name
-        name, (args, List.map (alphaRename2 mapping) body)
-
-    List.map replaceInDef defs, alphaRename2 mapping expr
-
 let revealFunctions (prog : Program) : Program =
-    let (defs, expr) = prog
-    let functionNames = 
-        List.map fst defs |> Set.ofList
+    // let (defs, expr) = prog
+    // let functionNames = 
+    //     List.map fst defs |> Set.ofList
     
-    let rec handleExpr = function
-        | If(exprc, exprt, exprf) -> If(handleExpr exprc, handleExpr exprt, handleExpr exprf)
-        | Assign(var, expr) -> Assign(var, handleExpr expr)
-        | Lambda(args, body) -> Lambda(args, List.map handleExpr body)
-        | Begin(exprs) -> Begin(List.map handleExpr exprs)
-        | App(func, args) -> App(handleExpr func, List.map handleExpr args)
-        | PrimApp(op, args) -> PrimApp(op, List.map handleExpr args)
-        | Ref(var) when Set.contains var functionNames -> FunctionRef var
-        | e -> e
+    // let rec handleExpr = function
+    //     | If(exprc, exprt, exprf) -> If(handleExpr exprc, handleExpr exprt, handleExpr exprf)
+    //     | Assign(var, expr) -> Assign(var, handleExpr expr)
+    //     | Lambda(args, body) -> Lambda(args, List.map handleExpr body)
+    //     | Begin(exprs) -> Begin(List.map handleExpr exprs)
+    //     | App(func, args) -> App(handleExpr func, List.map handleExpr args)
+    //     | PrimApp(op, args) -> PrimApp(op, List.map handleExpr args)
+    //     | Ref(var) when Set.contains var functionNames -> FunctionRef var
+    //     | e -> e
 
-    let handleDef (name, (args, expr)) =
-        name, (args, List.map handleExpr expr)
+    // let handleDef (name, (args, expr)) =
+    //     name, (args, List.map handleExpr expr)
 
-    List.map handleDef defs, handleExpr expr
+    // List.map handleDef defs, handleExpr expr
+    prog 
 
 let rec fixArithmeticPrims (prog : Program) : Program =
     let ops = [Add; Mul;]
@@ -241,12 +268,7 @@ let rec fixArithmeticPrims (prog : Program) : Program =
 
     let handleExpr2 = transform handleExpr
 
-    let handleDef (name, (args, expr)) =
-        name, (args, List.map handleExpr2 expr)
-
-    let defs, expr = prog
-
-    List.map handleDef defs, handleExpr2 expr
+    { prog with Main = List.map handleExpr2 prog.Main }
 
 let rec findModifiedVars expr =
     let find = findModifiedVars
@@ -265,7 +287,7 @@ let rec findModifiedVars expr =
         findMany exprs
     | _ -> Set.empty
 
-let assignmentConvert333 (prog : Program) : Program =
+let assignmentConvert (prog : Program) : Program =
     let rec convertRefs (modified : Set<string>) expr =
         let conv = convertRefs modified
         match expr with
@@ -300,29 +322,7 @@ let assignmentConvert333 (prog : Program) : Program =
         let body = convertLambda modified args body
         name, (args, body)
 
-    let defs, main = prog
-    let defs = List.map convertFunc defs
-    let modified = findModifiedVars main
-    let main = convertRefs modified main
-    defs, main
+    let modified = List.map findModifiedVars prog.Main |> Set.unionMany
+    { prog with Main = List.map (convertRefs modified) prog.Main }
 
 let stringToExpr = stringToSExpr >> sexprToExpr
-
-let stringToProgram str : Program =
-    let sexpr = stringToSExpr ("(" + str + ")")
-
-    let parseDefs defs sexpr =
-        match sexpr with
-        | List (Symbol "define" :: List (Symbol name :: args) :: body) ->
-            let args = symbolsToStrings args
-            let body = List.map sexprToExpr body
-            (name, (args, body)) :: defs
-        | _ -> failwith "parseDefs: wrong format"
-
-    match sexpr with
-    | List sexprs when not (sexprs.IsEmpty) ->
-        let sexprs = List.rev sexprs
-        let expr = sexprToExpr (List.head sexprs)
-        let defs = List.fold parseDefs [] (List.tail sexprs)
-        (defs, expr)
-    | _ -> failwith "stringToProgram: parsing failed"

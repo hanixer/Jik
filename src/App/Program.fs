@@ -60,7 +60,7 @@ let testMainTest s =
   |> stringToProgram
   |> fixArithmeticPrims
   |> alphaRename
-  |> assignmentConvert333
+  |> assignmentConvert
   |> revealFunctions 
   |> convertProgram
   |> Intermediate.analyzeFreeVars
@@ -76,22 +76,12 @@ let testMainTest s =
   |> patchInstr
   |> Codegen.programToString
 
-let testNew s =
-    s 
-    |> stringToProgram
-    |> fixArithmeticPrims
-    |> alphaRename
-    |> revealFunctions 
-    |> convertProgram
-    |> printIr
-    |> selectInstructions
-    |> Codegen.programToString
-    |> printfn "%s"
-
 let testLambda str =
     let r = stringToProgram str
     let r = fixArithmeticPrims r
+    let r = convertGlobalRefs r
     let r = alphaRename r
+    let r = assignmentConvert r
     let r = revealFunctions r
     let r = Intermediate.convertProgram r
     let r = Intermediate.analyzeFreeVars r
@@ -267,6 +257,6 @@ let main argv =
     // runTestsWithName testMainTest "basic" tests
     // runTestsWithName testMainTest "vector" vectorTests
     // runTestsWithName testMainTest "lambda" lambdaTests
-    runTestsWithName testMainTest "assignment" assignmentTests
-    // testLambda e16
+    // runTestsWithName testMainTest "assignment" assignmentTests
+    testLambda e2
     1
