@@ -248,6 +248,15 @@ let lambdaTests = [
     @"(let ((f (lambda () (let ((g (lambda () (+ 2 3)))) (* (g) (g)))))) (+ (f) (f)))", "50\n"
     @"(let ((f (lambda () (let ((f (lambda () (+ 2 3)))) (* (f) (f)))))) (+ (f) (f)))", "50\n"
     @"(let ((f (if (vector? (lambda () 12)) (lambda () 13) (lambda () 14)))) (f))", "14\n"
+    @"(let ((f (lambda (x) x))) (f 12))", "12\n"
+    @"(let ((f (lambda (x y) (+ x y)))) (f 12 13))", "25\n"
+    @"(let ((f (lambda (x) (let ((g (lambda (x y) (+ x y)))) (g x 100))))) (f 1000))", "1100\n"
+    @"(let ((f (lambda (g) (g 2 13)))) (f (lambda (n m) (* n m))))", "26\n"
+    @"(let ((f (lambda (g) (+ (g 10) (g 100))))) (f (lambda (x) (* x x))))", "10100\n"
+    @"(let ((f (lambda (f n m) (if (zero? n) m (f f (- n 1) (* n m)))))) (f f 5 1))", "120\n"
+    @"(let ((f (lambda (f n) (if (zero? n) 1 (* n (f f (- n 1))))))) (f f 5))", "120\n"
+    @"(let ((n 12)) (let ((f (lambda () n))) (f)))", "12\n"
+    @"(let ((n 12)) (let ((f (lambda (m) (+ n m)))) (f 100)))", "112\n"
 ]
 let assignmentTests = [
     "(let ((x 0)) (set! x 1) x)", "1\n"
@@ -255,9 +264,9 @@ let assignmentTests = [
 
 [<EntryPoint>]
 let main argv =
-    // runTestsWithName testMainTest "basic" tests
-    // runTestsWithName testMainTest "vector" vectorTests
+    runTestsWithName testMainTest "basic" tests
+    runTestsWithName testMainTest "vector" vectorTests
     runTestsWithName testMainTest "lambda" lambdaTests
-    // runTestsWithName testMainTest "assignment" assignmentTests
+    runTestsWithName testMainTest "assignment" assignmentTests
     // testLambda e2
     1

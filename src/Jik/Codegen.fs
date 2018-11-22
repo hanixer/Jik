@@ -329,7 +329,8 @@ let selectInstructions (prog : Intermediate.Program) : Program =
              Mov, [Reg R11; Var var]]
         | Simple.Prim(Prim.ClosureRef, [var1]) ->
             [Mov, [Var var1; Reg Rax]
-             Mov, [Deref4(-closureTag, Rsi, Rax, 1); Var var]]
+             Add, [Int 1; Reg Rax]
+             Mov, [Deref4(-closureTag, Rsi, Rax, wordSize); Var var]]
         | Simple.Prim(Prim.IsProcedure, [var1]) ->
             isOfTypeInstrs var var1 closureMask closureTag
         | Simple.Prim(Prim.BoxCreate, [var1]) ->
@@ -347,6 +348,13 @@ let selectInstructions (prog : Intermediate.Program) : Program =
             [Mov, [Var value; GlobalValue(glob)]]
         | Simple.Prim(Prim.GlobalRef, [glob]) ->
             [Mov, [GlobalValue(glob); Var var]]
+        | Simple.Prim(Prim.IsZero, [var1]) ->
+            [Cmp, [Int 0; Var var1]
+             Set E, [Reg Al]
+             Movzb, [Reg Al; Reg Rax]
+             Sal, [Operand.Int boolBit; Reg Rax]
+             Or, [Operand.Int falseLiteral; Reg Rax]
+             Mov, [Reg Rax; Var var]]
         | e -> failwithf "handleDecl: %s %A" var e
 
     let handleTransfer labels = function
@@ -376,8 +384,8 @@ let selectInstructions (prog : Intermediate.Program) : Program =
                 failwith "handleTransfer: wrong number of vars"
             moveToArgPositions @ 
             [Mov, [Reg Rsi; Deref(0, Rsp)]
-             Mov, [Var func; Reg Rax]
-             Mov, [Deref(-closureTag, Rax); Reg Rax]
+             Mov, [Var func; Reg Rsi]
+             Mov, [Deref(-closureTag, Rsi); Reg Rax]
              CallIndirect, [Reg Rax]
              Mov, [Deref(0, Rsp); Reg Rsi]
              Mov, [Reg Rax; Var argOfLabel]
@@ -396,8 +404,8 @@ let selectInstructions (prog : Intermediate.Program) : Program =
                 else []
             moveToArgPositions @ 
             moveStackArgs @ 
-            [Mov, [Var func; Reg Rax]
-             Mov, [Deref(-closureTag, Rax); Reg Rax]
+            [Mov, [Var func; Reg Rsi]
+             Mov, [Deref(-closureTag, Rsi); Reg Rax]
              RestoreStack, []
              JmpIndirect, [Reg Rax]]
 

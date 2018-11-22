@@ -26,6 +26,7 @@ type Prim =
     | IsProcedure
     | GlobalRef
     | GlobalSet
+    | IsZero
 
 type Expr = 
     | Int of int
@@ -72,6 +73,7 @@ let stringPrimop = [
     "vector-ref", VectorRef
     "vector-set!", VectorSet
     "procedure?", IsProcedure
+    "zero?", IsZero
 ]
 
 let tryStringToPrimop s =
