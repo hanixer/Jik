@@ -174,11 +174,20 @@ let instrsToString instrs =
 let programToString (prog : Program) =   
     let out = new StringWriter()  
 
+    let printGlobal globl =
+        fprintfn out "    .globl %s" globl
+        fprintfn out "    .bss"
+        fprintfn out "    .align %d" wordSize
+        fprintfn out "%s:" globl
+        fprintfn out "    .space %d" wordSize
+
     let handleDef def =
+        fprintfn out "    .text"
         fprintfn out "    .globl %s" def.Name
         showInstrs out def.Instrs
         fprintfn out "\n\n"
 
+    List.iter printGlobal prog.Globals
     List.iter handleDef prog.Procedures
     handleDef { prog.Main with Name = schemeEntryLabel }
     out.ToString()
@@ -334,6 +343,10 @@ let selectInstructions (prog : Intermediate.Program) : Program =
         | Simple.Prim(Prim.BoxWrite, [box; value]) ->
             vectorAddress box (Int 0) @
             [Mov, [Var value; Deref4(-vectorTag, R11, R12, wordSize)]]
+        | Simple.Prim(Prim.GlobalSet, [glob; value]) ->
+            [Mov, [Var value; GlobalValue(glob)]]
+        | Simple.Prim(Prim.GlobalRef, [glob]) ->
+            [Mov, [GlobalValue(glob); Var var]]
         | e -> failwithf "handleDecl: %s %A" var e
 
     let handleTransfer labels = function

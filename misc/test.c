@@ -61,6 +61,10 @@ int perm() {
     return l;
 }
 
+void setQuick() {
+    n = 1000000;
+}
+
 int main() {    
     printf("%d\n", fib(100000));
     return 0;
