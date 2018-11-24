@@ -295,11 +295,11 @@ let pairTests = [
 
 [<EntryPoint>]
 let main argv =
-    // runTestsWithName testMainTest "basic" tests
-    // runTestsWithName testMainTest "vector" vectorTests
-    // runTestsWithName testMainTest "lambda" lambdaTests
-    // runTestsWithName testMainTest "assignment" assignmentTests
-    // runTestsWithName testMainTest "andOr" andOrTests
+    runTestsWithName testMainTest "basic" tests
+    runTestsWithName testMainTest "vector" vectorTests
+    runTestsWithName testMainTest "lambda" lambdaTests
+    runTestsWithName testMainTest "assignment" assignmentTests
+    runTestsWithName testMainTest "andOr" andOrTests
     runTestsWithName testMainTest "pair" pairTests
     // testLambda e2
     1

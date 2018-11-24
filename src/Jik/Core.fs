@@ -107,7 +107,10 @@ let rec desugar sexpr =
         desugar a
     | List (S.Symbol "or" :: a :: rest) ->
         let a = desugar a
-        exprsToList [S.Symbol "if"; a; a; desugar (exprsToList (S.Symbol "or" :: rest))]
+        let t = S.Symbol (freshLabel "t")
+        exprsToList [S.Symbol "let" 
+                     exprsToList [exprsToList [t; a]]
+                     exprsToList [S.Symbol "if"; t; t; desugar (exprsToList (S.Symbol "or" :: rest))]]        
     | List sexprs -> exprsToList (List.map desugar sexprs)
     | e -> e
 
@@ -246,7 +249,10 @@ let rec alphaRename2 mapping =
     | e -> e
 
 let alphaRename (prog : Program) : Program =
-    { prog with Main = List.map (alphaRename2 Map.empty) prog.Main }
+    let newGlobals, mapping = extendMapping prog.Globals Map.empty
+    let rename = alphaRename2 mapping
+    { prog with Main = List.map rename prog.Main
+                Globals = newGlobals }
 
 let rec replaceVars mapping expr =
     let transf = replaceVars mapping
