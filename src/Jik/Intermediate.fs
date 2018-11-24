@@ -19,6 +19,7 @@ type Simple =
     | Prim of Prim * Var list
     | Int of int
     | Bool of bool
+    | EmptyList
     | FunctionRef of string
     | Lambda of Var list * Var list * Label list
 
@@ -100,6 +101,7 @@ let rec showLabel (name, vars, stmts) =
         | var, s ->
           let s =
             match s with
+            | Simple.EmptyList -> iStr "'()"
             | Simple.Int n -> iNum n
             | Simple.Bool true -> iStr "#t"
             | Simple.Bool false -> iStr "#f"
@@ -186,6 +188,10 @@ let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
 
     match expr with            
     | Expr.Ref var -> cont var
+    | Expr.EmptyList ->
+        let var = freshLabel "nil"
+        let labels, stmts = cont var
+        labels, Decl(var, EmptyList) :: stmts
     | Expr.Bool b -> 
         let var = freshLabel "b"
         let labels, stmts = cont var
@@ -237,6 +243,9 @@ let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
 and convertExprJoin expr (contVar : Var) =
     let jump var = Transfer(Jump(contVar, [var]))
     match expr with
+    | Expr.EmptyList ->
+        let var = freshLabel "nil"
+        [], [Decl(var, EmptyList); jump var]
     | Expr.Bool b -> 
         let var = freshLabel "b"
         [], [Decl(var, Bool b); jump var]
@@ -275,6 +284,9 @@ and convertExprJoin expr (contVar : Var) =
 
 and convertExprTail expr =
     match expr with
+    | Expr.EmptyList ->
+        let var = freshLabel "nil"
+        [], [Decl(var, EmptyList); Transfer(Return var)]
     | Expr.Bool b -> 
         let var = freshLabel "b"
         [], [Decl(var, Bool b); Transfer(Return var)]

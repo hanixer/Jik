@@ -278,6 +278,7 @@ let selectInstructions (prog : Intermediate.Program) : Program =
 
     let rec handleDecl (var, x) =
         match x with
+        | Simple.EmptyList -> moveInt nilLiteral var
         | Simple.Int n -> moveInt (convertNumber n) var
         | Simple.Bool true -> moveInt trueLiteral var
         | Simple.Bool false -> moveInt falseLiteral var
@@ -308,7 +309,7 @@ let selectInstructions (prog : Intermediate.Program) : Program =
         | Simple.Prim(Prim.Cons, [var1; var2]) ->
             [Mov, [GlobalValue(freePointer); Reg R11]
              Mov, [Var var1; Deref(0, R11)]
-             Mov, [Var var2; Deref(1, R11)]
+             Mov, [Var var2; Deref(wordSize, R11)]
              Or, [Int pairTag; Reg R11]
              Mov, [Reg R11; Var var]
              Add, [Int (2 * wordSize); GlobalValue(freePointer)]]

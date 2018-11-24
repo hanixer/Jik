@@ -35,6 +35,7 @@ type Prim =
 type Expr = 
     | Int of int
     | Bool of bool
+    | EmptyList
     | Ref of string
     | FunctionRef of string
     | If of Expr * Expr * Expr
@@ -124,6 +125,7 @@ let rec sexprToExpr sexpr =
     | List [Symbol "set!"; Symbol name; rhs] -> Assign(name, sexprToExpr rhs)
     | List(Symbol "lambda" :: List args :: body) -> 
         Lambda(symbolsToStrings args, convertList body)
+    | List [Symbol "quote"; List []] -> EmptyList
     | List [Symbol "quote"; form] -> 
         failwith "sexprToExpr: quote is not supported"
     | List(Symbol "let" :: List bindings :: body) -> 
@@ -141,7 +143,7 @@ let rec sexprToExpr sexpr =
         let bindings = transformLetrecBindings bindings
         let fnames = List.map fst bindings
         let bindInitial fname = 
-            Cons (Symbol fname, Cons (Number 0, Nil))
+            S.Cons (Symbol fname, S.Cons (Number 0, Nil))
         let letBindings = 
             fnames
             |> List.map bindInitial
