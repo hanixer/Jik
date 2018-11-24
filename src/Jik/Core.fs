@@ -16,6 +16,10 @@ type Prim =
     | Gt
     | Ge
     | Not
+    | Cons
+    | IsPair
+    | Car
+    | Cdr
     | MakeVector
     | IsVector
     | VectorLength
@@ -46,6 +50,8 @@ type Program =
     { Main : Expr list
       Globals : string list }
 
+type S = SExpr
+
 let freshLabel = 
     let mutable dict  = Dictionary<string, int>()
     fun prefix ->
@@ -67,6 +73,10 @@ let stringPrimop = [
     ">", Gt
     ">=", Ge
     "not", Not
+    "cons", Cons
+    "pair?", IsPair
+    "car", Car
+    "cdr", Cdr
     "make-vector", MakeVector
     "vector?", IsVector
     "vector-length", VectorLength
@@ -81,6 +91,24 @@ let tryStringToPrimop s =
     |> Option.map snd
 
 let isPrimop = tryStringToPrimop >> Option.isSome
+
+let rec desugar sexpr =
+    match sexpr with
+    | List [S.Symbol "and"] -> S.Bool true
+    | List [S.Symbol "and"; a] ->
+        let a = desugar a
+        exprsToList [S.Symbol "if"; a; a; S.Bool false]
+    | List (S.Symbol "and" :: a :: rest) ->
+        let a = desugar a
+        exprsToList [S.Symbol "if"; a; desugar (exprsToList (S.Symbol "and" :: rest)); S.Bool false]
+    | List [S.Symbol "or"] -> S.Bool false
+    | List [S.Symbol "or"; a] ->
+        desugar a
+    | List (S.Symbol "or" :: a :: rest) ->
+        let a = desugar a
+        exprsToList [S.Symbol "if"; a; a; desugar (exprsToList (S.Symbol "or" :: rest))]
+    | List sexprs -> exprsToList (List.map desugar sexprs)
+    | e -> e
 
 let rec sexprToExpr sexpr = 
     let convertList = List.map sexprToExpr
@@ -148,7 +176,7 @@ let stringToProgram str : Program =
         | sexpr ->
             globals, sexpr :: sexprs
 
-    match sexpr with
+    match desugar sexpr with
     | List sexprs when not (sexprs.IsEmpty) ->
         let globals, sexprs = List.fold parseSExpr ([], []) sexprs
         { Main = List.map sexprToExpr sexprs |> List.rev

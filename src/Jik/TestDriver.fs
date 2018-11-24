@@ -75,3 +75,4 @@ let runAllTests compile =
         printfn "-- Test <%s>: passed <%d> of <%d> \n\n" 
             testName passed (tests.Length))
         tests
+

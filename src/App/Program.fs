@@ -183,7 +183,8 @@ let e16 = "
 (define (foo x)
   (lambda (y) (+ x y)))
 ((foo 1) 2)"
-
+let e17 = "
+(define pair?)"
 let tests = [
     "(* 1 0)", "0\n"
     "(* 1 5)", "5\n"
@@ -261,12 +262,43 @@ let lambdaTests = [
 let assignmentTests = [
     "(let ((x 0)) (set! x 1) x)", "1\n"
 ]
+let andOrTests = [
+    @"(and)", "#t\n"
+    @"(and 5)", "5\n"
+    @"(and #f)", "#f\n"
+    @"(and 5 6)", "6\n"
+    @"(and #f ((lambda (x) (x x)) (lambda (x) (x x))))", "#f\n"
+    @"(or)", "#f\n"
+    @"(or #t)", "#t\n"
+    @"(or 5)", "5\n"
+    @"(or 1 2 3)", "1\n"
+    @"(or (cons 1 2) ((lambda (x) (x x)) (lambda (x) (x x))))", "(1 . 2)\n"
+    @"(let ((if 12)) (or if 17))", "12\n"
+    @"(let ((if 12)) (and if 17))", "17\n"
+    @"(let ((let 8)) (or let 18))", "8\n"
+    @"(let ((let 8)) (and let 18))", "18\n"
+    @"(let ((t 1)) (and (begin (set! t (+ 1 t)) t) t))", "2\n"
+    @"(let ((t 1)) (or (begin (set! t (+ 1 t)) t) t))", "2\n"
+
+]
+let pairTests = [
+    "(pair? (cons 1 2))", "#t\n"
+    "(pair? #t)", "#f\n"
+    "(cons 1 2)", "(1 . 2)\n"
+    "(cons 1 ())", "(1)\n"
+    "(cons 1 (cons 2 3))", "(1 2 . 3)\n"
+    "(cons 1 (cons (cons 2 ()) (cons 3 ())))", "(1 (2) 3)\n"
+    "(car (cons 1 2))", "1\n"
+    "(cdr (cons 1 2))", "2\n"
+    "(cdr (car (cdr (cons 1 (cons (cons 2 ()) (cons 3 ()))))))", "()\n"
+]
 
 [<EntryPoint>]
 let main argv =
-    runTestsWithName testMainTest "basic" tests
-    runTestsWithName testMainTest "vector" vectorTests
-    runTestsWithName testMainTest "lambda" lambdaTests
-    runTestsWithName testMainTest "assignment" assignmentTests
+    // runTestsWithName testMainTest "basic" tests
+    // runTestsWithName testMainTest "vector" vectorTests
+    // runTestsWithName testMainTest "lambda" lambdaTests
+    // runTestsWithName testMainTest "assignment" assignmentTests
+    runTestsWithName testMainTest "andOr" andOrTests
     // testLambda e2
     1

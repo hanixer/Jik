@@ -23,10 +23,10 @@ let specialChars = [
 
 let tokenize source =
     let isSymbolChar c =
-        (Char.IsWhiteSpace(c) ||
-         c = '(' ||
-         c = ')')
-        |> not
+        match c with
+        | '(' | ')' | '[' | ']' -> false
+        | c when Char.IsWhiteSpace(c) -> false
+        | _ -> true
 
     let rec string (acc:string) = function
         | '\\' :: '"' :: cs -> string (acc + "\"") cs
@@ -174,11 +174,11 @@ let rec parse ts : SExpr =
             let elem, ts1 = parseExpr ts
             match ts1 with
             | Close :: ts2 -> exprsToDottedList (List.rev (elem :: acc)), ts2
-            | _ -> failwith "Close paren is expected after dot"
+            | wha -> failwithf "Close paren is expected after dot: %A" wha
         | Close :: ts ->
             if o = Open then
                 exprsToDottedList (List.rev (Nil :: acc)), ts
-            else failwith "Close paren expected"
+            else failwithf "Close paren expected, got %A\n\n%A" o ts
         | Open :: ts ->
             let subList, ts1 = parseList Open [] ts
             parseList o (subList :: acc) ts1

@@ -305,6 +305,21 @@ let selectInstructions (prog : Intermediate.Program) : Program =
              Sal, [Operand.Int boolBit; Reg Rax]
              Or, [Operand.Int falseLiteral; Reg Rax]
              Mov, [Reg Rax; Var var]]
+        | Simple.Prim(Prim.Cons, [var1; var2]) ->
+            [Mov, [GlobalValue(freePointer); Reg R11]
+             Mov, [Var var1; Deref(0, R11)]
+             Mov, [Var var2; Deref(1, R11)]
+             Or, [Int pairTag; Reg R11]
+             Mov, [Reg R11; Var var]
+             Add, [Int (2 * wordSize); GlobalValue(freePointer)]]
+        | Simple.Prim(Prim.IsPair, [var1]) ->
+            isOfTypeInstrs var var1 pairMask pairTag
+        | Simple.Prim(Prim.Car, [pair]) ->
+            [Mov, [Var pair; Reg R11]
+             Mov, [Deref(-pairTag, R11); Var var]]
+        | Simple.Prim(Prim.Cdr, [pair]) ->
+            [Mov, [Var pair; Reg R11]
+             Mov, [Deref(-pairTag + wordSize, R11); Var var]]
         | Simple.Prim(Prim.MakeVector, [var1]) ->
             makeVector (Var var1) var
         | Simple.Prim(Prim.VectorLength, [var1]) ->
