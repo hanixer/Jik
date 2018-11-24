@@ -16,10 +16,13 @@ type Prim =
     | Gt
     | Ge
     | Not
+    | IsFixnum
     | Cons
     | IsPair
     | Car
     | Cdr
+    | SetCar
+    | SetCdr
     | MakeVector
     | IsVector
     | VectorLength
@@ -73,10 +76,13 @@ let stringPrimop = [
     ">", Gt
     ">=", Ge
     "not", Not
+    "fixnum?", IsFixnum
     "cons", Cons
     "pair?", IsPair
     "car", Car
     "cdr", Cdr
+    "set-car!", SetCar
+    "set-cdr!", SetCdr
     "make-vector", MakeVector
     "vector?", IsVector
     "vector-length", VectorLength
@@ -100,16 +106,26 @@ let rec desugar sexpr =
         exprsToList [S.Symbol "if"; a; a; S.Bool false]
     | List (S.Symbol "and" :: a :: rest) ->
         let a = desugar a
-        exprsToList [S.Symbol "if"; a; desugar (exprsToList (S.Symbol "and" :: rest)); S.Bool false]
+        let rest = exprsToList (S.Symbol "and" :: rest)
+        exprsToList [S.Symbol "if"; a; desugar rest; S.Bool false]
     | List [S.Symbol "or"] -> S.Bool false
     | List [S.Symbol "or"; a] ->
         desugar a
     | List (S.Symbol "or" :: a :: rest) ->
         let a = desugar a
         let t = S.Symbol (freshLabel "t")
+        let rest = exprsToList (S.Symbol "or" :: rest)
         exprsToList [S.Symbol "let" 
                      exprsToList [exprsToList [t; a]]
-                     exprsToList [S.Symbol "if"; t; t; desugar (exprsToList (S.Symbol "or" :: rest))]]        
+                     exprsToList [S.Symbol "if"; t; t; desugar rest]]
+    | List (S.Symbol "when" :: condition :: body) ->
+        let condition = desugar condition
+        let body = exprsToList (S.Symbol "begin" :: List.map desugar body)
+        exprsToList [S.Symbol "if"; condition; body; S.Bool false]
+    | List (S.Symbol "unless" :: condition :: body) ->
+        let condition = desugar condition
+        let body = exprsToList (S.Symbol "begin" :: List.map desugar body)
+        exprsToList [S.Symbol "if"; condition; S.Bool false; body]
     | List sexprs -> exprsToList (List.map desugar sexprs)
     | e -> e
 

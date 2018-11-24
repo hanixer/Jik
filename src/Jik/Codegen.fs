@@ -236,8 +236,9 @@ let selectInstructions (prog : Intermediate.Program) : Program =
             Mov, [Var arg; Deref((i + 1) * wordSize, R11)]) args
 
     let isOfTypeInstrs var var1 mask tag =
-        [And, [Int mask; Var var1]
-         Cmp, [Int tag; Var var1]
+        [Mov, [Var var1; Reg Rax]
+         And, [Int mask; Reg Rax]
+         Cmp, [Int tag; Reg Rax]
          Set E, [Reg Al]
          Movzb, [Reg Al; Reg Rax]
          Sal, [Operand.Int boolBit; Reg Rax]
@@ -257,6 +258,13 @@ let selectInstructions (prog : Intermediate.Program) : Program =
             instrs
         | Some dest ->
             instrs @ [Mov, [Reg Rax; dest]]
+
+    let setOnEqual var =
+         [Set E, [Reg Al]
+          Movzb, [Reg Al; Reg Rax]
+          Sal, [Operand.Int boolBit; Reg Rax]
+          Or, [Operand.Int falseLiteral; Reg Rax]
+          Mov, [Reg Rax; Var var]]
 
     let makeVector size var =
         let shift = if wordSize = 8 then 3 else 2
@@ -298,12 +306,16 @@ let selectInstructions (prog : Intermediate.Program) : Program =
         | Simple.Prim(Prim.Lt, [var1; var2]) ->
             comparison var1 var2 Cc.L (Some(Var var))
         | Simple.Prim(Prim.Not, [var1]) ->
-            [Cmp, [Operand.Int falseLiteral; Var var1]
-             Set E, [Reg Al]
-             Movzb, [Reg Al; Reg Rax]
-             Sal, [Operand.Int boolBit; Reg Rax]
-             Or, [Operand.Int falseLiteral; Reg Rax]
-             Mov, [Reg Rax; Var var]]
+            [Cmp, [Operand.Int falseLiteral; Var var1]] @
+            setOnEqual var
+        | Simple.Prim(Prim.Eq, [var1; var2]) ->
+            [Cmp, [Var var1; Var var2]] @
+            setOnEqual var
+        | Simple.Prim(Prim.IsFixnum, [var1]) ->
+            [Mov, [Var var1; Var var]
+             And, [Int fixnumMask; Var var]
+             Cmp, [Int fixnumTag; Var var]] @
+             setOnEqual var
         | Simple.Prim(Prim.Cons, [var1; var2]) ->
             [Mov, [GlobalValue(freePointer); Reg R11]
              Mov, [Var var1; Deref(0, R11)]
@@ -319,6 +331,14 @@ let selectInstructions (prog : Intermediate.Program) : Program =
         | Simple.Prim(Prim.Cdr, [pair]) ->
             [Mov, [Var pair; Reg R11]
              Mov, [Deref(-pairTag + wordSize, R11); Var var]]
+        | Simple.Prim(Prim.SetCar, [pair; value]) ->
+            [Mov, [Var pair; Reg R11]
+             Mov, [Var value; Deref(-pairTag, R11)]
+             Mov, [Var value; Var var]]
+        | Simple.Prim(Prim.SetCdr, [pair; value]) ->
+            [Mov, [Var pair; Reg R11]
+             Mov, [Var value; Deref(-pairTag + wordSize, R11)]
+             Mov, [Var value; Var var]]
         | Simple.Prim(Prim.MakeVector, [var1]) ->
             makeVector (Var var1) var
         | Simple.Prim(Prim.VectorLength, [var1]) ->

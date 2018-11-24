@@ -311,7 +311,34 @@ let pairTests = [
     "(cdr (cons 1 2))", "2\n"
     "(cdr (car (cdr (cons 1 (cons (cons 2 '()) (cons 3 '()))))))", "()\n"
 ]
-
+let setCarCdrTests = [
+    @"(let ((x (cons 1 2))) (begin (set-cdr! x '()) x))", "(1)\n"
+    @"(let ((x (cons 1 2))) (set-cdr! x '()) x)", "(1)\n"
+    @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! x y) x)", "(12 14 . 15)\n"
+    @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! y x) y)", "(14 12 . 13)\n"
+    @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! y x) x)", "(12 . 13)\n"
+    @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! x y) y)", "(14 . 15)\n"
+    @"(let ((x (let ((x (cons 1 2))) (set-car! x #t) (set-cdr! x #f) x))) (cons x x) x)", "(#t . #f)\n"
+    @"(let ((x (cons 1 2))) 
+       (set-cdr! x x)
+       (set-car! (cdr x) x)
+       (cons (eq? x (car x)) (eq? x (cdr x))))", "(#t . #t)\n"
+    @"(let ((x #f)) (if (pair? x) (set-car! x 12) #f) x)", "#f\n"
+]
+let whenUnlessTests = [
+    @"(let ((x (cons 1 2))) 
+       (when (pair? x) 
+        (set-car! x (+ (car x) (cdr x)))) 
+        x)", "(3 . 2)\n"
+    @"(let ((x (cons 1 2))) (when (pair? x) (set-car! x (+ (car x) (cdr x))) (set-car! x (+ (car x) (cdr x)))) x)", "(5 . 2)\n"
+    @"(let ((x (cons 1 2))) 
+       (unless (fixnum? x) 
+        (set-car! x (+ (car x) (cdr x)))) 
+       x)", "(3 . 2)\n"
+    @"(let ((x (cons 1 2))) (unless (fixnum? x) (set-car! x (+ (car x) (cdr x))) (set-car! x (+ (car x) (cdr x)))) x)", "(5 . 2)\n"
+    @"(let ((let 12)) (when let let let let let))", "12\n"
+    @"(let ((let #f)) (unless let let let let let))", "#f\n"
+]
 [<EntryPoint>]
 let main argv =
     runTestsWithName testMainTest "basic" tests
@@ -320,5 +347,7 @@ let main argv =
     runTestsWithName testMainTest "assignment" assignmentTests
     runTestsWithName testMainTest "andOr" andOrTests
     runTestsWithName testMainTest "pair" pairTests
+    runTestsWithName testMainTest "setCarCdr" setCarCdrTests
+    runTestsWithName testMainTest "whenUnless" whenUnlessTests
     // testLambda e2
     1
