@@ -98,6 +98,13 @@ let tryStringToPrimop s =
 
 let isPrimop = tryStringToPrimop >> Option.isSome
 
+let wrapInLet var value body =
+    exprsToList [S.Symbol "let" 
+                 exprsToList [exprsToList [var; value]]
+                 body]
+
+let undefinedExpr = S.Bool false
+
 let rec desugar sexpr =
     match sexpr with
     | List [S.Symbol "and"] -> S.Bool true
@@ -115,19 +122,42 @@ let rec desugar sexpr =
         let a = desugar a
         let t = S.Symbol (freshLabel "t")
         let rest = exprsToList (S.Symbol "or" :: rest)
-        exprsToList [S.Symbol "let" 
-                     exprsToList [exprsToList [t; a]]
-                     exprsToList [S.Symbol "if"; t; t; desugar rest]]
+        wrapInLet t a (exprsToList [S.Symbol "if"; t; t; desugar rest]) 
     | List (S.Symbol "when" :: condition :: body) ->
         let condition = desugar condition
         let body = exprsToList (S.Symbol "begin" :: List.map desugar body)
-        exprsToList [S.Symbol "if"; condition; body; S.Bool false]
+        exprsToList [S.Symbol "if"; condition; body; undefinedExpr]
     | List (S.Symbol "unless" :: condition :: body) ->
         let condition = desugar condition
         let body = exprsToList (S.Symbol "begin" :: List.map desugar body)
-        exprsToList [S.Symbol "if"; condition; S.Bool false; body]
+        exprsToList [S.Symbol "if"; condition; undefinedExpr; body]
+    | List [S.Symbol "cond"] ->
+        undefinedExpr
+    | List [S.Symbol "cond"; List [S.Symbol "else"; expr]] ->
+        desugar expr
+    | List (S.Symbol "cond" :: List [condition; conseq] :: rest) ->
+        desugarCond condition conseq rest
+    | List (S.Symbol "cond" :: List [condition; S.Symbol "=>"; conseq] :: rest) ->
+        let condition = desugar condition
+        let conseq = desugar conseq
+        let t = S.Symbol (freshLabel "t")
+        let t2 = S.Symbol (freshLabel "t2")
+        let rest = desugar (exprsToList (S.Symbol "cond" :: rest))
+        wrapInLet t condition 
+         (wrapInLet t2 conseq (exprsToList [S.Symbol "if"; t; exprsToList [t2; t]; rest]))
+    | List (S.Symbol "cond" :: List [clause] :: rest) ->
+        let clause = desugar clause
+        let t = S.Symbol (freshLabel "t")
+        let rest = desugar (exprsToList (S.Symbol "cond" :: rest))
+        wrapInLet t clause (exprsToList [S.Symbol "if"; t; t; rest])
     | List sexprs -> exprsToList (List.map desugar sexprs)
     | e -> e
+
+and desugarCond condition conseq rest =
+    let condition = desugar condition
+    let conseq = desugar conseq
+    let rest = desugar (exprsToList (S.Symbol "cond" :: rest))
+    exprsToList [S.Symbol "if"; condition; conseq; rest]
 
 let rec sexprToExpr sexpr = 
     let convertList = List.map sexprToExpr
