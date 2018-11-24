@@ -179,24 +179,20 @@ let labelsToString labels =
 let programToString (prog : Program) =
     showProgram prog |> iDisplay
 
+let convertSimpleDecl varPrefix value cont=
+    let var = freshLabel varPrefix
+    let labels, stmts = cont var
+    labels, Decl(var, value) :: stmts
+
 let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
     let makeJumpCont label var =
         [], [Transfer(Jump(label, [var]))]
 
     match expr with            
     | Expr.Ref var -> cont var
-    | Expr.EmptyList ->
-        let var = freshLabel "nil"
-        let labels, stmts = cont var
-        labels, Decl(var, EmptyList) :: stmts
-    | Expr.Bool b -> 
-        let var = freshLabel "b"
-        let labels, stmts = cont var
-        labels, Decl(var, Bool b) :: stmts
-    | Expr.Int n -> 
-        let var = freshLabel "n"
-        let labels, stmts = cont var
-        labels, Decl(var, Int n) :: stmts    
+    | Expr.EmptyList -> convertSimpleDecl "nil" EmptyList cont
+    | Expr.Bool b -> convertSimpleDecl "b" (Bool b) cont
+    | Expr.Int n -> convertSimpleDecl "n" (Int n) cont
     | Expr.If(exprc, exprt, exprf) ->
         let join, fresh = freshLabel "LJ", freshLabel "v"
         let labels, stmts = cont fresh
@@ -235,24 +231,13 @@ let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
 
 and convertExprJoin expr (contVar : Var) =
     let jump var = Transfer(Jump(contVar, [var]))
+    let jump2 var = [], [Transfer(Jump(contVar, [var]))]
     match expr with
-    | Expr.EmptyList ->
-        let var = freshLabel "nil"
-        [], [Decl(var, EmptyList); jump var]
-    | Expr.Bool b -> 
-        let var = freshLabel "b"
-        [], [Decl(var, Bool b); jump var]
-    | Expr.Int n -> 
-        let var = freshLabel "n"
-        [], [Decl(var, Int n); jump var]
-    | Expr.Ref(var) -> [], [jump var]
+    | Expr.EmptyList | Expr.Bool _ | Expr.Int _ | Expr.Ref _ | Expr.Lambda _ ->
+        convertExpr expr jump2
     | Expr.If(exprc, exprt, exprf) ->
         convertIf exprc exprt exprf [] contVar    
     | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
-    | Expr.Lambda(args, body) -> 
-        let var = freshLabel "lam"
-        let labels, stmts = convertExprTail (Begin body)
-        [], [Decl(var, Lambda([], args, (var, args, stmts) :: labels)); jump var]
     | Expr.Begin(exprs) ->
         let heads, tail = List.splitAt (List.length exprs - 1) exprs
         convertMany heads (fun _ ->
@@ -273,17 +258,10 @@ and convertExprJoin expr (contVar : Var) =
             [], [Decl(fresh, Prim(op, vars)); Transfer(Jump(contVar, [fresh]))])
 
 and convertExprTail expr =
+    let jump2 var = [], [Transfer(Return var)]
     match expr with
-    | Expr.EmptyList ->
-        let var = freshLabel "nil"
-        [], [Decl(var, EmptyList); Transfer(Return var)]
-    | Expr.Bool b -> 
-        let var = freshLabel "b"
-        [], [Decl(var, Bool b); Transfer(Return var)]
-    | Expr.Int n -> 
-        let var = freshLabel "n"
-        [], [Decl(var, Int n); Transfer(Return var)]
-    | Expr.Ref(var) -> [], [Transfer(Return var)]
+    | Expr.EmptyList | Expr.Bool _ | Expr.Int _ | Expr.Ref _ | Expr.Lambda _ ->
+        convertExpr expr jump2
     | Expr.If(exprc, exprt, exprf) ->
         convertExpr exprc (fun var ->
             let lt, lf = 
@@ -296,11 +274,6 @@ and convertExprTail expr =
             let labelf = (lf, [], stmtsf)
             [labelt] @ labelst @ [labelf] @ labelsf, [Transfer(If(var, lt, lf))])
     | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
-    | Expr.Lambda(args, body) -> 
-        let var = freshLabel "lam"
-        let labels, stmts = convertExprTail (Begin body)
-        [], [Decl(var, Lambda([], args, (var, args, stmts) :: labels))
-             Transfer(Return var)]
     | Expr.Begin(exprs) ->
         let heads, tail = List.splitAt (List.length exprs - 1) exprs
         convertMany heads (fun _ ->
