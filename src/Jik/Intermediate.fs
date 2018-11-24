@@ -20,7 +20,6 @@ type Simple =
     | Int of int
     | Bool of bool
     | EmptyList
-    | FunctionRef of string
     | Lambda of Var list * Var list * Label list
 
 and Transfer =
@@ -109,8 +108,6 @@ let rec showLabel (name, vars, stmts) =
                 iConcat [(sprintf "%A" op |> iStr)
                          iStr " "
                          List.map iStr vars |> comma ]
-            | Simple.FunctionRef lab -> 
-                iConcat [iStr "(func-ref "; iStr lab; iStr ")"]
             | Simple.Lambda(free, args, labels) ->
                 iConcat [iNewline
                          iStr "  "
@@ -169,7 +166,7 @@ and showDef (name, free, args, labels) =
              iNewline]
 
 let showProgram prog =
-    iConcat [List.map showDef prog.Procedures |> iConcat
+    iConcat [List.map showDef prog.Procedures |> iInterleave iNewline
              iNewline
              iNewline
              showDef prog.Main]
@@ -206,27 +203,27 @@ let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
         let labelJoin = (join, [fresh], stmts)
         let labels = labelJoin :: labels
         convertIf exprc exprt exprf labels join
-    | Expr.PrimApp(op, args) ->
-        convertMany args (fun vars ->
-            let fresh = freshLabel "v"
-            let labels, stmts = cont fresh
-            labels, [Decl(fresh, Prim(op, vars));] @ stmts)
-    | Expr.App(Expr.Lambda(formals, body), args) ->
-        convertMany args (fun vars ->
-            let mapping = 
-                List.zip formals vars |> Map.ofList
-            let body = replaceVars mapping (Begin body)
-            convertExpr body cont)
-    | Expr.Begin(exprs) ->
-        convertMany exprs (fun vars ->
-            let last = List.last vars
-            cont last)
     | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
     | Expr.Lambda(args, body) ->
         let var = freshLabel "lam"
         let labels, stmts = cont var
         let lamLabels, lamStmts = convertExprTail (Begin body)
         labels, (Decl(var, Lambda([], args, (var, args, lamStmts) :: lamLabels))) :: stmts
+    | Expr.Begin(exprs) ->
+        convertMany exprs (fun vars ->
+            let last = List.last vars
+            cont last)
+    | Expr.App(Expr.Lambda(formals, body), args) ->
+        convertMany args (fun vars ->
+            let mapping = 
+                List.zip formals vars |> Map.ofList
+            let body = replaceVars mapping (Begin body)
+            convertExpr body cont)
+    | Expr.PrimApp(op, args) ->
+        convertMany args (fun vars ->
+            let fresh = freshLabel "v"
+            let labels, stmts = cont fresh
+            labels, [Decl(fresh, Prim(op, vars));] @ stmts)
     | Expr.App(func, args) ->
         convertExpr func (fun func ->
             convertMany args (fun args -> 
@@ -235,10 +232,6 @@ let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
                 let labels, stmts = cont fresh
                 let label = (labelName, [fresh], stmts)
                 label :: labels, [Transfer(Call(NonTail labelName, func, args))]))
-    | Expr.FunctionRef(label) -> 
-        let var = freshLabel "fr"
-        let labels, stmts = cont var
-        labels, Decl(var, FunctionRef label) :: stmts
 
 and convertExprJoin expr (contVar : Var) =
     let jump var = Transfer(Jump(contVar, [var]))
@@ -278,9 +271,6 @@ and convertExprJoin expr (contVar : Var) =
         convertMany args (fun vars ->
             let fresh = freshLabel "v"
             [], [Decl(fresh, Prim(op, vars)); Transfer(Jump(contVar, [fresh]))])
-    | Expr.FunctionRef(label) -> 
-        let var = freshLabel "fr"
-        [], [Decl(var, FunctionRef label); jump var]
 
 and convertExprTail expr =
     match expr with
@@ -309,7 +299,8 @@ and convertExprTail expr =
     | Expr.Lambda(args, body) -> 
         let var = freshLabel "lam"
         let labels, stmts = convertExprTail (Begin body)
-        [], [Decl(var, Lambda([], args, (var, args, stmts) :: labels))]
+        [], [Decl(var, Lambda([], args, (var, args, stmts) :: labels))
+             Transfer(Return var)]
     | Expr.Begin(exprs) ->
         let heads, tail = List.splitAt (List.length exprs - 1) exprs
         convertMany heads (fun _ ->
@@ -328,9 +319,6 @@ and convertExprTail expr =
         convertMany args (fun vars ->
             let var = freshLabel "v"
             [], [Decl(var, Prim(op, vars)); Transfer(Return var)])
-    | Expr.FunctionRef(label) -> 
-        let var = freshLabel "fr"
-        [], [Decl(var, FunctionRef label); Transfer(Return var)]
 
 and convertIf exprc exprt exprf labels join =
     convertExpr exprc (fun var ->

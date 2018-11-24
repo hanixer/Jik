@@ -297,8 +297,6 @@ let selectInstructions (prog : Intermediate.Program) : Program =
              InstrName.Neg, [Var var]]
         | Simple.Prim(Prim.Lt, [var1; var2]) ->
             comparison var1 var2 Cc.L (Some(Var var))
-        | Simple.FunctionRef(funcRef) ->
-            [Lea(funcRef), [Var var]]
         | Simple.Prim(Prim.Not, [var1]) ->
             [Cmp, [Operand.Int falseLiteral; Var var1]
              Set E, [Reg Al]

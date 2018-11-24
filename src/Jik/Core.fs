@@ -37,7 +37,6 @@ type Expr =
     | Bool of bool
     | EmptyList
     | Ref of string
-    | FunctionRef of string
     | If of Expr * Expr * Expr
     | Assign of string * Expr
     | Lambda of LambdaData
@@ -270,27 +269,6 @@ let rec replaceVars mapping expr =
     | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
     | e -> e
 
-let revealFunctions (prog : Program) : Program =
-    // let (defs, expr) = prog
-    // let functionNames = 
-    //     List.map fst defs |> Set.ofList
-    
-    // let rec handleExpr = function
-    //     | If(exprc, exprt, exprf) -> If(handleExpr exprc, handleExpr exprt, handleExpr exprf)
-    //     | Assign(var, expr) -> Assign(var, handleExpr expr)
-    //     | Lambda(args, body) -> Lambda(args, List.map handleExpr body)
-    //     | Begin(exprs) -> Begin(List.map handleExpr exprs)
-    //     | App(func, args) -> App(handleExpr func, List.map handleExpr args)
-    //     | PrimApp(op, args) -> PrimApp(op, List.map handleExpr args)
-    //     | Ref(var) when Set.contains var functionNames -> FunctionRef var
-    //     | e -> e
-
-    // let handleDef (name, (args, expr)) =
-    //     name, (args, List.map handleExpr expr)
-
-    // List.map handleDef defs, handleExpr expr
-    prog 
-
 let rec fixArithmeticPrims (prog : Program) : Program =
     let ops = [Add; Mul;]
 
@@ -323,6 +301,8 @@ let rec findModifiedVars expr =
         findMany body
     | Begin exprs ->
         findMany exprs
+    | PrimApp(op, tail) ->
+        findMany tail
     | _ -> Set.empty
 
 let assignmentConvert (prog : Program) : Program =
