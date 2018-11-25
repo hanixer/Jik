@@ -102,7 +102,6 @@ type SExpr =
     | Char of char
     | Symbol of string
     | Bool of bool
-    | BuiltinFunc of (SExpr list -> SExpr)
 and Frame = Map<string, SExpr ref> ref
 
 let (|List|_|) (e:SExpr) =
@@ -196,15 +195,15 @@ let rec parse ts : SExpr =
     and parseNonlist ts =
         match ts with
         | Token.Number n :: ts ->
-            (SExpr.Number (int n)), ts
+            (Number (int n)), ts
         | Token.Symbol n :: ts ->
-            (SExpr.Symbol (n.ToLower())), ts
+            (Symbol (n.ToLower())), ts
         | Token.String n :: ts ->
-            (SExpr.String n), ts
+            (String n), ts
         | Token.Bool n :: ts ->
-            (SExpr.Bool n), ts
+            (Bool n), ts
         | Token.Char c :: ts ->
-            (SExpr.Char c), ts
+            (Char c), ts
         | Quote :: ts ->
             let expr, ts1 = parseExpr ts
             Cons (Symbol "quote", Cons (expr, Nil)), ts1
@@ -242,7 +241,6 @@ let rec sexprToString expr =
             add "("
             processCons c
             add ")"
-        | BuiltinFunc f ->  add (sprintf "BuiltinFunc %A" f)
         | Nil -> add "()"
     and processCons = function
         | Cons (x, y) ->

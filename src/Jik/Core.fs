@@ -105,6 +105,29 @@ let wrapInLet var value body =
 
 let undefinedExpr = S.Bool false
 
+let toExpand = [
+    "let"
+    "let*"
+    "letrec"
+    "letrec*"
+    "and"
+    "or"
+    "cond"
+]
+
+let rec desugar2 env sexpr =
+    match sexpr with
+    | List (S.Symbol s :: rest) when (List.contains s toExpand) && (List.contains s env |> not) ->
+        expand env sexpr
+
+and expand env sexpr =
+    match sexpr with
+    | List(Symbol "lambda" :: List args :: body) ->
+        let argsString = symbolsToStrings args
+        let env = argsString @ env
+        let body = List.map (desugar2 env) body
+        build
+
 let rec desugar sexpr =
     match sexpr with
     | List [S.Symbol "and"] -> S.Bool true
