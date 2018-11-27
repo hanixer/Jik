@@ -1,43 +1,8 @@
-#load "SExpr.fs"
+﻿// Learn more about F# at http://fsharp.org
+
+open System
 
 open SExpr
-
-let sexprMap func sexpr =
-    let rec loop sexpr =
-        match sexpr with
-        | Nil -> Nil
-        | Cons(a, b) -> Cons(func a, func b)
-        | _ -> func sexpr
-    
-    loop sexpr
-
-let datumToSyntax rename datum =
-    let func = function
-        | Symbol s -> Symbol (rename s)
-        | e -> e
-    
-    sexprMap func datum
-
-let mutable level = 0
-
-let makeRenamingProcedure initialLevel colour initialEnvironment capturing =
-    let levelCorrection = level - initialLevel
-    let inserted = []
-    let environment = initialEnvironment
-    1
-
-
-
-
-
-
-
-
-
-
-
-    
-
 
 let special = [
     "lambda"
@@ -49,6 +14,8 @@ let special = [
     "or"
     "cond"
 ]
+
+
 
 let rec desugar2 env sexpr =
     match sexpr with
@@ -81,4 +48,12 @@ and expand env sexpr =
         printfn "Oh no! %A" sexpr
         sexpr
 
-"(let ((y 1)) (let ((x 1)) x))" |> stringToSExpr |> desugar2 [] |> sexprToString 
+[<EntryPoint>]
+let main argv =
+    // "(let ((let 1)) (let ((x 1)) x))"
+    "(let ((y 1)) (let ((x 1)) x))"
+    |> stringToSExpr
+    |> desugar2 []
+    |> sexprToString
+    |> printfn "Result: %s"
+    0 // return an integer exit code

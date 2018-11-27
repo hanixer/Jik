@@ -105,7 +105,8 @@ let wrapInLet var value body =
 
 let undefinedExpr = S.Bool false
 
-let toExpand = [
+let special = [
+    "lambda"
     "let"
     "let*"
     "letrec"
@@ -113,26 +114,44 @@ let toExpand = [
     "and"
     "or"
     "cond"
+    "else"
+    "when"
+    "unless"
 ]
+
+let isUnused s env = List.contains s env |> not
 
 let rec desugar2 env sexpr =
     match sexpr with
-    | List (S.Symbol s :: rest) when (List.contains s toExpand) && (List.contains s env |> not) ->
+    | List (Symbol s :: rest) when (List.contains s special) && (List.contains s env |> not) ->
         expand env sexpr
+    | List sexprs ->
+        exprsToList (List.map (desugar2 env) sexprs)
+    | _ -> sexpr
 
 and expand env sexpr =
+    let desugar = desugar2 env
     match sexpr with
     | List(Symbol "lambda" :: List args :: body) ->
         let argsString = symbolsToStrings args
         let env = argsString @ env
         let body = List.map (desugar2 env) body
-        build
-
-let rec desugar sexpr =
-    match sexpr with
+        exprsToList (Symbol "lambda" :: exprsToList args :: body)
+    | List(Symbol "let" :: List bindings :: body) -> 
+        let folder sexpr (names, initExprs) = 
+            match sexpr with
+            | List [Symbol name; initExpr] -> 
+                name :: names, initExpr :: initExprs
+            | _ -> failwith "sexprToExpr: let: wrong bindings"
+        
+        let names, initExprs = List.foldBack folder bindings ([], [])
+        let args = List.map Symbol names
+        let lam = exprsToList (Symbol "lambda" :: exprsToList args :: body)
+        exprsToList (lam :: initExprs)
+        |> desugar2 env
     | List [S.Symbol "and"] -> S.Bool true
     | List [S.Symbol "and"; a] ->
-        let a = desugar a
+        let a = desugar2 env a
         exprsToList [S.Symbol "if"; a; a; S.Bool false]
     | List (S.Symbol "and" :: a :: rest) ->
         let a = desugar a
@@ -156,11 +175,14 @@ let rec desugar sexpr =
         exprsToList [S.Symbol "if"; condition; undefinedExpr; body]
     | List [S.Symbol "cond"] ->
         undefinedExpr
-    | List [S.Symbol "cond"; List [S.Symbol "else"; expr]] ->
+    | List [S.Symbol "cond"; List [S.Symbol "else"; expr]] when isUnused "else" env ->
         desugar expr
-    | List (S.Symbol "cond" :: List [condition; conseq] :: rest) ->
-        desugarCond condition conseq rest
-    | List (S.Symbol "cond" :: List [condition; S.Symbol "=>"; conseq] :: rest) ->
+    | List (S.Symbol "cond" :: List [clause] :: rest) ->
+        let clause = desugar clause
+        let t = S.Symbol (freshLabel "t")
+        let rest = desugar (exprsToList (S.Symbol "cond" :: rest))
+        wrapInLet t clause (exprsToList [S.Symbol "if"; t; t; rest])
+    | List (S.Symbol "cond" :: List [condition; S.Symbol "=>"; conseq] :: rest) when isUnused "=>" env ->
         let condition = desugar condition
         let conseq = desugar conseq
         let t = S.Symbol (freshLabel "t")
@@ -168,19 +190,14 @@ let rec desugar sexpr =
         let rest = desugar (exprsToList (S.Symbol "cond" :: rest))
         wrapInLet t condition 
          (wrapInLet t2 conseq (exprsToList [S.Symbol "if"; t; exprsToList [t2; t]; rest]))
-    | List (S.Symbol "cond" :: List [clause] :: rest) ->
-        let clause = desugar clause
-        let t = S.Symbol (freshLabel "t")
+    | List (S.Symbol "cond" :: List (condition :: conseq) :: rest) ->
+        let condition = desugar condition
+        let conseq = exprsToList (S.Symbol "begin" :: List.map desugar conseq)
         let rest = desugar (exprsToList (S.Symbol "cond" :: rest))
-        wrapInLet t clause (exprsToList [S.Symbol "if"; t; t; rest])
-    | List sexprs -> exprsToList (List.map desugar sexprs)
-    | e -> e
-
-and desugarCond condition conseq rest =
-    let condition = desugar condition
-    let conseq = desugar conseq
-    let rest = desugar (exprsToList (S.Symbol "cond" :: rest))
-    exprsToList [S.Symbol "if"; condition; conseq; rest]
+        exprsToList [S.Symbol "if"; condition; conseq; rest]
+    | _ ->
+        printfn "Oh no! %A" sexpr
+        sexpr
 
 let rec sexprToExpr sexpr = 
     let convertList = List.map sexprToExpr
@@ -249,7 +266,7 @@ let stringToProgram str : Program =
         | sexpr ->
             globals, sexpr :: sexprs
 
-    match desugar sexpr with
+    match desugar2 [] sexpr with
     | List sexprs when not (sexprs.IsEmpty) ->
         let globals, sexprs = List.fold parseSExpr ([], []) sexprs
         { Main = List.map sexprToExpr sexprs |> List.rev

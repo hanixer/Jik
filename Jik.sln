@@ -9,6 +9,8 @@ Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Jik", "src\Jik\Jik.fsproj",
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "App", "src\App\App.fsproj", "{992C86EF-3312-44B3-A57B-C4B2085B2521}"
 EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "App2", "src\App2\App2.fsproj", "{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}"
+EndProject
 Global
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -16,6 +18,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{A82CB710-3A1A-40BA-BD67-4623C7754EBC} = {AAD36CF0-17FE-4EB4-8644-F4BCA6679FCD}
 		{992C86EF-3312-44B3-A57B-C4B2085B2521} = {AAD36CF0-17FE-4EB4-8644-F4BCA6679FCD}
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67} = {AAD36CF0-17FE-4EB4-8644-F4BCA6679FCD}
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -50,5 +53,17 @@ Global
 		{992C86EF-3312-44B3-A57B-C4B2085B2521}.Release|x64.Build.0 = Release|x64
 		{992C86EF-3312-44B3-A57B-C4B2085B2521}.Release|x86.ActiveCfg = Release|x86
 		{992C86EF-3312-44B3-A57B-C4B2085B2521}.Release|x86.Build.0 = Release|x86
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Debug|x64.ActiveCfg = Debug|x64
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Debug|x64.Build.0 = Debug|x64
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Debug|x86.ActiveCfg = Debug|x86
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Debug|x86.Build.0 = Debug|x86
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Release|Any CPU.Build.0 = Release|Any CPU
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Release|x64.ActiveCfg = Release|x64
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Release|x64.Build.0 = Release|x64
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Release|x86.ActiveCfg = Release|x86
+		{53CDD047-F0DC-46F9-80FD-428EC0EF4C67}.Release|x86.Build.0 = Release|x86
 	EndGlobalSection
 EndGlobal

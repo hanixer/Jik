@@ -17,6 +17,18 @@
          "internalConsoleOptions": "openOnSessionStart"
       },
       {
+         "name": ".NET Core Launch (console) 2",
+         "type": "coreclr",
+         "request": "launch",
+         "preLaunchTask": "build",
+         "program": "${workspaceFolder}/src/App2/bin/Debug/netcoreapp2.0/App2.dll",
+         "args": [],
+         "cwd": "${workspaceFolder}",
+         "console": "internalConsole",
+         "stopAtEntry": false,
+         "internalConsoleOptions": "openOnSessionStart"
+      },
+      {
          "name": ".NET Core Launch (web)",
          "type": "coreclr",
          "request": "launch",
