@@ -149,6 +149,25 @@ and expand env sexpr =
         let lam = exprsToList (Symbol "lambda" :: exprsToList args :: body)
         exprsToList (lam :: initExprs)
         |> desugar2 env
+    | List(Symbol "letrec" :: List bindings :: body) -> 
+        let folder sexpr (bindings) = 
+            match sexpr with
+            | List [Symbol name; initExpr] -> 
+                (name, initExpr) :: bindings
+            | _ -> failwith "sexprToExpr: let: wrong bindings"
+        
+        let bindings = List.foldBack folder bindings []
+        let names = List.map fst bindings
+        let bindInitial name = 
+            S.Cons (Symbol name, S.Cons (Number 0, Nil))
+        let letBindings = 
+            names
+            |> List.map bindInitial
+            |> exprsToList
+        let body = List.foldBack (fun (name, expr) acc -> 
+            exprsToList [Symbol "set!"; Symbol name; expr] :: acc) bindings body
+        exprsToList (Symbol "let" :: letBindings :: body)
+        |> desugar
     | List [S.Symbol "and"] -> S.Bool true
     | List [S.Symbol "and"; a] ->
         let a = desugar2 env a

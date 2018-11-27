@@ -363,8 +363,8 @@ let selectInstructions (prog : Intermediate.Program) : Program =
              Mov, [Reg R11; Var var]]
         | Simple.Prim(Prim.ClosureRef, [var1]) ->
             [Mov, [Var var1; Reg Rax]
-             Add, [Int 1; Reg Rax]
-             Mov, [Deref4(-closureTag, Rsi, Rax, wordSize); Var var]]
+             Sar, [Int fixnumShift; Reg Rax]
+             Mov, [Deref4(-closureTag + wordSize, Rsi, Rax, wordSize); Var var]]
         | Simple.Prim(Prim.IsProcedure, [var1]) ->
             isOfTypeInstrs var var1 closureMask closureTag
         | Simple.Prim(Prim.BoxCreate, [var1]) ->
@@ -581,6 +581,7 @@ let rec computeLiveness (prog : Program) =
         | Mov | Movzb -> List.head args |> Set.singleton
         | Set _ -> Set.empty
         | Ret -> Set.ofList (Rax :: calleeSave) |> Set.map Reg
+        | JmpIndirect -> Set.ofList (Rax :: calleeSave) |> Set.map Reg
         | _ -> Set.ofList args
         |> Set.filter isRegVar
 

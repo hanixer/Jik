@@ -381,10 +381,11 @@ let closureConversion (prog : Program) : Program =
         | Decl(var, Prim(op, args)) ->
             let stmts, args = replaceClosureRefs free args
             [], stmts @ [Decl(var, Prim(op, args))]
-        | Decl(var, Lambda(free, args, labels)) ->
+        | Decl(var, Lambda(freeInner, args, labels)) ->
             let proc = freshLabel "proc"
-            let procs = convertLambda proc (free, args, labels)
-            procs, [Decl(var, Prim(Prim.MakeClosure, proc :: free))]
+            let procs = convertLambda proc (freeInner, args, labels)
+            let stmts, freeInner = replaceClosureRefs free freeInner
+            procs, stmts @ [Decl(var, Prim(Prim.MakeClosure, proc :: freeInner))]
         | Decl(_) as decl ->
             [], [decl]
         | Transfer(Transfer.Return(var)) ->

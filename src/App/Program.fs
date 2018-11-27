@@ -13,9 +13,9 @@ open System.IO
 let saveToFile filename str =
     System.IO.File.WriteAllText(filename, str)
 
-let path = __SOURCE_DIRECTORY__ + "\\..\\..\\misc\\test.ir"
+let path = __SOURCE_DIRECTORY__ + "\\..\\..\\misc\\"
 
-let printIr = (fun prog -> prog |> Intermediate.programToString |> saveToFile (path); prog)
+let printIr s = (fun prog -> prog |> Intermediate.programToString |> saveToFile (path + s); prog)
 
 let testInterf s =
   let ds, m =
@@ -24,7 +24,7 @@ let testInterf s =
     |> fixArithmeticPrims
     |> alphaRename
     |> convertProgram
-    |> printIr
+    |> printIr "test.ir"
     |> selectInstructions
     |> computeLiveness
     // |> buildInterference
@@ -63,8 +63,9 @@ let testMainTest s =
   |> assignmentConvert
   |> convertProgram
   |> Intermediate.analyzeFreeVars
+  |> printIr "test2.ir"
   |> Intermediate.closureConversion
-  |> printIr
+  |> printIr "test.ir"
   |> selectInstructions
   |> revealGlobals
   |> computeLiveness
@@ -84,7 +85,7 @@ let testLambda str =
     let r = Intermediate.convertProgram r
     let r = Intermediate.analyzeFreeVars r
     let r = Intermediate.closureConversion r
-    printIr r |> ignore
+    printIr "test.ir" r |> ignore
 
 let e ="
 (let ([a 1]
@@ -357,6 +358,27 @@ let condTests =  [
     @"(let ((let 12)) (cond (let => (lambda (x) (+ let x))) (else 14)))", "24\n"
     // " (let ((cond +)) (cond (+ 1) (- 2)))", "1\n"
 ]
+let letrecTests = [
+    @"(letrec () 12)", "12\n"
+    @"(letrec ((f 12)) f)", "12\n"
+    @"(letrec ((f 12) (g 13)) (+ f g))", "25\n"
+    @"(letrec ((fact (lambda (n) (if (zero? n) 1 (* n (fact (- n 1))))))) (fact 5))", "120\n"
+    @"(letrec ((f 12) (g (lambda () f))) (g))", "12\n"
+    @"(letrec ((f 12) (g (lambda (n) (set! f n)))) (g 130) f)", "130\n"
+    @"(letrec ((f (lambda (g) (set! f g) (f)))) (f (lambda () 12)))", "12\n"
+    @"(letrec ((f (cons (lambda () f) (lambda (x) (set! f x))))) (let ((g (car f))) ((cdr f) 100) (g)))", "100\n"
+    @"(letrec ((f (letrec ((g (lambda (x) (* x 2)))) (lambda (n) (g (* n 2)))))) (f 12))", "48\n"
+    @"(letrec ((f (lambda (f n) (if (zero? n) 1 (* n (f f (- n 1))))))) (f f 5))", "120\n"
+    @"(let ((f (lambda (f) 
+                (lambda (n) 
+                 (if (zero? n) 
+                  1 
+                  (* n (f (- n 1)))))))) 
+       (letrec ((fix (lambda (f) 
+                      (f (lambda (n) 
+                          ((fix f) n)))))) 
+        ((fix f) 5)))", "120\n"
+]
 [<EntryPoint>]
 let main argv =
     runTestsWithName testMainTest "basic" tests
@@ -368,4 +390,5 @@ let main argv =
     runTestsWithName testMainTest "setCarCdr" setCarCdrTests
     runTestsWithName testMainTest "whenUnless" whenUnlessTests
     runTestsWithName testMainTest "cond" condTests
+    runTestsWithName testMainTest "letrec" letrecTests
     1
