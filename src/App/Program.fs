@@ -8,6 +8,8 @@ open RuntimeConstants
 open Display
 open Intermediate
 open Codegen
+open RegisterAllocation
+open SelectInstructions
 open System.IO
 
 let saveToFile filename str =

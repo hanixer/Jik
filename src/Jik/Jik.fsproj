@@ -15,5 +15,7 @@
     <Compile Include="Core.fs" />
     <Compile Include="Intermediate.fs" />
     <Compile Include="Codegen.fs" />
+    <Compile Include="SelectInstructions.fs" />
+    <Compile Include="RegisterAllocation.fs" />
   </ItemGroup>
 </Project>
