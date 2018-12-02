@@ -47,7 +47,7 @@ type Expr =
     | App of Expr * Expr list
     | PrimApp of Prim * Expr list
 
-and LambdaData = string list * Expr list
+and LambdaData = string list * bool * Expr list
 
 type Program = 
     { Main : Expr list
@@ -182,8 +182,12 @@ and expand env sexpr =
     | List (S.Symbol "or" :: a :: rest) ->
         let a = desugar a
         let t = S.Symbol (freshLabel "t")
-        let rest = exprsToList (S.Symbol "or" :: rest)
-        wrapInLet t a (exprsToList [S.Symbol "if"; t; t; desugar rest]) 
+        let rest = 
+            exprsToList (S.Symbol "or" :: rest)
+            |> desugar
+        exprsToList [S.Symbol "if"; t; t; rest]
+        |> wrapInLet t a
+        |> expand env
     | List (S.Symbol "when" :: condition :: body) ->
         let condition = desugar condition
         let body = exprsToList (S.Symbol "begin" :: List.map desugar body)
@@ -199,16 +203,19 @@ and expand env sexpr =
     | List (S.Symbol "cond" :: List [clause] :: rest) ->
         let clause = desugar clause
         let t = S.Symbol (freshLabel "t")
-        let rest = desugar (exprsToList (S.Symbol "cond" :: rest))
+        let rest = (exprsToList (S.Symbol "cond" :: rest))
         wrapInLet t clause (exprsToList [S.Symbol "if"; t; t; rest])
+        |> expand env
     | List (S.Symbol "cond" :: List [condition; S.Symbol "=>"; conseq] :: rest) when isUnused "=>" env ->
         let condition = desugar condition
         let conseq = desugar conseq
         let t = S.Symbol (freshLabel "t")
         let t2 = S.Symbol (freshLabel "t2")
         let rest = desugar (exprsToList (S.Symbol "cond" :: rest))
-        wrapInLet t condition 
-         (wrapInLet t2 conseq (exprsToList [S.Symbol "if"; t; exprsToList [t2; t]; rest]))
+        wrapInLet t2 conseq (exprsToList [S.Symbol "if"; t; exprsToList [t2; t]; rest])
+        |> expand env
+        |> wrapInLet t condition 
+        |> expand env
     | List (S.Symbol "cond" :: List (condition :: conseq) :: rest) ->
         let condition = desugar condition
         let conseq = exprsToList (S.Symbol "begin" :: List.map desugar conseq)
@@ -217,6 +224,24 @@ and expand env sexpr =
     | _ ->
         printfn "Oh no! %A" sexpr
         sexpr
+
+let parseArgs args =
+    let rec loop processed = function
+        | S.Cons(a, S.Cons(b, c)) ->
+            loop (a :: processed) (S.Cons(b, c))
+        | S.Cons(a, Nil) ->
+            List.rev (a :: processed), false
+        | S.Cons(a, b) ->
+            List.rev (b :: a :: processed), true
+        | Nil ->
+            List.rev processed, false
+        | _ -> failwith "parseArgs: parsing fails"
+
+    match args with
+    | Symbol arg -> [arg], true
+    | _ -> 
+        let args, dotted = loop [] args
+        symbolsToStrings args, dotted
 
 let rec sexprToExpr sexpr = 
     let convertList = List.map sexprToExpr
@@ -230,40 +255,12 @@ let rec sexprToExpr sexpr =
         let es = convertList exprs
         Begin(sexprToExpr e :: es)
     | List [Symbol "set!"; Symbol name; rhs] -> Assign(name, sexprToExpr rhs)
-    | List(Symbol "lambda" :: List args :: body) -> 
-        Lambda(symbolsToStrings args, convertList body)
+    | List(Symbol "lambda" :: args :: body) -> 
+        let args, dotted = parseArgs args
+        Lambda(args, dotted, convertList body)
     | List [Symbol "quote"; List []] -> EmptyList
     | List [Symbol "quote"; form] -> 
         failwith "sexprToExpr: quote is not supported"
-    | List(Symbol "let" :: List bindings :: body) -> 
-        let folder sexpr (names, initExprs) = 
-            match sexpr with
-            | List [Symbol name; initExpr] -> 
-                name :: names, initExpr :: initExprs
-            | _ -> failwith "sexprToExpr: let: wrong bindings"
-        
-        let names, initExprs = List.foldBack folder bindings ([], [])
-        let lam = Lambda(names, convertList body)
-        let argExprs = convertList initExprs
-        App(lam, argExprs)
-    | List(Symbol "letrec" :: List bindings :: body) -> 
-        let bindings = transformLetrecBindings bindings
-        let fnames = List.map fst bindings
-        let bindInitial fname = 
-            S.Cons (Symbol fname, S.Cons (Number 0, Nil))
-        let letBindings = 
-            fnames
-            |> List.map bindInitial
-            |> exprsToList
-        let foldSets (name, (args, lamBody)) next =
-            let args = List.map Symbol args |> exprsToList
-            let lambda = exprsToList [Symbol "lambda"; args; lamBody]
-            let set = exprsToList [Symbol "set!"; Symbol name; lambda]
-            set :: next
-        let body =
-            List.foldBack foldSets bindings body
-        exprsToList (Symbol "let" :: letBindings :: body)
-        |> sexprToExpr
     | List(Symbol op :: tail) when isPrimop op ->
         let op = tryStringToPrimop op
         PrimApp(Option.get op, convertList tail)
@@ -287,6 +284,7 @@ let stringToProgram str : Program =
 
     match desugar2 [] sexpr with
     | List sexprs when not (sexprs.IsEmpty) ->
+        printfn "after desugaring:\n%s" (sexprToString (exprsToList sexprs))
         let globals, sexprs = List.fold parseSExpr ([], []) sexprs
         { Main = List.map sexprToExpr sexprs |> List.rev
           Globals = List.rev globals }
@@ -297,7 +295,7 @@ let rec transform f expr =
         match expr with
         | Expr.If(cond, conseq, altern) -> Expr.If(transform cond, transform conseq, transform altern)
         | Expr.Assign(var, rhs) -> Expr.Assign(var, transform rhs)
-        | Expr.Lambda(args, body) -> Expr.Lambda(args, List.map transform body)
+        | Expr.Lambda(args, dotted, body) -> Expr.Lambda(args, dotted, List.map transform body)
         | Expr.Begin(exprs) -> Expr.Begin(List.map transform exprs)
         | Expr.App(func, args) -> Expr.App(transform func, List.map transform args)
         | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transform args)
@@ -342,9 +340,9 @@ let rec alphaRename2 mapping =
              alphaRename2 mapping elseExpr)
     | Assign(var, rhs) -> 
         Assign(trySubstitute var mapping, alphaRename2 mapping rhs)
-    | Lambda(args, body) -> 
+    | Lambda(args, dotted, body) -> 
         let newVars, mapping = extendMapping args mapping
-        Lambda(newVars, List.map (alphaRename2 mapping) body)
+        Lambda(newVars, dotted, List.map (alphaRename2 mapping) body)
     | Begin exprs -> Begin(List.map (alphaRename2 mapping) exprs)
     | App(func, argsExprs) -> 
         App(alphaRename2 mapping func, List.map (alphaRename2 mapping) argsExprs)
@@ -368,7 +366,7 @@ let rec replaceVars mapping expr =
     | Expr.Ref var -> replace var |> Expr.Ref
     | Expr.If(cond, conseq, altern) -> Expr.If(transf cond, transf conseq, transf altern)
     | Expr.Assign(var, rhs) -> Expr.Assign(replace var, transf rhs)
-    | Expr.Lambda(args, body) -> Expr.Lambda(args, List.map transf body)
+    | Expr.Lambda(args, dotted, body) -> Expr.Lambda(args, dotted, List.map transf body)
     | Expr.Begin(exprs) -> Expr.Begin(List.map transf exprs)
     | Expr.App(func, args) -> Expr.App(transf func, List.map transf args)
     | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
@@ -402,7 +400,7 @@ let rec findModifiedVars expr =
         Set.add v (find rhs)
     | App (head, tail) ->
         findMany (head :: tail)
-    | Lambda (args, body) ->
+    | Lambda (args, dotted, body) ->
         findMany body
     | Begin exprs ->
         findMany exprs
@@ -423,9 +421,9 @@ let assignmentConvert (prog : Program) : Program =
             If(conv cond, conv conseq, conv altern)
         | Assign(var, rhs) -> 
             PrimApp(BoxWrite, [Ref var; conv rhs])
-        | Lambda(args, body) -> 
+        | Lambda(args, dotted, body) -> 
             let body = convertLambda modified args body
-            Lambda(args, body)
+            Lambda(args, dotted, body)
         | Begin exprs -> Begin(List.map conv exprs)
         | App(func, args) -> App(conv func, List.map conv args)
         | PrimApp(op, args) -> PrimApp(op, List.map conv args)

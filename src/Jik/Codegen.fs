@@ -73,6 +73,7 @@ type FunctionDef =
     { Name : string
       Free : string list
       Args : string list
+      IsDotted : bool
       StackArgs : string list
       Instrs : Instr list
       Vars : string list ref
@@ -225,7 +226,6 @@ let argumentToLocation (siStart, siMult) reg args =
 
     let _, _, result = List.fold fold (registersForArgs, 0, Map.empty) args
     result
-
 
 let selectInstructions (prog : Intermediate.Program) : Program =
     let convertNumber n = n <<< fixnumShift
@@ -463,17 +463,18 @@ let selectInstructions (prog : Intermediate.Program) : Program =
         | head :: tail -> head :: saveInstrs @ tail
         | _ -> instrs
 
-    let handleDef (name, free, args, labels) =
+    let handleDef proc =
         let instrs =
-            List.collect (handleLabel labels) labels
-            |> saveArgs args
+            List.collect (handleLabel proc.Labels) proc.Labels
+            |> saveArgs proc.Args
         let graph = makeGraph []
-        let diff = List.length args - List.length registersForArgs
+        let diff = List.length proc.Args - List.length registersForArgs
         let slots = if diff > 0 then diff else 0
-        let stackArgs = if diff > 0 then List.skip (List.length registersForArgs) args else []
-        { Name = name
-          Free = free
-          Args = args
+        let stackArgs = if diff > 0 then List.skip (List.length registersForArgs) proc.Args else []
+        { Name = proc.Name
+          Free = proc.Free
+          Args = proc.Args
+          IsDotted = proc.IsDotted
           StackArgs = stackArgs
           Vars = ref []
           MaxStack = 0
@@ -485,13 +486,15 @@ let selectInstructions (prog : Intermediate.Program) : Program =
 
     let impl = freshLabel "schemeEntryImpl"
     let entryImplFunc =
-        match prog.Main with
-        | name, free, [], ((_, [], stmts) :: rest) ->
-            (impl, free, [], (impl, [], stmts) :: rest)            
+        match prog.Main.Labels with
+        | (_, args, stmts) :: restLabels ->
+            { prog.Main with 
+                Name = impl
+                Labels = (impl, args, stmts) :: restLabels }
         | _ -> failwith "selectInstructions: wrong main function"
     let procs = entryImplFunc :: prog.Procedures
-    let main = handleDef (schemeEntryLabel, [], [], [])
-    let main = {main with Instrs = [Label schemeEntryLabel, []; Call impl, []]}
+    let main = handleDef { emptyFunction with Name = schemeEntryLabel }
+    let main = { main with Instrs = [Label schemeEntryLabel, []; Call impl, []] }
     { Procedures = List.map handleDef procs 
       Main = main
       Globals = prog.Globals }
@@ -694,7 +697,6 @@ let assignColors graph uncolored initialMap =
                 if Map.containsKey adj initialMap then
                     let color = Map.find adj initialMap
                     addBanned var color
-                        
 
     let pickNode nodes =
         Seq.maxBy (fun node -> 
@@ -708,7 +710,8 @@ let assignColors graph uncolored initialMap =
 
     let rec findLowestColor bannedSet =
         Seq.initInfinite id
-        |> Seq.find (fun x -> Seq.exists ((=) x) bannedSet |> not)
+        |> Seq.find (fun x -> 
+            Seq.exists ((=) x) bannedSet |> not)
 
     let updateBanned node color =
         adjacent graph node

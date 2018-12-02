@@ -20,7 +20,7 @@ type Simple =
     | Int of int
     | Bool of bool
     | EmptyList
-    | Lambda of Var list * Var list * Label list
+    | Lambda of Var list * Var list * bool * Label list
 
 and Transfer =
     | Return of Var
@@ -36,7 +36,12 @@ and Stmt =
 
 and Label = Var * Var list * Stmt list
 
-and Function = Var * Var list * Var list * Label list
+and Function =
+    { Name : string
+      Free : string list
+      Args : string list
+      IsDotted : bool
+      Labels : Label list }
 
 type Program = 
     { Procedures : Function list
@@ -44,6 +49,13 @@ type Program =
       Globals : string list }
 
 let schemeEntryLabel = "schemeEntry"
+
+let emptyFunction =
+    { Name = ""
+      Free = []
+      Args = []
+      IsDotted = false
+      Labels = [] }
 
 let generalAccess labels name f cn =
     match List.tryFind (fun (name2, _, _) -> name2 = name) labels with
@@ -108,10 +120,16 @@ let rec showLabel (name, vars, stmts) =
                 iConcat [(sprintf "%A" op |> iStr)
                          iStr " "
                          List.map iStr vars |> comma ]
-            | Simple.Lambda(free, args, labels) ->
+            | Simple.Lambda(free, args, dotted, labels) ->
+                let deff = 
+                    { Name = "lam"; 
+                      Free = free
+                      Args = args
+                      IsDotted = dotted
+                      Labels = labels }
                 iConcat [iNewline
                          iStr "  "
-                         showDef ("lam", free, args, labels) |> iIndent]                
+                         showDef deff |> iIndent]                
           iConcat [iStr var 
                    iStr " = "
                    s]
@@ -152,17 +170,20 @@ let rec showLabel (name, vars, stmts) =
              iNewline 
              iInterleave iNewline <| List.map showStmt stmts]
 
-and showDef (name, free, args, labels) =
+and showDef (func : Function) =
+    // (name, free, args, dotted, labels)
+    let dotted = if func.IsDotted then iStr " dotted " else iNil
     iConcat [iStr "def "
-             iStr name
+             iStr func.Name
              iStr " <"
-             comma  (List.map iStr free)
+             comma  (List.map iStr func.Free)
              iStr ">"
              iStr " ("
-             comma  (List.map iStr args)
+             comma  (List.map iStr func.Args)
              iStr ")"
+             dotted
              iNewline
-             iInterleave iNewline (List.map showLabel labels)
+             iInterleave iNewline (List.map showLabel func.Labels)
              iNewline]
 
 let showProgram prog =
@@ -200,16 +221,17 @@ let rec convertExpr expr (cont : Var -> Label list * Stmt list) =
         let labels = labelJoin :: labels
         convertIf exprc exprt exprf labels join
     | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
-    | Expr.Lambda(args, body) ->
+    | Expr.Lambda(args, dotted, body) ->
         let var = freshLabel "lam"
         let labels, stmts = cont var
         let lamLabels, lamStmts = convertExprTail (Begin body)
-        labels, (Decl(var, Lambda([], args, (var, args, lamStmts) :: lamLabels))) :: stmts
+        let body = (var, args, lamStmts) :: lamLabels
+        labels, (Decl(var, Lambda([], args, dotted, body))) :: stmts
     | Expr.Begin(exprs) ->
         convertMany exprs (fun vars ->
             let last = List.last vars
             cont last)
-    | Expr.App(Expr.Lambda(formals, body), args) ->
+    | Expr.App(Expr.Lambda(formals, dotted, body), args) ->
         convertMany args (fun vars ->
             let mapping = 
                 List.zip formals vars |> Map.ofList
@@ -242,7 +264,7 @@ and convertExprJoin expr (contVar : Var) =
         let heads, tail = List.splitAt (List.length exprs - 1) exprs
         convertMany heads (fun _ ->
             convertExprJoin tail.Head contVar)
-    | Expr.App(Expr.Lambda(formals, body), args) ->
+    | Expr.App(Expr.Lambda(formals, dotted, body), args) ->
         convertMany args (fun vars ->
             let mapping = 
                 List.zip formals vars |> Map.ofList
@@ -278,7 +300,7 @@ and convertExprTail expr =
         let heads, tail = List.splitAt (List.length exprs - 1) exprs
         convertMany heads (fun _ ->
             convertExprTail tail.Head)
-    | Expr.App(Expr.Lambda(formals, body), args) ->
+    | Expr.App(Expr.Lambda(formals, dotted, body), args) ->
         convertMany args (fun vars ->
             let mapping = 
                 List.zip formals vars |> Map.ofList
@@ -316,7 +338,11 @@ and convertMany exprs (cont : Var list -> Label list * Stmt list) =
 
 let convertMainExprs expr : Function =
     let labels, stmts = convertExprTail expr
-    schemeEntryLabel, [], [], (schemeEntryLabel, [], stmts) :: labels
+    { Name = schemeEntryLabel
+      Free = []
+      Args = []
+      IsDotted = false
+      Labels = (schemeEntryLabel, [], stmts) :: labels }
 
 let convertProgram (prog : Core.Program) : Program =
     { Procedures = []
@@ -329,9 +355,9 @@ let analyzeFreeVars (prog : Program) : Program =
 
     let rec transformStmt stmt =
         match stmt with
-        | Decl(var, Lambda(_, args, labels)) ->
-            let free, args, labels = transformLambda (args, labels)
-            Set.singleton var, Set.remove var (Set.ofList free), Decl(var, Lambda(free, args, labels))
+        | Decl(var, Lambda(_, args, dotted, labels)) ->
+            let free, labels = transformLambda (args, labels)
+            Set.singleton var, Set.remove var (Set.ofList free), Decl(var, Lambda(free, args, dotted, labels))
         | Decl(var, _) -> Set.singleton var, Set.difference (getUsed stmt) globals, stmt
         | _ -> Set.empty, Set.difference (getUsed stmt) globals, stmt
 
@@ -343,7 +369,7 @@ let analyzeFreeVars (prog : Program) : Program =
                 (Set.empty, Set.empty, []) stmts
         Set.union defined (Set.ofList args), free, (name, args, List.rev stmts)
 
-    and transformLambda ((args, labels) as func) =
+    and transformLambda (args, labels) =
         let defined, free, labels =
             List.fold (fun (defined, free, labels) label ->
                 let defined1, free1, label = transformLabel label
@@ -351,11 +377,13 @@ let analyzeFreeVars (prog : Program) : Program =
                 (Set.empty, Set.empty, []) labels
         let labels = List.rev labels
         let free = Set.difference free (Set.union defined (Set.ofList args)) |> Set.toList
-        free, args, labels
+        free, labels
 
-    and transformFunction (name, free, args, labels) =
-        let free, args, labels = transformLambda (args, labels)
-        name, free, args, labels
+    and transformFunction (func : Function) =
+        let free, labels = transformLambda (func.Args, func.Labels)
+        { func with
+            Free = free
+            Labels = labels }
 
     { prog with Procedures = List.map transformFunction prog.Procedures
                 Main = transformFunction prog.Main }
@@ -381,9 +409,9 @@ let closureConversion (prog : Program) : Program =
         | Decl(var, Prim(op, args)) ->
             let stmts, args = replaceClosureRefs free args
             [], stmts @ [Decl(var, Prim(op, args))]
-        | Decl(var, Lambda(freeInner, args, labels)) ->
+        | Decl(var, Lambda(freeInner, args, dotted, labels)) ->
             let proc = freshLabel "proc"
-            let procs = convertLambda proc (freeInner, args, labels)
+            let procs = convertLambda proc (freeInner, args, dotted, labels)
             let stmts, freeInner = replaceClosureRefs free freeInner
             procs, stmts @ [Decl(var, Prim(Prim.MakeClosure, proc :: freeInner))]
         | Decl(_) as decl ->
@@ -416,16 +444,23 @@ let closureConversion (prog : Program) : Program =
             procs1 @ procs, label :: labels)
             labels ([], [])
     
-    and convertLambda proc (free, args, labels) =
-        match labels with
-        | (name, args, stmts) :: restLabels ->
-            let procs, labels = foldLabels free ((proc, args, stmts) :: restLabels)
-            (proc, free, args, labels) :: procs
-        | _ -> failwith "convertLambda: wrong labels format"
-        
-    let convertFunction (name, free, args, labels) =
+    and convertLambda newName (free, args, dotted, labels) =
+        let labels =
+            match labels with
+            | (_, _, stmts) :: restLabels -> ((newName, args, stmts) :: restLabels)
+            | _ -> failwith "convertLambda: wrong labels format"    
         let procs, labels = foldLabels free labels
-        procs, (name, free, args, labels)
+        let proc =
+            { Name = newName
+              Free = free
+              Args = args
+              Labels = labels
+              IsDotted = dotted }
+        proc :: procs
+        
+    let convertFunction (func : Function) =
+        let procs, labels = foldLabels func.Free func.Labels
+        procs, { func with Labels = labels }
 
     let converted = List.map convertFunction prog.Procedures
     let procs = List.collect fst converted
