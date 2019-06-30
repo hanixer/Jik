@@ -97,7 +97,7 @@ let rec computeLiveness (prog : Program) =
                 Main = handleDef prog.Main }
 
 let rec buildInterference (prog : Program) : Program =
-    let registersForUse = 
+    let registersForUse =
         [Rbx; Rcx; Rdx; Rsi; Rdi; Rbp;
          R8; R9; R10; R11; R12; R13; R14; R15]
         |> Set.ofList
@@ -191,7 +191,7 @@ let assignColors graph uncolored initialMap =
     loop (Set.ofSeq uncolored) initialMap
 
 
-let makeInitialColorMap graph stackArgs = 
+let makeInitialColorMap graph stackArgs =
     let regs =
         vertices graph
         |> Seq.filter isRegister
@@ -203,11 +203,11 @@ let makeInitialColorMap graph stackArgs =
 
 let getSortedVars graph stackArgs =
     vertices graph
-    |> Seq.filter (function 
+    |> Seq.filter (function
         | Var var when Seq.contains var stackArgs -> false
-        | Var _ -> true 
+        | Var _ -> true
         | _ -> false)
-    |> Seq.map (fun var -> 
+    |> Seq.map (fun var ->
         let l = adjacent graph var
         var, Seq.length l)
     |> Seq.sortBy snd
@@ -227,12 +227,12 @@ let geconvertMainExprsrandToLocation operandToColor stackArgs =
                 | Some location ->
                     Map.add operand location result, colorToLocation, slot
                 | None ->
-                    let colorToLocation = 
+                    let colorToLocation =
                         Map.add color (Slot slot) colorToLocation
                     Map.add operand (Slot slot) result, colorToLocation, slot + 1
             | Reg _ ->
                 Map.add operand operand result, Map.add color operand colorToLocation, slot
-            | _ -> failwithf "geconvertMainExprsrandToLocation: wrong operand %A" operand) 
+            | _ -> failwithf "geconvertMainExprsrandToLocation: wrong operand %A" operand)
             (Map.empty, Map.empty, Seq.length stackArgs)
     result, slots
 
@@ -242,7 +242,7 @@ let geconvertMainExprsrandToLocation operandToColor stackArgs =
 let allocateRegisters (prog : Program) =
     let handleArg env arg =
         match Map.tryFind arg env with
-        | Some other -> 
+        | Some other ->
             other
         | _ -> arg
 

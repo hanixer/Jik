@@ -12,12 +12,12 @@ open Display
 /// Language resembles x86 instruction set.
 /// After conversion from Intermediate, 'Var' operands created.
 /// Later these operands are changed to stack locations or registers.
-/// 
+///
 /// Register %rsi is used as closure pointer.
 /// It is saved and restored at each function call.
 
 type Register =
-    | Rsp | Rbp | Rax | Rbx | Rcx | Rdx | Rsi | Rdi 
+    | Rsp | Rbp | Rax | Rbx | Rcx | Rdx | Rsi | Rdi
     | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15
     | Al | Ah | Bl | Bh | Cl | Ch
 
@@ -69,7 +69,7 @@ type InstrName =
 
 and Instr = InstrName * Operand list
 
-type FunctionDef = 
+type FunctionDef =
     { Name : string
       Free : string list
       Args : string list
@@ -83,22 +83,22 @@ type FunctionDef =
       LiveAfter : Map<int, Set<Operand>>
       SlotsOccupied : int }
 
-type Program = 
+type Program =
     { Procedures : FunctionDef list
       Main : FunctionDef
       Globals : string list }
 
 let freePointer = "freePointer"
 
-let allRegisters = 
-    [Rsp; Rbp; Rax; Rbx; Rcx; Rdx; Rsi; Rdi; 
-     R8; R9; R10; R11; R12; R13; R14; R15; 
+let allRegisters =
+    [Rsp; Rbp; Rax; Rbx; Rcx; Rdx; Rsi; Rdi;
+     R8; R9; R10; R11; R12; R13; R14; R15;
      Al; Ah; Bl; Bh; Cl; Ch]
 
-let registersForArgs = 
+let registersForArgs =
     [Rcx; Rdx; R8; R9]
 
-let callerSave = 
+let callerSave =
     [R10; R11; R8; R9; Rcx; Rdi; Rdx]
 
 let calleeSave =
@@ -127,7 +127,7 @@ let showInstr out (op, args) =
             let s = sprintf "%A" op
             fprintf out "%s" (s.ToLower() + "q ")
 
-    let reg r = 
+    let reg r =
         let s = sprintf "%%%A" r
         s.ToLower()
 
@@ -140,9 +140,9 @@ let showInstr out (op, args) =
         | ByteReg(r) -> fprintf out "%s" (reg r)
         | Slot(n) -> fprintfn out "{slot %d}" n
         | GlobalValue(v) -> fprintf out "%s(%%rip)" v
-        
+
     let showArgs args =
-        List.iteri (fun i arg -> 
+        List.iteri (fun i arg ->
             showArg arg
             if i <> List.length args - 1 then
                 fprintf out ", ") args
@@ -174,8 +174,8 @@ let instrsToString instrs =
     showInstrs out instrs
     out.ToString()
 
-let programToString (prog : Program) =   
-    let out = new StringWriter()  
+let programToString (prog : Program) =
+    let out = new StringWriter()
 
     let printGlobal globl =
         fprintfn out "    .globl %s" globl
@@ -200,21 +200,21 @@ let revealGlobals (prog : Program) =
         | Var var when List.contains var prog.Globals ->
             GlobalValue var
         | arg -> arg
-    
+
     let convertInstr (op, args) =
         op, List.map convertArg args
-    
+
     let convertProc proc =
         { proc with Instrs = List.map convertInstr proc.Instrs }
-    
-    { prog with Procedures = List.map convertProc prog.Procedures 
+
+    { prog with Procedures = List.map convertProc prog.Procedures
                 Main = convertProc prog.Main}
 
 let dbg func =
     (fun x -> let y = func x in printfn "%s" (instrsToString y); y)
 
-let computePreds instrs = 
-    let labelToIndex = 
+let computePreds instrs =
+    let labelToIndex =
         Seq.mapi (fun i (x, _) -> i, x) instrs
         |> Seq.collect (fun (i, x) ->
             match x with
@@ -229,17 +229,17 @@ let computePreds instrs =
             else mapping
 
         match op with
-        | InstrName.Jmp label -> 
+        | InstrName.Jmp label ->
             let index = Map.find label labelToIndex
             add index mapping, i + 1
-        | InstrName.JmpIf(_, label) ->         
+        | InstrName.JmpIf(_, label) ->
             let index = Map.find label labelToIndex
-            add index mapping 
+            add index mapping
             |> add (i + 1), i + 1
-        | _ -> 
+        | _ ->
             add (i + 1) mapping, i + 1
 
-    let initial = 
+    let initial =
         Seq.fold (fun (mapping, i) _ -> Map.add i Set.empty mapping, i + 1) (Map.empty, 0) instrs
         |> fst
     Seq.fold handleInstr (initial, 0) instrs
@@ -276,7 +276,7 @@ let stackCorrections (prog : Program) =
         match def.Instrs with
         | (Label _, []) as i  :: rest->
             let n = def.MaxStack * wordSize
-            let instrs = 
+            let instrs =
                 [i
                  Push, [Reg R15]
                  Mov, [Reg Rsp; Reg R15]

@@ -1,5 +1,4 @@
-﻿
-open SExpr
+﻿open SExpr
 open Util
 open Core
 open Graph
@@ -12,71 +11,77 @@ open RegisterAllocation
 open SelectInstructions
 open System.IO
 
-let saveToFile filename str =
-    System.IO.File.WriteAllText(filename, str)
-
+let saveToFile filename str = System.IO.File.WriteAllText(filename, str)
 let path = __SOURCE_DIRECTORY__ + "\\..\\..\\misc\\"
 
-let printIr s = (fun prog -> prog |> Intermediate.programToString |> saveToFile (path + s); prog)
+let printIr s =
+    (fun prog ->
+    prog
+    |> Intermediate.programToString
+    |> saveToFile (path + s)
+    prog)
 
 let testInterf s =
-  let ds, m =
-    s 
-    |> stringToProgram
-    |> fixArithmeticPrims
-    |> alphaRename
-    |> convertProgram
-    |> printIr "test.ir"
-    |> selectInstructions
-    |> computeLiveness
-    // |> buildInterference
-    |> failwithf "nothing more %A"
-    
-  use fileOut = new StreamWriter(path)
-  let handleLiv out live =
-    Map.iter (fun k v -> 
-      fprintf out "%d) " k
-      Seq.iter (function
-        | Var var -> fprintf out "%s, " var
-        | Reg reg -> fprintf out "%%%s, " (reg.ToString().ToLower())
-        | _ -> ()) v
-      fprintfn out "") live
-    fprintfn out "\n"
-  let handleDef def =
-    let out = new StringWriter()
-    Seq.iteri (fun i instr ->
-      fprintf out "%d) " i
-      showInstr out instr
-      fprintfn out "") def.Instrs
-    let out1 = new StringWriter()
-    handleLiv out1 def.LiveBefore
-    let out2 = new StringWriter()
-    handleLiv out2 def.LiveAfter
-    fprintfn fileOut "%s" ((out.ToString()) + (out1.ToString())  + (out2.ToString()))
-  List.iter handleDef ds
-  handleDef m
+    let ds, m =
+        s
+        |> stringToProgram
+        |> fixArithmeticPrims
+        |> alphaRename
+        |> convertProgram
+        |> printIr "test.ir"
+        |> selectInstructions
+        |> computeLiveness
+        // |> buildInterference
+        |> failwithf "nothing more %A"
+
+    use fileOut = new StreamWriter(path)
+
+    let handleLiv out live =
+        Map.iter (fun k v ->
+            fprintf out "%d) " k
+            Seq.iter (function
+                | Var var -> fprintf out "%s, " var
+                | Reg reg -> fprintf out "%%%s, " (reg.ToString().ToLower())
+                | _ -> ()) v
+            fprintfn out "") live
+        fprintfn out "\n"
+
+    let handleDef def =
+        let out = new StringWriter()
+        Seq.iteri (fun i instr ->
+            fprintf out "%d) " i
+            showInstr out instr
+            fprintfn out "") def.Instrs
+        let out1 = new StringWriter()
+        handleLiv out1 def.LiveBefore
+        let out2 = new StringWriter()
+        handleLiv out2 def.LiveAfter
+        fprintfn fileOut "%s" ((out.ToString()) + (out1.ToString()) + (out2.ToString()))
+
+    List.iter handleDef ds
+    handleDef m
 
 let testMainTest s =
-  s 
-  |> stringToProgram
-  |> fixArithmeticPrims
-  |> convertGlobalRefs
-  |> alphaRename
-  |> assignmentConvert
-  |> convertProgram
-  |> Intermediate.analyzeFreeVars
-  |> printIr "test2.ir"
-  |> Intermediate.closureConversion
-  |> printIr "test.ir"
-  |> selectInstructions
-  |> revealGlobals
-  |> computeLiveness
-  |> buildInterference
-  |> allocateRegisters
-  |> convertSlots
-  |> stackCorrections
-  |> patchInstr
-  |> Codegen.programToString
+    s
+    |> stringToProgram
+    |> fixArithmeticPrims
+    |> convertGlobalRefs
+    |> alphaRename
+    |> assignmentConvert
+    |> convertProgram
+    |> Intermediate.analyzeFreeVars
+    |> printIr "test2.ir"
+    |> Intermediate.closureConversion
+    |> printIr "test.ir"
+    |> selectInstructions
+    |> revealGlobals
+    |> computeLiveness
+    |> buildInterference
+    |> allocateRegisters
+    |> convertSlots
+    |> stackCorrections
+    |> patchInstr
+    |> Codegen.programToString
 
 let testLambda str =
     let r = stringToProgram str
@@ -89,7 +94,7 @@ let testLambda str =
     let r = Intermediate.closureConversion r
     printIr "test.ir" r |> ignore
 
-let e ="
+let e = "
 (let ([a 1]
       [b 2]
       [c 3])
@@ -102,7 +107,7 @@ let e ="
 let e2 = "(define (one) 1)
 (+ (one) 1)"
 let e3 = "
-(define (one) 
+(define (one)
   (let ([a 1]
         [b 2]
         [c 3])
@@ -185,33 +190,34 @@ let e16 = "
 ((foo 1) 2)"
 let e17 = "
 (define pair?)"
-let tests = [
-    "(* 1 0)", "0\n"
-    "(* 1 5)", "5\n"
-    "(* -1 5)", "-5\n"
-    "(* 2 2)", "4\n"
-    "#t", "#t\n"
-    "#f", "#f\n"
-    "1", "1\n"
-    "-1", "-1\n"
-    "(+ 1 2)", "3\n"
-    "(+ 1 (+ 2 3))", "6\n"
-    "(+ (+ 1 4) (+ 2 3))", "10\n"
-    "(< 1 2)", "#t\n"
-    "(if 1 2 3)", "2\n"
-    "(if #f 2 3)", "3\n"
-    "(if (< 3 1) 2 3)", "3\n"
-    "(if (if 1 2 3) 4 5)", "4\n"
-    "(if 4 (if #f 2 3) 5)", "3\n"
-    "(if 4 (if #t 8 9) (if #f 2 3))", "8\n"    
-    "
+
+let basicTests =
+    [ "(* 1 0)", "0\n"
+      "(* 1 5)", "5\n"
+      "(* -1 5)", "-5\n"
+      "(* 2 2)", "4\n"
+      "#t", "#t\n"
+      "#f", "#f\n"
+      "1", "1\n"
+      "-1", "-1\n"
+      "(+ 1 2)", "3\n"
+      "(+ 1 (+ 2 3))", "6\n"
+      "(+ (+ 1 4) (+ 2 3))", "10\n"
+      "(< 1 2)", "#t\n"
+      "(if 1 2 3)", "2\n"
+      "(if #f 2 3)", "3\n"
+      "(if (< 3 1) 2 3)", "3\n"
+      "(if (if 1 2 3) 4 5)", "4\n"
+      "(if 4 (if #f 2 3) 5)", "3\n"
+      "(if 4 (if #t 8 9) (if #f 2 3))", "8\n"
+      "
 (let ([v 1])
 (let ([w 46])
 (let ([x (+ v 7)])
 (let ([y (+ 4 x)])
 (let ([z (+ x w)])
 (+ z (- y)))))))", "42\n"
-    "
+      "
 (let ([a 1]
       [b 2]
       [c 3])
@@ -221,176 +227,197 @@ let tests = [
       (+ c (+ d e)))
     (let ([f 6])
       (+ a (+ c f)))))", "12\n"
-    e2, "2\n"
-    e3, "13\n"
-    e4, "2\n"
-    e6, "4\n"
-    e7, "27\n"
-    e8, "-4\n"
-    e9, "50005000\n"
-    e10, "3\n"
-    e11, "-2\n"
-]
-let vectorTests = [
-    "(vector-length (make-vector 4))", "4\n"
-    e12, "103\n"
-    "(vector? (make-vector 3))", "#t\n"
-    "(vector? #t)", "#f\n"
-    e13, "33\n"
-    e14, "#(1 2 3)\n"
-]
-let lambdaTests = [
-    "(procedure? (lambda (x) x))", "#t\n"
-    "(procedure? ((lambda ()
-                  (lambda () 1))))", "#t\n"
-    @"(let ((f (lambda () 12))) (f))", "12\n"
-    @"(let ((f (lambda () (+ 12 13)))) (f))", "25\n"
-    @"(let ((f (lambda () 13))) (+ (f) (f)))", "26\n"
-    @"(let ((f (lambda () (let ((g (lambda () (+ 2 3)))) (* (g) (g)))))) (+ (f) (f)))", "50\n"
-    @"(let ((f (lambda () (let ((f (lambda () (+ 2 3)))) (* (f) (f)))))) (+ (f) (f)))", "50\n"
-    @"(let ((f (if (vector? (lambda () 12)) (lambda () 13) (lambda () 14)))) (f))", "14\n"
-    @"(let ((f (lambda (x) x))) (f 12))", "12\n"
-    @"(let ((f (lambda (x y) (+ x y)))) (f 12 13))", "25\n"
-    @"(let ((f (lambda (x) (let ((g (lambda (x y) (+ x y)))) (g x 100))))) (f 1000))", "1100\n"
-    @"(let ((f (lambda (g) (g 2 13)))) (f (lambda (n m) (* n m))))", "26\n"
-    @"(let ((f (lambda (g) (+ (g 10) (g 100))))) (f (lambda (x) (* x x))))", "10100\n"
-    @"(let ((f (lambda (f n m) (if (zero? n) m (f f (- n 1) (* n m)))))) (f f 5 1))", "120\n"
-    @"(let ((f (lambda (f n) (if (zero? n) 1 (* n (f f (- n 1))))))) (f f 5))", "120\n"
-    @"(let ((n 12)) (let ((f (lambda () n))) (f)))", "12\n"
-    @"(let ((n 12)) (let ((f (lambda (m) (+ n m)))) (f 100)))", "112\n"
-]
-let assignmentTests = [
-    "(let ((x 0)) (set! x 1) x)", "1\n"
-    @"(let ((x 12)) (set! x 13) x)", "13\n"
-    @"(let ((x 12)) (set! x (+ 1  x)) x)", "13\n"
-    @"(let ((x 12)) (let ((x #f)) (set! x 14)) x)", "12\n"
-    @"(let ((x 12)) (let ((y (let ((x #f)) (set! x 14)))) x))", "12\n"
-    @"(let ((f #f)) (let ((g (lambda () f))) (set! f 10) (g)))", "10\n"
-    @"(let ((f (lambda (x) (set! x (+ 1  x)) x))) (f 12))", "13\n"
-    @"(let ((x 10)) (let ((f (lambda (x) (set! x (+ 1  x)) x))) (cons x (f x))))", "(10 . 11)\n"
-    @"(let ((t #f)) 
-       (let ((locative (cons (lambda () t) (lambda (n) (set! t n))))) 
-        ((cdr locative) 17) 
-        ((car locative))))", "17\n"
-    @"(let ((locative (let ((t #f)) (cons (lambda () t) (lambda (n) (set! t n)))))) ((cdr locative) 17) ((car locative)))", "17\n"
-    @"(let ((make-counter (lambda () 
-                           (let ((counter -1)) 
-                            (lambda () 
-                             (set! counter (+ 1  counter)) counter))))) 
-       (let ((c0 (make-counter)) 
-             (c1 (make-counter))) 
-        (c0) 
-        (cons (c0) (c1))))", "(1 . 0)\n"
-    @"(let ((fact #f)) (set! fact (lambda (n) (if (zero? n) 1 (* n (fact (- n 1)))))) (fact 5))", "120\n"
-    @"(let ((fact #f)) ((begin (set! fact (lambda (n) (if (zero? n) 1 (* n (fact (- n 1)))))) fact) 5))", "120\n"
-]
-let andOrTests = [
-    @"(and)", "#t\n"
-    @"(and 5)", "5\n"
-    @"(and #f)", "#f\n"
-    @"(and 5 6)", "6\n"
-    @"(and #f ((lambda (x) (x x)) (lambda (x) (x x))))", "#f\n"
-    @"(or)", "#f\n"
-    @"(or #t)", "#t\n"
-    @"(or 5)", "5\n"
-    @"(or 1 2 3)", "1\n"
-    @"(or (cons 1 2) ((lambda (x) (x x)) (lambda (x) (x x))))", "(1 . 2)\n"
-    @"(let ((if 12)) (or if 17))", "12\n"
-    @"(let ((if 12)) (and if 17))", "17\n"
-    @"(let ((let 8)) (or let 18))", "8\n"
-    @"(let ((let 8)) (and let 18))", "18\n"
-    @"(let ((t 1)) (and (begin (set! t (+ 1 t)) t) t))", "2\n"
-    @"(let ((t 1)) (or (begin (set! t (+ 1 t)) t) t))", "2\n"
+      e2, "2\n"
+      e3, "13\n"
+      e4, "2\n"
+      e6, "4\n"
+      e7, "27\n"
+      e8, "-4\n"
+      e9, "50005000\n"
+      e10, "3\n"
+      e11, "-2\n" ]
 
-]
-let pairTests = [
-    "(pair? (cons 1 2))", "#t\n"
-    "(pair? #t)", "#f\n"
-    "(cons 1 2)", "(1 . 2)\n"
-    "(cons 1 '())", "(1)\n"
-    "(cons 1 (cons 2 3))", "(1 2 . 3)\n"
-    "(cons 1 (cons (cons 2 '()) (cons 3 '())))", "(1 (2) 3)\n"
-    "(car (cons 1 2))", "1\n"
-    "(cdr (cons 1 2))", "2\n"
-    "(cdr (car (cdr (cons 1 (cons (cons 2 '()) (cons 3 '()))))))", "()\n"
-]
-let setCarCdrTests = [
-    @"(let ((x (cons 1 2))) (begin (set-cdr! x '()) x))", "(1)\n"
-    @"(let ((x (cons 1 2))) (set-cdr! x '()) x)", "(1)\n"
-    @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! x y) x)", "(12 14 . 15)\n"
-    @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! y x) y)", "(14 12 . 13)\n"
-    @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! y x) x)", "(12 . 13)\n"
-    @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! x y) y)", "(14 . 15)\n"
-    @"(let ((x (let ((x (cons 1 2))) (set-car! x #t) (set-cdr! x #f) x))) (cons x x) x)", "(#t . #f)\n"
-    @"(let ((x (cons 1 2))) 
+let vectorTests =
+    [ "(vector-length (make-vector 4))", "4\n"
+      e12, "103\n"
+      "(vector? (make-vector 3))", "#t\n"
+      "(vector? #t)", "#f\n"
+      e13, "33\n"
+      e14, "#(1 2 3)\n" ]
+
+let lambdaTests =
+    [ "(procedure? (lambda (x) x))", "#t\n"
+      "(procedure? ((lambda ()
+                  (lambda () 1))))", "#t\n"
+      @"(let ((f (lambda () 12))) (f))", "12\n"
+      @"(let ((f (lambda () (+ 12 13)))) (f))", "25\n"
+      @"(let ((f (lambda () 13))) (+ (f) (f)))", "26\n"
+      @"(let ((f (lambda () (let ((g (lambda () (+ 2 3)))) (* (g) (g)))))) (+ (f) (f)))", "50\n"
+      @"(let ((f (lambda () (let ((f (lambda () (+ 2 3)))) (* (f) (f)))))) (+ (f) (f)))", "50\n"
+      @"(let ((f (if (vector? (lambda () 12)) (lambda () 13) (lambda () 14)))) (f))", "14\n"
+      @"(let ((f (lambda (x) x))) (f 12))", "12\n"
+      @"(let ((f (lambda (x y) (+ x y)))) (f 12 13))", "25\n"
+      @"(let ((f (lambda (x) (let ((g (lambda (x y) (+ x y)))) (g x 100))))) (f 1000))", "1100\n"
+      @"(let ((f (lambda (g) (g 2 13)))) (f (lambda (n m) (* n m))))", "26\n"
+      @"(let ((f (lambda (g) (+ (g 10) (g 100))))) (f (lambda (x) (* x x))))", "10100\n"
+      @"(let ((f (lambda (f n m) (if (zero? n) m (f f (- n 1) (* n m)))))) (f f 5 1))", "120\n"
+      @"(let ((f (lambda (f n) (if (zero? n) 1 (* n (f f (- n 1))))))) (f f 5))", "120\n"
+      @"(let ((n 12)) (let ((f (lambda () n))) (f)))", "12\n"
+      @"(let ((n 12)) (let ((f (lambda (m) (+ n m)))) (f 100)))", "112\n" ]
+
+let assignmentTests =
+    [ "(let ((x 0)) (set! x 1) x)", "1\n"
+      @"(let ((x 12)) (set! x 13) x)", "13\n"
+      @"(let ((x 12)) (set! x (+ 1  x)) x)", "13\n"
+      @"(let ((x 12)) (let ((x #f)) (set! x 14)) x)", "12\n"
+      @"(let ((x 12)) (let ((y (let ((x #f)) (set! x 14)))) x))", "12\n"
+      @"(let ((f #f)) (let ((g (lambda () f))) (set! f 10) (g)))", "10\n"
+      @"(let ((f (lambda (x) (set! x (+ 1  x)) x))) (f 12))", "13\n"
+      @"(let ((x 10)) (let ((f (lambda (x) (set! x (+ 1  x)) x))) (cons x (f x))))", "(10 . 11)\n"
+      @"(let ((t #f))
+       (let ((locative (cons (lambda () t) (lambda (n) (set! t n)))))
+        ((cdr locative) 17)
+        ((car locative))))", "17\n"
+
+      @"(let ((locative (let ((t #f)) (cons (lambda () t) (lambda (n) (set! t n)))))) ((cdr locative) 17) ((car locative)))",
+      "17\n"
+      @"(let ((make-counter (lambda ()
+                           (let ((counter -1))
+                            (lambda ()
+                             (set! counter (+ 1  counter)) counter)))))
+       (let ((c0 (make-counter))
+             (c1 (make-counter)))
+        (c0)
+        (cons (c0) (c1))))", "(1 . 0)\n"
+      @"(let ((fact #f)) (set! fact (lambda (n) (if (zero? n) 1 (* n (fact (- n 1)))))) (fact 5))", "120\n"
+
+      @"(let ((fact #f)) ((begin (set! fact (lambda (n) (if (zero? n) 1 (* n (fact (- n 1)))))) fact) 5))",
+      "120\n" ]
+
+let andOrTests =
+    [ @"(and)", "#t\n"
+      @"(and 5)", "5\n"
+      @"(and #f)", "#f\n"
+      @"(and 5 6)", "6\n"
+      @"(and #f ((lambda (x) (x x)) (lambda (x) (x x))))", "#f\n"
+      @"(or)", "#f\n"
+      @"(or #t)", "#t\n"
+      @"(or 5)", "5\n"
+      @"(or 1 2 3)", "1\n"
+      @"(or (cons 1 2) ((lambda (x) (x x)) (lambda (x) (x x))))", "(1 . 2)\n"
+      @"(let ((if 12)) (or if 17))", "12\n"
+      @"(let ((if 12)) (and if 17))", "17\n"
+      @"(let ((let 8)) (or let 18))", "8\n"
+      @"(let ((let 8)) (and let 18))", "18\n"
+      @"(let ((t 1)) (and (begin (set! t (+ 1 t)) t) t))", "2\n"
+      @"(let ((t 1)) (or (begin (set! t (+ 1 t)) t) t))", "2\n" ]
+
+let pairTests =
+    [ "(pair? (cons 1 2))", "#t\n"
+      "(pair? #t)", "#f\n"
+      "(cons 1 2)", "(1 . 2)\n"
+      "(cons 1 '())", "(1)\n"
+      "(cons 1 (cons 2 3))", "(1 2 . 3)\n"
+      "(cons 1 (cons (cons 2 '()) (cons 3 '())))", "(1 (2) 3)\n"
+      "(car (cons 1 2))", "1\n"
+      "(cdr (cons 1 2))", "2\n"
+      "(cdr (car (cdr (cons 1 (cons (cons 2 '()) (cons 3 '()))))))", "()\n" ]
+
+let setCarCdrTests =
+    [ @"(let ((x (cons 1 2))) (begin (set-cdr! x '()) x))", "(1)\n"
+      @"(let ((x (cons 1 2))) (set-cdr! x '()) x)", "(1)\n"
+      @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! x y) x)", "(12 14 . 15)\n"
+      @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! y x) y)", "(14 12 . 13)\n"
+      @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! y x) x)", "(12 . 13)\n"
+      @"(let ((x (cons 12 13)) (y (cons 14 15))) (set-cdr! x y) y)", "(14 . 15)\n"
+      @"(let ((x (let ((x (cons 1 2))) (set-car! x #t) (set-cdr! x #f) x))) (cons x x) x)", "(#t . #f)\n"
+      @"(let ((x (cons 1 2)))
        (set-cdr! x x)
        (set-car! (cdr x) x)
        (cons (eq? x (car x)) (eq? x (cdr x))))", "(#t . #t)\n"
-    @"(let ((x #f)) (if (pair? x) (set-car! x 12) #f) x)", "#f\n"
-]
-let whenUnlessTests = [
-    @"(let ((x (cons 1 2))) 
-       (when (pair? x) 
-        (set-car! x (+ (car x) (cdr x)))) 
+      @"(let ((x #f)) (if (pair? x) (set-car! x 12) #f) x)", "#f\n" ]
+
+let whenUnlessTests =
+    [ @"(let ((x (cons 1 2)))
+       (when (pair? x)
+        (set-car! x (+ (car x) (cdr x))))
         x)", "(3 . 2)\n"
-    @"(let ((x (cons 1 2))) (when (pair? x) (set-car! x (+ (car x) (cdr x))) (set-car! x (+ (car x) (cdr x)))) x)", "(5 . 2)\n"
-    @"(let ((x (cons 1 2))) 
-       (unless (fixnum? x) 
-        (set-car! x (+ (car x) (cdr x)))) 
+
+      @"(let ((x (cons 1 2))) (when (pair? x) (set-car! x (+ (car x) (cdr x))) (set-car! x (+ (car x) (cdr x)))) x)",
+      "(5 . 2)\n"
+      @"(let ((x (cons 1 2)))
+       (unless (fixnum? x)
+        (set-car! x (+ (car x) (cdr x))))
        x)", "(3 . 2)\n"
-    @"(let ((x (cons 1 2))) (unless (fixnum? x) (set-car! x (+ (car x) (cdr x))) (set-car! x (+ (car x) (cdr x)))) x)", "(5 . 2)\n"
-    @"(let ((let 12)) (when let let let let let))", "12\n"
-    @"(let ((let #f)) (unless let let let let let))", "#f\n"
-]
-let condTests =  [
-    @"(cond (1 2) (else 3))", "2\n"
-    @"(cond (1) (else 13))", "1\n"
-    @"(cond (#f #t) (#t #f))", "#f\n"
-    @"(cond (else 17))", "17\n"
-    @"(cond (#f) (#f 12) (12 13))", "13\n"
-    @"(cond ((cons 1 2) => (lambda (x) (cdr x))))", "2\n"
-    @"(let ((else #t)) (cond (else 1287)))", "1287\n"
-    @"(let ((else 17)) (cond (else)))", "17\n"
-    @"(let ((else 17)) (cond (else => (lambda (x) x))))", "17\n"
-    @"(let ((else #f)) (cond (else ((lambda (x) (x x)) (lambda (x) (x x))))) else)", "#f\n"
-    @"(let ((=> 12)) (cond (12 => 14) (else 17)))", "14\n"
-    @"(let ((=> 12)) (cond (=>)))", "12\n"
-    @"(let ((=> 12)) (cond (=> =>)))", "12\n"
-    @"(let ((=> 12)) (cond (=> => =>)))", "12\n"
-    @"(let ((let 12)) (cond (let => (lambda (x) (+ let x))) (else 14)))", "24\n"
-    // " (let ((cond +)) (cond (+ 1) (- 2)))", "1\n"
-]
-let letrecTests = [
-    @"(letrec () 12)", "12\n"
-    @"(letrec ((f 12)) f)", "12\n"
-    @"(letrec ((f 12) (g 13)) (+ f g))", "25\n"
-    @"(letrec ((fact (lambda (n) (if (zero? n) 1 (* n (fact (- n 1))))))) (fact 5))", "120\n"
-    @"(letrec ((f 12) (g (lambda () f))) (g))", "12\n"
-    @"(letrec ((f 12) (g (lambda (n) (set! f n)))) (g 130) f)", "130\n"
-    @"(letrec ((f (lambda (g) (set! f g) (f)))) (f (lambda () 12)))", "12\n"
-    @"(letrec ((f (cons (lambda () f) (lambda (x) (set! f x))))) (let ((g (car f))) ((cdr f) 100) (g)))", "100\n"
-    @"(letrec ((f (letrec ((g (lambda (x) (* x 2)))) (lambda (n) (g (* n 2)))))) (f 12))", "48\n"
-    @"(letrec ((f (lambda (f n) (if (zero? n) 1 (* n (f f (- n 1))))))) (f f 5))", "120\n"
-    @"(let ((f (lambda (f) 
-                (lambda (n) 
-                 (if (zero? n) 
-                  1 
-                  (* n (f (- n 1)))))))) 
-       (letrec ((fix (lambda (f) 
-                      (f (lambda (n) 
-                          ((fix f) n)))))) 
-        ((fix f) 5)))", "120\n"
-]
+
+      @"(let ((x (cons 1 2))) (unless (fixnum? x) (set-car! x (+ (car x) (cdr x))) (set-car! x (+ (car x) (cdr x)))) x)",
+      "(5 . 2)\n"
+      @"(let ((let 12)) (when let let let let let))", "12\n"
+      @"(let ((let #f)) (unless let let let let let))", "#f\n" ]
+
+let condTests =
+    [ @"(cond (1 2) (else 3))", "2\n"
+      @"(cond (1) (else 13))", "1\n"
+      @"(cond (#f #t) (#t #f))", "#f\n"
+      @"(cond (else 17))", "17\n"
+      @"(cond (#f) (#f 12) (12 13))", "13\n"
+      @"(cond ((cons 1 2) => (lambda (x) (cdr x))))", "2\n"
+      @"(let ((else #t)) (cond (else 1287)))", "1287\n"
+      @"(let ((else 17)) (cond (else)))", "17\n"
+      @"(let ((else 17)) (cond (else => (lambda (x) x))))", "17\n"
+      @"(let ((else #f)) (cond (else ((lambda (x) (x x)) (lambda (x) (x x))))) else)", "#f\n"
+      @"(let ((=> 12)) (cond (12 => 14) (else 17)))", "14\n"
+      @"(let ((=> 12)) (cond (=>)))", "12\n"
+      @"(let ((=> 12)) (cond (=> =>)))", "12\n"
+      @"(let ((=> 12)) (cond (=> => =>)))", "12\n"
+      @"(let ((let 12)) (cond (let => (lambda (x) (+ let x))) (else 14)))", "24\n" ]
+
+// " (let ((cond +)) (cond (+ 1) (- 2)))", "1\n"
+let letrecTests =
+    [ @"(letrec () 12)", "12\n"
+      @"(letrec ((f 12)) f)", "12\n"
+      @"(letrec ((f 12) (g 13)) (+ f g))", "25\n"
+      @"(letrec ((fact (lambda (n) (if (zero? n) 1 (* n (fact (- n 1))))))) (fact 5))", "120\n"
+      @"(letrec ((f 12) (g (lambda () f))) (g))", "12\n"
+      @"(letrec ((f 12) (g (lambda (n) (set! f n)))) (g 130) f)", "130\n"
+      @"(letrec ((f (lambda (g) (set! f g) (f)))) (f (lambda () 12)))", "12\n"
+
+      @"(letrec ((f (cons (lambda () f) (lambda (x) (set! f x))))) (let ((g (car f))) ((cdr f) 100) (g)))",
+      "100\n"
+      @"(letrec ((f (letrec ((g (lambda (x) (* x 2)))) (lambda (n) (g (* n 2)))))) (f 12))", "48\n"
+      @"(letrec ((f (lambda (f n) (if (zero? n) 1 (* n (f f (- n 1))))))) (f f 5))", "120\n"
+      @"(let ((f (lambda (f)
+                (lambda (n)
+                 (if (zero? n)
+                  1
+                  (* n (f (- n 1))))))))
+       (letrec ((fix (lambda (f)
+                      (f (lambda (n)
+                          ((fix f) n))))))
+        ((fix f) 5)))", "120\n" ]
+
+let listTests =
+  [ "(define length
+       (lambda (l)
+         (if (null? l)
+           0
+           (+ 1 (length (cdr l))))))
+     (length '())", "0\n"
+
+  ]
+
 [<EntryPoint>]
 let main argv =
-    runTestsWithName testMainTest "basic" tests
-    runTestsWithName testMainTest "vector" vectorTests
-    runTestsWithName testMainTest "lambda" lambdaTests
-    runTestsWithName testMainTest "assignment" assignmentTests
-    runTestsWithName testMainTest "andOr" andOrTests
-    runTestsWithName testMainTest "pair" pairTests
-    runTestsWithName testMainTest "setCarCdr" setCarCdrTests
-    runTestsWithName testMainTest "whenUnless" whenUnlessTests
-    runTestsWithName testMainTest "cond" condTests
-    runTestsWithName testMainTest "letrec" letrecTests
+    // runTestsWithName testMainTest "basic" basicTests
+    // runTestsWithName testMainTest "vector" vectorTests
+    // runTestsWithName testMainTest "lambda" lambdaTests
+    // runTestsWithName testMainTest "assignment" assignmentTests
+    // runTestsWithName testMainTest "andOr" andOrTests
+    // runTestsWithName testMainTest "pair" pairTests
+    // runTestsWithName testMainTest "setCarCdr" setCarCdrTests
+    // runTestsWithName testMainTest "whenUnless" whenUnlessTests
+    // runTestsWithName testMainTest "cond" condTests
+    // runTestsWithName testMainTest "letrec" letrecTests
+    runTestsWithName testMainTest "list" listTests
+    // testLambda e8
     1

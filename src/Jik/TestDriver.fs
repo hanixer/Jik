@@ -14,9 +14,9 @@ let getTempFile () =
 
 let gccCompile filename =
     let res = Util.executeProcess("gcc", filename + " -g -std=c99 runner.c")
-    if res.stderr.Trim().Length > 0 then 
+    if res.stderr.Trim().Length > 0 then
         failwithf "gcc error:\n%s\n\n" res.stderr
-    if res.stdout.Trim().Length > 0 then 
+    if res.stdout.Trim().Length > 0 then
         printfn "gcc output:\n%s\n\n" res.stdout
 
 let runCompiled () =
@@ -62,17 +62,9 @@ let runTestsWithName compile testName tests =
             else
                 passed + 1, i + 1
         with
-        | e -> 
+        | e ->
             printfn "FAIL! Test<%s> #%d\nexception:\n<%s>\nstacktrace:\n<%s>\ninput:\n%s\n" testName i (e.Message) (e.StackTrace) input
             passed, i + 1
 
-    List.fold fold (0, 1) tests |> fst
-
-let runAllTests compile =
-    let tests = List.rev testCases
-    List.iter (fun (testName, tests) ->
-        let passed = runTestsWithName compile testName tests          
-        printfn "-- Test <%s>: passed <%d> of <%d> \n\n" 
-            testName passed (tests.Length))
-        tests
-
+    let n = List.fold fold (0, 1) tests |> fst
+    printfn "Test<%s> run: completed %d / %d" testName n tests.Length

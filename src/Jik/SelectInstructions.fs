@@ -9,7 +9,7 @@ open Codegen
 let argumentToLocation (siStart, siMult) reg args =
     let fold (regs, index, pairs) arg =
         match regs with
-        | argReg :: rest -> 
+        | argReg :: rest ->
             rest, index, Map.add arg (Reg argReg) pairs
         | _ ->
             let offset = siStart + siMult * index
@@ -116,6 +116,8 @@ let rec declToInstrs (var, x) =
          Add, [Int (2 * wordSize); GlobalValue(freePointer)]]
     | Simple.Prim(Prim.IsPair, [var1]) ->
         isOfTypeInstrs var var1 pairMask pairTag
+    | Simple.Prim(Prim.IsNull, [var1]) ->
+        isOfTypeInstrs var var1 nilMask nilLiteral
     | Simple.Prim(Prim.Car, [pair]) ->
         [Mov, [Var pair; Reg R11]
          Mov, [Deref(-pairTag, R11); Var var]]
@@ -182,15 +184,14 @@ let rec declToInstrs (var, x) =
          Mov, [Reg Rax; Var var]]
     | e -> failwithf "handleDecl: %s %A" var e
 
-
 let transferToInstrs labels = function
-    | Return var -> 
+    | Return var ->
         [Mov, [Var var; Reg Rax]
          RestoreStack, []
          Ret, []]
     | Transfer.Jump(label, vars) ->
         let args = getArgsOfLabel labels label
-        if List.length args <> List.length vars then 
+        if List.length args <> List.length vars then
             failwith "handleTransfer: wrong number of vars"
         let movArgs =
             List.zip vars args
@@ -203,12 +204,12 @@ let transferToInstrs labels = function
     | Transfer.Call(NonTail label, func, args) ->
         let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
         let moveToArgPositions =
-            List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args                        
+            List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
         let argsOfLabel = getArgsOfLabel labels label
         let argOfLabel = List.head argsOfLabel
-        if List.length argsOfLabel <> 1 then 
+        if List.length argsOfLabel <> 1 then
             failwith "handleTransfer: wrong number of vars"
-        moveToArgPositions @ 
+        moveToArgPositions @
         [Mov, [Reg Rsi; Deref(0, Rsp)]
          Mov, [Var func; Reg Rsi]
          Mov, [Deref(-closureTag, Rsi); Reg Rax]
@@ -222,26 +223,26 @@ let transferToInstrs labels = function
             List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
         let moveStackArgs =
             if List.length args > List.length registersForArgs then
-                List.skip (List.length registersForArgs) moveToArgPositions 
+                List.skip (List.length registersForArgs) moveToArgPositions
                 |> List.mapi (fun i x ->
                     match x with
                     | Mov, [_; arg2] -> Mov, [arg2; Slot(i)]
                     | _ -> failwith "wrong")
             else []
-        moveToArgPositions @ 
-        moveStackArgs @ 
+        moveToArgPositions @
+        moveStackArgs @
         [Mov, [Var func; Reg Rsi]
          Mov, [Deref(-closureTag, Rsi); Reg Rax]
          RestoreStack, []
          JmpIndirect, [Reg Rax]]
 
 let saveArgs args instrs =
-    let args = 
+    let args =
         if List.length args > List.length registersForArgs then
             List.take (List.length registersForArgs) args
         else args
     let argToLoc = argumentToLocation (wordSize, wordSize) Rbp args
-    let saveInstrs = 
+    let saveInstrs =
         List.map (fun arg -> Mov, [Map.find arg argToLoc; Var arg]) args
     match instrs with
     | head :: tail -> head :: saveInstrs @ tail
@@ -280,14 +281,14 @@ let selectInstructions (prog : Intermediate.Program) : Program =
     let entryImplFunc =
         match prog.Main.Labels with
         | (_, args, stmts) :: restLabels ->
-            { prog.Main with 
+            { prog.Main with
                 Name = impl
                 Labels = (impl, args, stmts) :: restLabels }
         | _ -> failwith "selectInstructions: wrong main function"
     let procs = entryImplFunc :: prog.Procedures
     let main = handleDef { emptyFunction with Name = schemeEntryLabel }
     let main = { main with Instrs = [Label schemeEntryLabel, []; Call impl, []] }
-    { Procedures = List.map handleDef procs 
+    { Procedures = List.map handleDef procs
       Main = main
       Globals = prog.Globals }
 

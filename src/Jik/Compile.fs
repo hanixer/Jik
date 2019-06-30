@@ -10,8 +10,8 @@ let freshLabel =
         n <- n + 1
         sprintf "L_%d" n
 
-let tryGetLabel name env = 
-    Map.tryFind name env 
+let tryGetLabel name env =
+    Map.tryFind name env
 
 let getLabel name env =
     match tryGetLabel name env with
@@ -24,8 +24,8 @@ let isCall env = function
     | _ -> false
 
 let getLabelAndArgs env = function
-    | List (Symbol "app" :: Symbol name :: exprs) 
-    | Cons (Symbol name, List exprs) -> 
+    | List (Symbol "app" :: Symbol name :: exprs)
+    | Cons (Symbol name, List exprs) ->
         getLabel name env, exprs
     | _ -> failwith "getLabelAndArgs: wrong sexpr"
 
@@ -56,7 +56,7 @@ let compile s =
         emitfn "  movzb %%al, %%rax"
         emitfn "  sal $%d, %%al" boolBit
         emitfn "  or $%d, %%al" falseLiteral
-    let emitToBoolEq () =    
+    let emitToBoolEq () =
         emitfn "  sete %%al"
         emitToBool ()
     let emitCompare flag si =
@@ -67,7 +67,7 @@ let compile s =
     let rec emitMainExpr = function
         | List [Symbol "letrec"; List bindings; body] ->
             ``letrec`` Map.empty 0 bindings body
-        | mainExpr ->  
+        | mainExpr ->
             emitSchemeEntry Map.empty -wordSize mainExpr
 
     and ``letrec`` env si bindings body =

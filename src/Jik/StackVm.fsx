@@ -11,7 +11,7 @@
 /// - call/cc
 /// - tail calls
 /// - inline primitives (like +, -, etc.)
-/// This interpreter translates s-expressions into Expr Scheme making 
+/// This interpreter translates s-expressions into Expr Scheme making
 /// some desugaring (let, letrec). Then Expr expression is translated
 /// into Tree-like instructions for ''VM''.
 /// VM has following state:
@@ -20,7 +20,7 @@
 /// - frame pointer - pointer to beginning of the current frame
 /// - closure - which contains code and free variables for current executing function.
 /// - stack pointer - which points to next free location on the stack.
-/// Memory organization. 
+/// Memory organization.
 /// Predefined storage - where primitives are stored.
 /// Global storage - where global variables are store.
 /// Stack memory - implemented as an array, supporting push, pop.
