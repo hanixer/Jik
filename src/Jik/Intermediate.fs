@@ -370,8 +370,14 @@ let analyzeFreeVars (prog : Program) : Program =
         { func with Free = free
                     Labels = labels }
 
-    { prog with Procedures = List.map transformFunction prog.Procedures
-                Main = transformFunction prog.Main }
+    let procedures = List.map transformFunction prog.Procedures
+    let main = transformFunction prog.Main
+
+    if not main.Free.IsEmpty then
+        failwithf "Names %A are not defined" main.Free
+
+    { prog with Procedures = procedures
+                Main = main }
 
 let replaceClosureRef free var =
     match List.tryFindIndex ((=) var) free with

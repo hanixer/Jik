@@ -397,12 +397,14 @@ let letrecTests =
         ((fix f) 5)))", "120\n" ]
 
 let listTests =
-  [ "(define length
+  [
+    "(define length
        (lambda (l)
          (if (null? l)
            0
            (+ 1 (length (cdr l))))))
      (length '())", "0\n"
+    "(let ((f (lambda () (null? 1)))) (f))", "#f\n"
 
   ]
 
