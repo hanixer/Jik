@@ -7,7 +7,7 @@ int reallyGlobality = 293871;
 int fib(int n) {
     if (n <= 1) {
         return n;
-    } 
+    }
     else {
         return n + fib(n - 1);
     }
@@ -47,7 +47,7 @@ int perm() {
         m += m;
         l += k + m;
     }
-    else {        
+    else {
         int k = n;
         int m = k % n;
         k -= n + l;
@@ -65,7 +65,7 @@ void setQuick() {
     n = 1000000;
 }
 
-int main() {    
+int main() {
     printf("%d\n", fib(100000));
     return 0;
 }

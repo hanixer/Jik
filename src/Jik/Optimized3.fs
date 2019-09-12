@@ -28,7 +28,7 @@ and Meaning = unit -> Value
 type Env = string list list
 
 type VarKind =
-    | Local of 
+    | Local of
         int * // index in environment
         int   // index inside environment entry
     | Global of int
@@ -45,18 +45,19 @@ let rec valueToString = function
     | Void -> "void"
     | Cons _ -> "cons"
     | SymbValue s -> s
+    | _ -> failwith "not implemented"
 
 let extendEnv env names =
     names :: env
 
 let deepFetch store i j =
-    match List.tryItem i store with 
-    | Some it -> 
+    match List.tryItem i store with
+    | Some it ->
         Array.item j it
     | None -> failwithf "deepFetch: i <%d> j <%d> %A" i j store
 
 let deepUpdate store i j value =
-    match List.tryItem i store with 
+    match List.tryItem i store with
     | Some a ->
         Array.set a j value
         value
@@ -73,7 +74,7 @@ type GlobalStore () =
         Array.get values i
     member this.Update i value =
         Array.set values i value
-    
+
 let globalStore = GlobalStore()
 let predefinedStore = GlobalStore()
 
@@ -97,7 +98,7 @@ type GlobalEnv (isPredefined) =
     let mutable vars : (string * int) list = []
     member this.TryFind (name) =
         match List.tryFind (fst >> ((=) name)) vars with
-        | Some (_, i) -> 
+        | Some (_, i) ->
             if isPredefined then
                 Predefined i |> Some
             else
@@ -109,7 +110,7 @@ type GlobalEnv (isPredefined) =
         level
     override this.ToString() =
         sprintf "predefined? %b, %A" isPredefined vars
-        
+
 
 let globalEnv = GlobalEnv(false)
 let predefinedEnv = GlobalEnv(true)
@@ -121,12 +122,12 @@ let tryComputeKind env name =
         match globalEnv.TryFind name with
         | Some glob -> glob |> Some
         | None ->
-            predefinedEnv.TryFind name 
+            predefinedEnv.TryFind name
 
 let computeKind env name =
     match tryComputeKind env name with
     | Some kind -> kind
-    | _ -> 
+    | _ ->
         failwithf "computeKind: name '%s' not found\nglobal: %O\npredefined: %O" name globalEnv predefinedEnv
 
 let initializeCurrent name =
@@ -212,7 +213,7 @@ let CALL funcMeaning argsMeaning = fun () ->
             f argsValue
         | _ -> failwithf "wrong function value during call"
     mainStore <- savedStore
-    result    
+    result
 
 let callNumber =
     let mutable n = 0
@@ -255,7 +256,7 @@ and meaningRef env name isTail =
         PREDEFINED i
 
 and meaningBegin env exprs isTail =
-    let fold meaningNext expr = 
+    let fold meaningNext expr =
         let meaningCurr = meaning env expr false
         SEQUENCE meaningCurr meaningNext
     match List.rev exprs with
@@ -271,7 +272,7 @@ and meaningAssignment env name rhs isTail =
         DEEP_ARGUMENT_SET i j m
     | Global i ->
         GLOBAL_SET i m
-    | Predefined i -> 
+    | Predefined i ->
         failwithf "immutable predefined variable '%s'" name
 
 and meaningLambda env args body isTail =
@@ -324,7 +325,7 @@ let cons cont =
     Cons (v1, v2)
 
 let display cont =
-    let v = deepFetch mainStore 0 0 
+    let v = deepFetch mainStore 0 0
     printf "%s" <| valueToString v
     cont Void
 
@@ -376,6 +377,6 @@ let evaluate (str : string) =
         answer <- value
         value
     mainStore <- []
-    m () 
+    m ()
 
 let evaluateToString = evaluate >> valueToString

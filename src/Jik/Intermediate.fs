@@ -288,7 +288,7 @@ and convertExprTail expr =
             let labelsf, stmtsf = convertExprTail exprf
             let labelf = (lf, [], stmtsf)
             [ labelt ] @ labelst @ [ labelf ] @ labelsf, [ Transfer(If(var, lt, lf)) ])
-    | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
+    | Expr.Assign(_) -> failwith "Not Implemented Expr.Assign"
     | Expr.Begin(exprs) ->
         let heads, tail = List.splitAt (List.length exprs - 1) exprs
         convertMany heads (fun _ -> convertExprTail tail.Head)
