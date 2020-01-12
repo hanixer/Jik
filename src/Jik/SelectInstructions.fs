@@ -184,13 +184,13 @@ let rec declToInstrs (var, x) =
          Mov, [Reg Rax; Var var]]
     | e -> failwithf "handleDecl: %s %A" var e
 
-let transferToInstrs labels = function
+let transferToInstrs blocks = function
     | Return var ->
         [Mov, [Var var; Reg Rax]
          RestoreStack, []
          Ret, []]
     | Transfer.Jump(label, vars) ->
-        let args = getArgsOfLabel labels label
+        let args = getArgsOfBlock blocks label
         if List.length args <> List.length vars then
             failwith "handleTransfer: wrong number of vars"
         let movArgs =
@@ -205,9 +205,9 @@ let transferToInstrs labels = function
         let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
         let moveToArgPositions =
             List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
-        let argsOfLabel = getArgsOfLabel labels label
-        let argOfLabel = List.head argsOfLabel
-        if List.length argsOfLabel <> 1 then
+        let argsOfBlock = getArgsOfBlock blocks label
+        let argOfBlock = List.head argsOfBlock
+        if List.length argsOfBlock <> 1 then
             failwith "handleTransfer: wrong number of vars"
         moveToArgPositions @
         [Mov, [Reg Rsi; Deref(0, Rsp)]
@@ -215,7 +215,7 @@ let transferToInstrs labels = function
          Mov, [Deref(-closureTag, Rsi); Reg Rax]
          CallIndirect, [Reg Rax]
          Mov, [Deref(0, Rsp); Reg Rsi]
-         Mov, [Reg Rax; Var argOfLabel]
+         Mov, [Reg Rax; Var argOfBlock]
          InstrName.Jmp label, []]
     | Transfer.Call(Tail, func, args) ->
         let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
@@ -249,16 +249,16 @@ let saveArgs args instrs =
     | _ -> instrs
 
 let selectInstructions (prog : Intermediate.Program) : Program =
-    let handleStmt labels = function
+    let handleStmt blocks = function
         | Decl decl -> declToInstrs decl
-        | Transfer tran -> transferToInstrs labels tran
+        | Transfer tran -> transferToInstrs blocks tran
 
-    let handleLabel labels (name, _, stmts) =
-        (InstrName.Label name, []) :: List.collect (handleStmt labels) stmts
+    let handleBlock blocks (name, _, stmts) =
+        (InstrName.Label name, []) :: List.collect (handleStmt blocks) stmts
 
     let handleDef proc =
         let instrs =
-            List.collect (handleLabel proc.Labels) proc.Labels
+            List.collect (handleBlock proc.Blocks) proc.Blocks
             |> saveArgs proc.Args
         let graph = makeGraph []
         let diff = List.length proc.Args - List.length registersForArgs
@@ -279,11 +279,11 @@ let selectInstructions (prog : Intermediate.Program) : Program =
 
     let impl = freshLabel "schemeEntryImpl"
     let entryImplFunc =
-        match prog.Main.Labels with
-        | (_, args, stmts) :: restLabels ->
+        match prog.Main.Blocks with
+        | (_, args, stmts) :: restBlocks ->
             { prog.Main with
                 Name = impl
-                Labels = (impl, args, stmts) :: restLabels }
+                Blocks = (impl, args, stmts) :: restBlocks }
         | _ -> failwith "selectInstructions: wrong main function"
     let procs = entryImplFunc :: prog.Procedures
     let main = handleDef { emptyFunction with Name = schemeEntryLabel }

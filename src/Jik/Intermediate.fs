@@ -7,7 +7,7 @@ open Display
 type Var = string
 
 /// Intermediate language. It is a mix of SSA and CPS.
-/// Labels (blocks) with arguments consist of statements. The last
+/// Blocks (blocks) with arguments consist of statements. The last
 /// statement in block is transfer statement.
 /// Other statements are declarations.
 type CallCont =
@@ -19,7 +19,7 @@ type Simple =
     | Int of int
     | Bool of bool
     | EmptyList
-    | Lambda of Var list * Var list * bool * Label list
+    | Lambda of Var list * Var list * bool * Block list
 
 and Transfer =
     | Return of Var
@@ -33,14 +33,14 @@ and Stmt =
     | Decl of Decl
     | Transfer of Transfer
 
-and Label = Var * Var list * Stmt list
+and Block = Var * Var list * Stmt list
 
 and Function =
     { Name : string
       Free : string list
       Args : string list
       IsDotted : bool
-      Labels : Label list }
+      Blocks : Block list }
 
 type Program =
     { Procedures : Function list
@@ -54,28 +54,28 @@ let emptyFunction =
       Free = []
       Args = []
       IsDotted = false
-      Labels = [] }
+      Blocks = [] }
 
-let generalAccess labels name f cn =
-    match List.tryFind (fun (name2, _, _) -> name2 = name) labels with
+let generalAccess blocks name f cn =
+    match List.tryFind (fun (name2, _, _) -> name2 = name) blocks with
     | Some x -> f x
     | None -> failwithf "%s: name=%s" cn name
 
-let getArgsOfLabel labels name = generalAccess labels name (fun (_, args, _) -> args) "getArgsOfLabel"
-let getStmts labels name = generalAccess labels name (fun (_, _, stmts) -> stmts) "getStmts"
+let getArgsOfBlock blocks name = generalAccess blocks name (fun (_, args, _) -> args) "getArgsOfBlock"
+let getStmts blocks name = generalAccess blocks name (fun (_, _, stmts) -> stmts) "getStmts"
 
 let getSuccs stmts =
     match List.tryLast stmts with
-    | Some(Transfer(Jump(label, _))) -> [ label ]
-    | Some(Transfer(If(_, labelt, labelf))) -> [ labelt; labelf ]
-    | Some(Transfer(Call(NonTail label, _, _))) -> [ label ]
+    | Some(Transfer(Jump(block, _))) -> [ block ]
+    | Some(Transfer(If(_, blockt, blockf))) -> [ blockt; blockf ]
+    | Some(Transfer(Call(NonTail block, _, _))) -> [ block ]
     | _ -> []
 
-let getPredecessors labels name =
+let getPredecessors blocks name =
     let fold preds (name2, _, stmts) =
         if name2 <> name && List.contains name (getSuccs stmts) then name2 :: preds
         else preds
-    List.fold fold [] labels
+    List.fold fold [] blocks
 
 let getUsed =
     function
@@ -91,16 +91,16 @@ let getDefined =
     | Decl(var, _) -> Set.singleton var
     | _ -> Set.empty
 
-let getVars labels =
-    let handleLabel (name, args, stmts) =
+let getVars blocks =
+    let handleBlock (name, args, stmts) =
         List.map getUsed stmts @ List.map getDefined stmts
         |> List.fold Set.union Set.empty
         |> Set.union (Set.ofList args)
-    List.map handleLabel labels |> List.fold Set.union Set.empty
+    List.map handleBlock blocks |> List.fold Set.union Set.empty
 
 let comma = iInterleave (iStr ", ")
 
-let rec showLabel (name, vars, stmts) =
+let rec showBlock (name, vars, stmts) =
     let showDecl = function
         | var, s ->
             let s =
@@ -113,13 +113,13 @@ let rec showLabel (name, vars, stmts) =
                     iConcat [ (sprintf "%A" op |> iStr)
                               iStr " "
                               List.map iStr vars |> comma ]
-                | Simple.Lambda(free, args, dotted, labels) ->
+                | Simple.Lambda(free, args, dotted, blocks) ->
                     let deff =
                         { Name = "lam"
                           Free = free
                           Args = args
                           IsDotted = dotted
-                          Labels = labels }
+                          Blocks = blocks }
                     iConcat [ iNewline
                               iStr "  "
                               showDef deff |> iIndent ]
@@ -165,7 +165,7 @@ let rec showLabel (name, vars, stmts) =
               iInterleave iNewline <| List.map showStmt stmts ]
 
 and showDef (func : Function) =
-    // (name, free, args, dotted, labels)
+    // (name, free, args, dotted, blocks)
     let dotted =
         if func.IsDotted then iStr " dotted "
         else iNil
@@ -179,7 +179,7 @@ and showDef (func : Function) =
               iStr ")"
               dotted
               iNewline
-              iInterleave iNewline (List.map showLabel func.Labels)
+              iInterleave iNewline (List.map showBlock func.Blocks)
               iNewline ]
 
 let showProgram prog =
@@ -188,8 +188,8 @@ let showProgram prog =
               iNewline
               showDef prog.Main ]
 
-let labelsToString labels =
-    List.map showLabel labels
+let blocksToString blocks =
+    List.map showBlock blocks
     |> iInterleave (iStr "\n\n")
     |> iDisplay
 
@@ -197,11 +197,11 @@ let programToString (prog : Program) = showProgram prog |> iDisplay
 
 let convertSimpleDecl varPrefix value cont =
     let var = freshLabel varPrefix
-    let labels, stmts = cont var
-    labels, Decl(var, value) :: stmts
+    let blocks, stmts = cont var
+    blocks, Decl(var, value) :: stmts
 
-let rec convertExpr expr (cont : Var -> (Label list * Stmt list)) =
-    let makeJumpCont label var = [], [ Transfer(Jump(label, [ var ])) ]
+let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
+    let makeJumpCont block var = [], [ Transfer(Jump(block, [ var ])) ]
     match expr with
     | Expr.Ref var -> cont var
     | Expr.EmptyList -> convertSimpleDecl "nil" EmptyList cont
@@ -209,17 +209,17 @@ let rec convertExpr expr (cont : Var -> (Label list * Stmt list)) =
     | Expr.Int n -> convertSimpleDecl "n" (Int n) cont
     | Expr.If(exprc, exprt, exprf) ->
         let join, fresh = freshLabel "LJ", freshLabel "v"
-        let labels, stmts = cont fresh
-        let labelJoin = (join, [ fresh ], stmts)
-        let labels = labelJoin :: labels
-        convertIf exprc exprt exprf labels join
+        let blocks, stmts = cont fresh
+        let blockJoin = (join, [ fresh ], stmts)
+        let blocks = blockJoin :: blocks
+        convertIf exprc exprt exprf blocks join
     | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
     | Expr.Lambda(args, dotted, body) ->
         let var = freshLabel "lam"
-        let labels, stmts = cont var
-        let lamLabels, lamStmts = convertExprTail (Begin body)
-        let body = (var, args, lamStmts) :: lamLabels
-        labels, (Decl(var, Lambda([], args, dotted, body))) :: stmts
+        let blocks, stmts = cont var
+        let lamBlocks, lamStmts = convertExprTail (Begin body)
+        let body = (var, args, lamStmts) :: lamBlocks
+        blocks, (Decl(var, Lambda([], args, dotted, body))) :: stmts
     | Expr.Begin(exprs) ->
         convertMany exprs (fun vars ->
             let last = List.last vars
@@ -232,16 +232,16 @@ let rec convertExpr expr (cont : Var -> (Label list * Stmt list)) =
     | Expr.PrimApp(op, args) ->
         convertMany args (fun vars ->
             let fresh = freshLabel "v"
-            let labels, stmts = cont fresh
-            labels, [ Decl(fresh, Prim(op, vars)) ] @ stmts)
+            let blocks, stmts = cont fresh
+            blocks, [ Decl(fresh, Prim(op, vars)) ] @ stmts)
     | Expr.App(func, args) ->
         convertExpr func (fun func ->
             convertMany args (fun args ->
                 let fresh = freshLabel "r"
-                let labelName = freshLabel "LC"
-                let labels, stmts = cont fresh
-                let label = (labelName, [ fresh ], stmts)
-                label :: labels, [ Transfer(Call(NonTail labelName, func, args)) ]))
+                let blockName = freshLabel "LC"
+                let blocks, stmts = cont fresh
+                let block = (blockName, [ fresh ], stmts)
+                block :: blocks, [ Transfer(Call(NonTail blockName, func, args)) ]))
 
 and convertExprJoin expr (contVar : Var) =
     let jump var = Transfer(Jump(contVar, [ var ]))
@@ -283,11 +283,11 @@ and convertExprTail expr =
     | Expr.If(exprc, exprt, exprf) ->
         convertExpr exprc (fun var ->
             let lt, lf = freshLabel "LT", freshLabel "LF"
-            let labelst, stmtst = convertExprTail exprt
-            let labelt = (lt, [], stmtst)
-            let labelsf, stmtsf = convertExprTail exprf
-            let labelf = (lf, [], stmtsf)
-            [ labelt ] @ labelst @ [ labelf ] @ labelsf, [ Transfer(If(var, lt, lf)) ])
+            let blockst, stmtst = convertExprTail exprt
+            let blockt = (lt, [], stmtst)
+            let blocksf, stmtsf = convertExprTail exprf
+            let blockf = (lf, [], stmtsf)
+            [ blockt ] @ blockst @ [ blockf ] @ blocksf, [ Transfer(If(var, lt, lf)) ])
     | Expr.Assign(_) -> failwith "Not Implemented Expr.Assign"
     | Expr.Begin(exprs) ->
         let heads, tail = List.splitAt (List.length exprs - 1) exprs
@@ -306,16 +306,16 @@ and convertExprTail expr =
             [ Decl(var, Prim(op, vars))
               Transfer(Return var) ])
 
-and convertIf exprc exprt exprf labels join =
+and convertIf exprc exprt exprf blocks join =
     convertExpr exprc (fun var ->
         let lt, lf = freshLabel "LT", freshLabel "LF"
-        let labelst, stmtst = convertExprJoin exprt join
-        let labelt = (lt, [], stmtst)
-        let labelsf, stmtsf = convertExprJoin exprf join
-        let labelf = (lf, [], stmtsf)
-        [ labelt ] @ labelst @ [ labelf ] @ labelsf @ labels, [ Transfer(If(var, lt, lf)) ])
+        let blockst, stmtst = convertExprJoin exprt join
+        let blockt = (lt, [], stmtst)
+        let blocksf, stmtsf = convertExprJoin exprf join
+        let blockf = (lf, [], stmtsf)
+        [ blockt ] @ blockst @ [ blockf ] @ blocksf @ blocks, [ Transfer(If(var, lt, lf)) ])
 
-and convertMany exprs (cont : Var list -> (Label list * Stmt list)) =
+and convertMany exprs (cont : Var list -> (Block list * Stmt list)) =
     let rec loop vars =
         function
         | expr :: rest -> convertExpr expr (fun var -> loop (var :: vars) rest)
@@ -323,12 +323,12 @@ and convertMany exprs (cont : Var list -> (Label list * Stmt list)) =
     loop [] exprs
 
 let convertMainExprs expr : Function =
-    let labels, stmts = convertExprTail expr
+    let blocks, stmts = convertExprTail expr
     { Name = schemeEntryLabel
       Free = []
       Args = []
       IsDotted = false
-      Labels = (schemeEntryLabel, [], stmts) :: labels }
+      Blocks = (schemeEntryLabel, [], stmts) :: blocks }
 
 let convertProgram (prog : Core.Program) : Program =
     { Procedures = []
@@ -340,13 +340,13 @@ let analyzeFreeVars (prog : Program) : Program =
 
     let rec transformStmt stmt =
         match stmt with
-        | Decl(var, Lambda(_, args, dotted, labels)) ->
-            let free, labels = transformLambda (args, labels)
-            Set.singleton var, Set.remove var (Set.ofList free), Decl(var, Lambda(free, args, dotted, labels))
+        | Decl(var, Lambda(_, args, dotted, blocks)) ->
+            let free, blocks = transformLambda (args, blocks)
+            Set.singleton var, Set.remove var (Set.ofList free), Decl(var, Lambda(free, args, dotted, blocks))
         | Decl(var, _) -> Set.singleton var, Set.difference (getUsed stmt) globals, stmt
         | _ -> Set.empty, Set.difference (getUsed stmt) globals, stmt
 
-    and transformLabel (name, args, stmts) =
+    and transformBlock (name, args, stmts) =
         let defined, free, stmts =
             List.fold (fun (defined, free, stmts) stmt ->
                 let defined1, free1, stmt = transformStmt stmt
@@ -354,21 +354,21 @@ let analyzeFreeVars (prog : Program) : Program =
                 stmts
         Set.union defined (Set.ofList args), free, (name, args, List.rev stmts)
 
-    and transformLambda (args, labels) =
-        let defined, free, labels =
-            List.fold (fun (defined, free, labels) label ->
-                let defined1, free1, label = transformLabel label
-                Set.union defined defined1, (Set.union free (Set.ofSeq free1)), label :: labels)
-                (Set.empty, Set.empty, []) labels
+    and transformLambda (args, blocks) =
+        let defined, free, blocks =
+            List.fold (fun (defined, free, blocks) block ->
+                let defined1, free1, block = transformBlock block
+                Set.union defined defined1, (Set.union free (Set.ofSeq free1)), block :: blocks)
+                (Set.empty, Set.empty, []) blocks
 
-        let labels = List.rev labels
+        let blocks = List.rev blocks
         let free = Set.difference free (Set.union defined (Set.ofList args)) |> Set.toList
-        free, labels
+        free, blocks
 
     and transformFunction (func : Function) =
-        let free, labels = transformLambda (func.Args, func.Labels)
+        let free, blocks = transformLambda (func.Args, func.Blocks)
         { func with Free = free
-                    Labels = labels }
+                    Blocks = blocks }
 
     let procedures = List.map transformFunction prog.Procedures
     let main = transformFunction prog.Main
@@ -399,57 +399,57 @@ let closureConversion (prog : Program) : Program =
         | Decl(var, Prim(op, args)) ->
             let stmts, args = replaceClosureRefs free args
             [], stmts @ [ Decl(var, Prim(op, args)) ]
-        | Decl(var, Lambda(freeInner, args, dotted, labels)) ->
+        | Decl(var, Lambda(freeInner, args, dotted, blocks)) ->
             let proc = freshLabel "proc"
-            let procs = convertLambda proc (freeInner, args, dotted, labels)
+            let procs = convertLambda proc (freeInner, args, dotted, blocks)
             let stmts, freeInner = replaceClosureRefs free freeInner
             procs, stmts @ [ Decl(var, Prim(Prim.MakeClosure, proc :: freeInner)) ]
         | Decl(_) as decl -> [], [ decl ]
         | Transfer(Transfer.Return(var)) ->
             let stmts, var = replaceClosureRef free var
             [], stmts @ [ Transfer(Transfer.Return(var)) ]
-        | Transfer(Transfer.Jump(label, args)) ->
+        | Transfer(Transfer.Jump(block, args)) ->
             let stmts, args = replaceClosureRefs free args
-            [], stmts @ [ Transfer(Transfer.Jump(label, args)) ]
+            [], stmts @ [ Transfer(Transfer.Jump(block, args)) ]
         | Transfer(Transfer.Call(tail, func, args)) ->
             let stmts1, func = replaceClosureRef free func
             let stmts2, args = replaceClosureRefs free args
             [], stmts1 @ stmts2 @ [ Transfer(Transfer.Call(tail, func, args)) ]
-        | Transfer(Transfer.If(cond, labelt, labelf)) ->
+        | Transfer(Transfer.If(cond, blockt, blockf)) ->
             let stmts, cond = replaceClosureRef free cond
-            [], stmts @ [ Transfer(Transfer.If(cond, labelt, labelf)) ]
+            [], stmts @ [ Transfer(Transfer.If(cond, blockt, blockf)) ]
 
-    and convertLabel free (name, args, stmts) =
+    and convertBlock free (name, args, stmts) =
         let procs, stmts =
             List.foldBack (fun stmt (procs, stmts) ->
                 let procs1, stmts1 = convertStmt free stmt
                 procs1 @ procs, stmts1 @ stmts) stmts ([], [])
         procs, (name, args, stmts)
 
-    and foldLabels free labels =
-        List.foldBack (fun label (procs, labels) ->
-            let procs1, label = convertLabel free label
-            procs1 @ procs, label :: labels) labels ([], [])
+    and foldBlocks free blocks =
+        List.foldBack (fun block (procs, blocks) ->
+            let procs1, block = convertBlock free block
+            procs1 @ procs, block :: blocks) blocks ([], [])
 
-    and convertLambda newName (free, args, dotted, labels) =
-        let labels =
-            match labels with
-            | (_, _, stmts) :: restLabels -> ((newName, args, stmts) :: restLabels)
-            | _ -> failwith "convertLambda: wrong labels format"
+    and convertLambda newName (free, args, dotted, blocks) =
+        let blocks =
+            match blocks with
+            | (_, _, stmts) :: restBlocks -> ((newName, args, stmts) :: restBlocks)
+            | _ -> failwith "convertLambda: wrong blocks format"
 
-        let procs, labels = foldLabels free labels
+        let procs, blocks = foldBlocks free blocks
 
         let proc =
             { Name = newName
               Free = free
               Args = args
-              Labels = labels
+              Blocks = blocks
               IsDotted = dotted }
         proc :: procs
 
     let convertFunction (func : Function) =
-        let procs, labels = foldLabels func.Free func.Labels
-        procs, { func with Labels = labels }
+        let procs, blocks = foldBlocks func.Free func.Blocks
+        procs, { func with Blocks = blocks }
 
     let converted = List.map convertFunction prog.Procedures
     let procs = List.collect fst converted

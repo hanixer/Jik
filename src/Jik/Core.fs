@@ -3,6 +3,8 @@ module Core
 open SExpr
 open System.Collections.Generic
 
+/// Core represents desugared form of input language.
+
 type Prim =
     | BoxRead
     | BoxWrite
@@ -409,6 +411,7 @@ let rec findModifiedVars expr =
         findMany tail
     | _ -> Set.empty
 
+/// Convert assignments to box writes.
 let assignmentConvert (prog : Program) : Program =
     let rec convertRefs (modified : Set<string>) expr =
         let conv = convertRefs modified
