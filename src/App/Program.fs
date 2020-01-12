@@ -10,6 +10,7 @@ open Codegen
 open RegisterAllocation
 open SelectInstructions
 open System.IO
+open System.Text
 
 let saveToFile filename str = System.IO.File.WriteAllText(filename, str)
 let path = __SOURCE_DIRECTORY__ + "\\..\\..\\misc\\"
@@ -408,6 +409,36 @@ let listTests =
 
   ]
 
+let tak = [
+    "(define (tak x y z)
+       (if (not (< y x))
+         z
+         (tak (tak (- x 1) y z)
+              (tak (- y 1) z x)
+              (tak (- z 1) x y))))
+     (tak 32 16 8)", "9\n";
+     "(cons 1 2)", "3\n"
+]
+
+let generateBigLet n =
+    let sb = StringBuilder()
+    use f = new StringWriter()
+    fprintfn f "(let ("
+    for i in 0..n do
+        fprintfn f "  (x%d %d)" i i
+    fprintfn f "  )"
+    fprintfn f "(+ x1 x3))"
+    f.ToString()
+
+let toIntermediate s =
+    s
+    |> stringToProgram
+    |> fixArithmeticPrims
+    |> convertGlobalRefs
+    |> alphaRename
+    |> assignmentConvert
+    // |> convertProgram
+
 [<EntryPoint>]
 let main argv =
     // runTestsWithName testMainTest "basic" basicTests
@@ -420,6 +451,10 @@ let main argv =
     // runTestsWithName testMainTest "whenUnless" whenUnlessTests
     // runTestsWithName testMainTest "cond" condTests
     // runTestsWithName testMainTest "letrec" letrecTests
-    runTestsWithName testMainTest "list" listTests
+    // runTestsWithName testMainTest "list" listTests
+    // runTestsWithName testMainTest "tak" tak
     // testLambda e8
-    1
+    let l = generateBigLet 2000
+    let l = toIntermediate l
+    printfn "%A" l
+    0
