@@ -31,15 +31,24 @@ type Prim =
     | VectorLength
     | VectorRef
     | VectorSet
+    | MakeString
+    | IsString
+    | StringLength
+    | StringRef
+    | StringSet
     | MakeClosure
     | ClosureRef
     | IsProcedure
     | GlobalRef
     | GlobalSet
     | IsZero
+    | NumberToChar
+    | CharToNumber
+    | IsChar
 
 type Expr =
     | Int of int
+    | Char of char
     | Bool of bool
     | String of string
     | EmptyList
@@ -94,8 +103,16 @@ let stringPrimop = [
     "vector-length", VectorLength
     "vector-ref", VectorRef
     "vector-set!", VectorSet
+    "make-string", MakeString
+    "string?", IsString
+    "string-length", StringLength
+    "string-ref", StringRef
+    "string-set!", StringSet
     "procedure?", IsProcedure
     "zero?", IsZero
+    "number->char", NumberToChar
+    "char->number", CharToNumber
+    "char?", IsChar
 ]
 
 let tryStringToPrimop s =
@@ -252,6 +269,7 @@ let parseArgs args =
 let rec sexprToExpr sexpr =
     let convertList = List.map sexprToExpr
     match sexpr with
+    | SExpr.Char c -> Char c
     | SExpr.Number n -> Int n
     | SExpr.Bool n -> Bool n
     | SExpr.Symbol name -> Ref name

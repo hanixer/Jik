@@ -83,6 +83,18 @@ let makeVectorInstrs size var =
      Sal, [Int shift; Reg R11]
      Add, [Reg R11; GlobalValue(freePointer)]]
 
+let makeStringInstrs size var =
+    let shift = 3
+    [Mov, [GlobalValue(freePointer); Reg R11]
+     Mov, [size; Deref(0, R11)]
+     Or, [Int stringTag; Reg R11]
+     Mov, [Reg R11; Var var]
+     Mov, [size; Reg R11]
+     Sar, [Int fixnumShift; Reg R11]
+     Add, [Int 1; Reg R11]
+     Sal, [Int shift; Reg R11]
+     Add, [Reg R11; GlobalValue(freePointer)]]
+
 let vectorAddress vec index =
     [Mov, [Var vec; Reg R11]
      Mov, [index; Reg R12]
@@ -93,6 +105,7 @@ let rec declToInstrs (var, x) =
     match x with
     | Simple.EmptyList -> moveInt nilLiteral var
     | Simple.Int n -> moveInt (convertNumber n) var
+    | Simple.Char c -> moveInt (((int c) <<< charShift) ||| charTag) var
     | Simple.Bool true -> moveInt trueLiteral var
     | Simple.Bool false -> moveInt falseLiteral var
     | Simple.Prim(Prim.Add, [var1; var2]) ->
@@ -121,6 +134,13 @@ let rec declToInstrs (var, x) =
          And, [Int fixnumMask; Var var]
          Cmp, [Int fixnumTag; Var var]] @
          setOnEqualInstrs var
+    | Simple.Prim(Prim.IsChar, [var1]) ->
+        isOfTypeInstrs var var1 charMask charTag
+    | Simple.Prim(Prim.CharToNumber, [var1]) ->
+        [Sar, [Int charShift; Reg Rax]
+         Movzb, [Reg Al; Reg Rax]
+         Sal, [Int fixnumShift; Reg Rax]
+         Mov, [Reg Rax; Var var]]
     | Simple.Prim(Prim.Cons, [var1; var2]) ->
         [Mov, [GlobalValue(freePointer); Reg R11]
          Mov, [Var var1; Deref(0, R11)]
@@ -146,6 +166,7 @@ let rec declToInstrs (var, x) =
         [Mov, [Var pair; Reg R11]
          Mov, [Var value; Deref(-pairTag + wordSize, R11)]
          Mov, [Var value; Var var]]
+    // Vectors.
     | Simple.Prim(Prim.MakeVector, [var1]) ->
         makeVectorInstrs (Var var1) var
     | Simple.Prim(Prim.VectorLength, [var1]) ->
@@ -159,6 +180,10 @@ let rec declToInstrs (var, x) =
     | Simple.Prim(Prim.VectorRef, [vec; index]) ->
         vectorAddress vec (Var index) @
         [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var var]]
+    // Strings.
+    // | Simple.Prim(Prim.MakeVector, [var1]) ->
+        // makeVectorInstrs (Var var1) var
+    // Closures.
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
         let offset = (List.length args + 1) * wordSize
         [Mov, [GlobalValue(freePointer); Reg R11]

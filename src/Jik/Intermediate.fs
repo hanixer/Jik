@@ -17,6 +17,7 @@ type CallCont =
 type Simple =
     | Prim of Prim * Var list
     | Int of int
+    | Char of char
     | Bool of bool
     | EmptyList
     | Lambda of Var list * Var list * bool * Block list
@@ -108,6 +109,7 @@ let rec showBlock (name, vars, stmts) =
                 match s with
                 | Simple.EmptyList -> iStr "'()"
                 | Simple.Int n -> iNum n
+                | Simple.Char c -> iStr (sprintf "#\\%A" c)
                 | Simple.Bool true -> iStr "#t"
                 | Simple.Bool false -> iStr "#f"
                 | Simple.Prim(op, vars) ->
@@ -214,6 +216,7 @@ let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
     | Expr.EmptyList -> convertSimpleDecl "nil" EmptyList cont
     | Expr.Bool b -> convertSimpleDecl "b" (Bool b) cont
     | Expr.Int n -> convertSimpleDecl "n" (Int n) cont
+    | Expr.Char c -> convertSimpleDecl "c" (Char c) cont
     | Expr.If(exprc, exprt, exprf) ->
         let join, fresh = freshLabel "LJ", freshLabel "v"
         let blocks, stmts = cont fresh

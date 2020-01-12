@@ -239,11 +239,11 @@ let basicTests =
       e11, "-2\n" ]
 
 let vectorTests =
-    [ "(vector-length (make-vector 4))", "4\n"
-      e12, "103\n"
-      "(vector? (make-vector 3))", "#t\n"
-      "(vector? #t)", "#f\n"
-      e13, "33\n"
+    [ //"(vector-length (make-vector 4))", "4\n"
+      //e12, "103\n"
+      //"(vector? (make-vector 3))", "#t\n"
+      //"(vector? #t)", "#f\n"
+      //e13, "33\n"
       e14, "#(1 2 3)\n" ]
 
 let lambdaTests =
@@ -409,16 +409,31 @@ let listTests =
 let foreignCallTests =
     [ "(foreign-call \"write\" 1 \"hello!\" 6)", "hello!\n" ]
 
-let tak = [
-    "(define (tak x y z)
+let numcharTests =
+    [ @"(number->char 65)", "#\\A\n"
+      @"(number->char 97)", "#\\a\n"
+      @"(number->char 122)", "#\\z\n"
+      @"(number->char 90)", "#\\Z\n"
+      @"(number->char 48)", "#\\0\n"
+      @"(number->char 57)", "#\\9\n"
+      @"(char->number #\A)", "65\n"
+      @"(char->number #\a)", "97\n"
+      @"(char->number #\z)", "122\n"
+      @"(char->number #\Z)", "90\n"
+      @"(char->number #\0)", "48\n"
+      @"(char->number #\9)", "57\n"
+      @"(char->number (number->char 12))", "12\n"
+      @"(number->char (char->number #\x))", "#\\x\n" ]
+
+let tak =
+    [ "(define (tak x y z)
        (if (not (< y x))
          z
          (tak (tak (- x 1) y z)
               (tak (- y 1) z x)
               (tak (- z 1) x y))))
      (tak 32 16 8)", "9\n";
-     "(cons 1 2)", "3\n"
-]
+      "(cons 1 2)", "3\n" ]
 
 let generateBigLet n =
     let sb = StringBuilder()
@@ -453,6 +468,7 @@ let main argv =
     // runTestsWithName testMainTest "letrec" letrecTests
     // runTestsWithName testMainTest "list" listTests
     // runTestsWithName testMainTest "tak" tak
-    runTestsWithName testMainTest "foreign-call" foreignCallTests
+    // runTestsWithName testMainTest "foreign-call" foreignCallTests
+    runTestsWithName testMainTest "num -> char" numcharTests
     // testLambda e8
     0
