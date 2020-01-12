@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Lib</OutputType>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="RuntimeConstants.fs" />
@@ -10,7 +10,6 @@
     <Compile Include="Util.fs" />
     <Compile Include="Compile.fs" />
     <Compile Include="TestDriver.fs" />
-    <Compile Include="Optimized3.fs" />
     <Compile Include="Graph.fs" />
     <Compile Include="Core.fs" />
     <Compile Include="Intermediate.fs" />

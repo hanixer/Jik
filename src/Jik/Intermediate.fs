@@ -7,7 +7,7 @@ open Display
 type Var = string
 
 /// Intermediate language. It is a mix of SSA and CPS.
-/// Blocks (blocks) with arguments consist of statements. The last
+/// Blocks with arguments consist of statements. The last
 /// statement in block is transfer statement.
 /// Other statements are declarations.
 type CallCont =
@@ -26,6 +26,7 @@ and Transfer =
     | Jump of Var * Var list
     | Call of CallCont * Var * Var list
     | If of Var * Var * Var
+    | ForeignCall of contVar : Var * foreignName : string * args : Var list
 
 and Decl = Var * Simple
 
@@ -151,6 +152,12 @@ let rec showBlock (name, vars, stmts) =
                       iStr b
                       iStr " "
                       iStr c ]
+        | ForeignCall(contVar, foreignName, args) ->
+            let tail = iStr (" => " + contVar)
+            iConcat [ iStr ("foreign-call " + foreignName + " ")
+                      comma (List.map iStr args)
+                      iStr " "
+                      tail ]
 
     let showStmt =
         function
@@ -213,7 +220,7 @@ let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
         let blockJoin = (join, [ fresh ], stmts)
         let blocks = blockJoin :: blocks
         convertIf exprc exprt exprf blocks join
-    | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
+    | Expr.Assign(_) -> failwith "Not Implemented Expr.Assign"
     | Expr.Lambda(args, dotted, body) ->
         let var = freshLabel "lam"
         let blocks, stmts = cont var
@@ -242,6 +249,13 @@ let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
                 let blocks, stmts = cont fresh
                 let block = (blockName, [ fresh ], stmts)
                 block :: blocks, [ Transfer(Call(NonTail blockName, func, args)) ]))
+    | Expr.ForeignCall(foreignName, args) ->
+        convertMany args (fun args ->
+                let fresh = freshLabel "r"
+                let blockName = freshLabel "LC"
+                let blocks, stmts = cont fresh
+                let block = (blockName, [ fresh ], stmts)
+                block :: blocks, [ Transfer(ForeignCall(blockName, foreignName, args)) ])
 
 and convertExprJoin expr (contVar : Var) =
     let jump var = Transfer(Jump(contVar, [ var ]))
@@ -253,7 +267,7 @@ and convertExprJoin expr (contVar : Var) =
     | Expr.Ref _
     | Expr.Lambda _ -> convertExpr expr jump2
     | Expr.If(exprc, exprt, exprf) -> convertIf exprc exprt exprf [] contVar
-    | Expr.Assign(_, _) -> failwith "Not Implemented Expr.Assign"
+    | Expr.Assign(_) -> failwith "Not Implemented Expr.Assign"
     | Expr.Begin(exprs) ->
         let heads, tail = List.splitAt (List.length exprs - 1) exprs
         convertMany heads (fun _ -> convertExprJoin tail.Head contVar)
@@ -263,14 +277,18 @@ and convertExprJoin expr (contVar : Var) =
             let body = replaceVars mapping (Begin body)
             convertExprJoin body contVar)
     | Expr.App(func, args) ->
-        convertExpr func
-            (fun func -> convertMany args (fun args -> [], [ Transfer(Call(NonTail contVar, func, args)) ]))
+        convertExpr func (fun func ->
+            convertMany args (fun args ->
+                [], [ Transfer(Call(NonTail contVar, func, args)) ]))
     | Expr.PrimApp(op, args) ->
         convertMany args (fun vars ->
             let fresh = freshLabel "v"
             [],
             [ Decl(fresh, Prim(op, vars))
               Transfer(Jump(contVar, [ fresh ])) ])
+    | Expr.ForeignCall(foreignName, args) ->
+        convertMany args (fun args ->
+            [], [ Transfer(ForeignCall(contVar, foreignName, args)) ])
 
 and convertExprTail expr =
     let jump2 var = [], [ Transfer(Return var) ]
@@ -279,7 +297,11 @@ and convertExprTail expr =
     | Expr.Bool _
     | Expr.Int _
     | Expr.Ref _
-    | Expr.Lambda _ -> convertExpr expr jump2
+    | Expr.ForeignCall _
+    | Expr.Lambda _ ->
+        // Convert expression, generate a new variable and return that variable,
+        // because for above cases we don't have nothing to do for tail call.
+        convertExpr expr jump2
     | Expr.If(exprc, exprt, exprf) ->
         convertExpr exprc (fun var ->
             let lt, lf = freshLabel "LT", freshLabel "LF"
@@ -298,7 +320,9 @@ and convertExprTail expr =
             let body = replaceVars mapping (Begin body)
             convertExprTail body)
     | Expr.App(func, args) ->
-        convertExpr func (fun func -> convertMany args (fun args -> [], [ Transfer(Call(Tail, func, args)) ]))
+        convertExpr func (fun func ->
+            convertMany args (fun args ->
+                [], [ Transfer(Call(Tail, func, args)) ]))
     | Expr.PrimApp(op, args) ->
         convertMany args (fun vars ->
             let var = freshLabel "v"
@@ -415,6 +439,9 @@ let closureConversion (prog : Program) : Program =
             let stmts1, func = replaceClosureRef free func
             let stmts2, args = replaceClosureRefs free args
             [], stmts1 @ stmts2 @ [ Transfer(Transfer.Call(tail, func, args)) ]
+        | Transfer(ForeignCall(contVar, foreignName, args)) ->
+            let stmts2, args = replaceClosureRefs free args
+            [], stmts2 @ [ Transfer(Transfer.ForeignCall(contVar, foreignName, args)) ]
         | Transfer(Transfer.If(cond, blockt, blockf)) ->
             let stmts, cond = replaceClosureRef free cond
             [], stmts @ [ Transfer(Transfer.If(cond, blockt, blockf)) ]

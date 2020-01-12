@@ -16,9 +16,9 @@ type Token =
     | Unquote
 
 let specialChars = [
-    "tab", '\t' 
-    "newline", '\n' 
-    "return", '\n' 
+    "tab", '\t'
+    "newline", '\n'
+    "return", '\n'
 ]
 
 let tokenize source =
@@ -64,7 +64,7 @@ let tokenize source =
         | ')' :: cs -> loop (Close :: acc) cs
         | '[' :: cs -> loop (OpenBr :: acc) cs
         | ']' :: cs -> loop (CloseBr :: acc) cs
-        | '"' :: cs -> 
+        | '"' :: cs ->
             let s, cs' = string "" cs
             loop (String s :: acc) cs'
         | '-' :: d ::cs when Char.IsDigit(d) ->
@@ -90,7 +90,7 @@ let tokenize source =
         | cs ->
             let s, cs' = symbol "" cs
             loop (Symbol s :: acc) cs'
-    
+
     loop [] (Seq.toList source) |> List.rev
 
 
@@ -111,7 +111,8 @@ let (|List|_|) (e:SExpr) =
             |> Option.map (fun y -> x :: y)
         | Nil -> Some []
         | _ -> None
-    loop e
+    let retu = loop e
+    retu
 
 
 /// **Description**
@@ -167,7 +168,7 @@ let rec consToListMap f = function
     | _ -> failwith "Cons or Nil is expected"
 
 let rec parse ts : SExpr =
-    let rec parseList o (acc:SExpr list) ts = 
+    let rec parseList o (acc:SExpr list) ts =
         match ts with
         | Dot :: ts ->
             let elem, ts1 = parseExpr ts
@@ -212,7 +213,7 @@ let rec parse ts : SExpr =
             Cons (Symbol "unquote", Cons (expr, Nil)), ts1
         | ts -> failwithf "Expected a list element. %A" ts
 
-    and parseExpr ts = 
+    and parseExpr ts =
         match ts with
         | Open :: ts1 ->
             parseList Open [] ts1
@@ -227,14 +228,14 @@ let rec sexprToString expr =
     let add (str:string) = s.Append(str) |> ignore
     let rec loop = function
         | Number n -> n.ToString() |> add
-        | String str -> 
+        | String str ->
             add "\""
             str.Replace("\"", "\\\"") |> add
             add "\""
         | Symbol sy -> add sy
         | Bool true -> add "#t"
         | Bool false -> add "#f"
-        | Char c -> 
+        | Char c ->
             add "#\\"
             add <| c.ToString()
         | Cons _ as c ->
@@ -249,7 +250,7 @@ let rec sexprToString expr =
                 loop x
                 add " "
                 processCons y
-            | Nil -> 
+            | Nil ->
                 loop x
             | _ ->
                 loop x
@@ -277,7 +278,7 @@ let extend env bindings =
     let frame = List.fold (fun acc (n, v) -> Map.add n (ref v) acc) Map.empty bindings
     (ref frame) :: env
 
-let getTopEnv env = 
+let getTopEnv env =
     [List.last env]
 
 let stringToSExpr (s : string) = s |> tokenize |> parse
@@ -289,7 +290,7 @@ let symbolsToStrings sexprs =
 
 let transformLetrecBindings bindings =
   List.map (function
-    | List [Symbol name; List [Symbol "lambda"; List args; body]] -> 
+    | List [Symbol name; List [Symbol "lambda"; List args; body]] ->
         let args = List.map (function | Symbol n -> n | e -> failwithf "arg is expected") args
         name, (args, body)
     | e -> failwithf "letrec: wrong bindings %A" e) bindings

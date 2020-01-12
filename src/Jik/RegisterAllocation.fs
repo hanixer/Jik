@@ -19,12 +19,12 @@ let collectVars instrs =
     |> Set.unionMany
 
 let rec computeLiveness (prog : Program) =
-    let isRegVar = 
-        function 
-        | Reg _ | Var _ -> true 
+    let isRegVar =
+        function
+        | Reg _ | Var _ -> true
         | _ -> false
 
-    let writtenBy (op, args)  = 
+    let writtenBy (op, args)  =
         match op with
         | Add | Sub | Mov | Sar | Sal | And | Or | Xor | Movzb | Cmp ->
             List.item 1 args|> Set.singleton
@@ -36,7 +36,7 @@ let rec computeLiveness (prog : Program) =
 
     let readBy (op, args) =
         match op with
-        | Call _ -> registersForArgs |> Set.ofList |> Set.map Reg            
+        | Call _ -> registersForArgs |> Set.ofList |> Set.map Reg
         | CallIndirect ->
             Set.ofList (callerSave) |> Set.map Reg
             |> Set.union (Set.ofList args)
@@ -67,7 +67,7 @@ let rec computeLiveness (prog : Program) =
         let before = Set.union (Set.difference after w) r
         let afterMap = Map.add index (Set.difference after w) afterMap
         let beforeMap = Map.add index before beforeMap
-        let todo, afterMap = 
+        let todo, afterMap =
             updatePreds (Map.find index preds) afterMap beforeMap index
         todo, afterMap, beforeMap
 
@@ -77,15 +77,15 @@ let rec computeLiveness (prog : Program) =
         else
             let index = Set.maxElement todo
             let todo1 = Set.remove index todo
-            let todo2, liveAfterMap, liveBeforeMap = 
+            let todo2, liveAfterMap, liveBeforeMap =
                 handleInstr instrs preds afterMap beforeMap index
             loop instrs preds (Set.union todo1 todo2) liveAfterMap liveBeforeMap
 
-    let liveAfter instrs = 
+    let liveAfter instrs =
         let preds = computePreds instrs
         let todo = [0..Seq.length instrs - 1] |> Set.ofList
         let liveAfterMap =
-            Seq.fold (fun (map, i) _ -> Map.add i Set.empty map, i + 1) (Map.empty, 0) instrs 
+            Seq.fold (fun (map, i) _ -> Map.add i Set.empty map, i + 1) (Map.empty, 0) instrs
             |> fst
         loop instrs preds todo liveAfterMap liveAfterMap
 
@@ -101,11 +101,11 @@ let rec buildInterference (prog : Program) : Program =
         [Rbx; Rcx; Rdx; Rsi; Rdi; Rbp;
          R8; R9; R10; R11; R12; R13; R14; R15]
         |> Set.ofList
-                          
+
 
     let filterAndAddEdges graph ignore live target =
         Set.difference live (Set.ofList ignore)
-        |> Set.iter (fun x -> 
+        |> Set.iter (fun x ->
             addEdge graph target x)
 
     let isGoodArg = function
@@ -115,7 +115,7 @@ let rec buildInterference (prog : Program) : Program =
         | _ -> false
 
     let iter live graph index (op, args) =
-        let live =            
+        let live =
             match Map.tryFind index live with
             | Some vl -> vl
             | None _ ->
@@ -158,23 +158,23 @@ let assignColors graph uncolored initialMap =
                     addBanned var color
 
     let pickNode nodes =
-        Seq.maxBy (fun node -> 
+        Seq.maxBy (fun node ->
             if banned.ContainsKey node then
                 banned.Item node |> Seq.length
             else
                 for kv in banned do printf "%A :: %A ;;;; " kv.Key kv.Value
                 printfn "\n\n"
-                -1 
+                -1
             ) nodes
 
     let rec findLowestColor bannedSet =
         Seq.initInfinite id
-        |> Seq.find (fun x -> 
+        |> Seq.find (fun x ->
             Seq.exists ((=) x) bannedSet |> not)
 
     let updateBanned node color =
         adjacent graph node
-        |> Seq.iter (fun v -> 
+        |> Seq.iter (fun v ->
             addBanned v color)
 
     let rec loop nodes map =

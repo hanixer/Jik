@@ -6,6 +6,8 @@ open Intermediate
 open RuntimeConstants
 open Codegen
 
+let foreignFuncPrefix = "s_"
+
 let argumentToLocation (siStart, siMult) reg args =
     let fold (regs, index, pairs) arg =
         match regs with
@@ -21,6 +23,18 @@ let argumentToLocation (siStart, siMult) reg args =
 let moveClosureArgs args =
     List.mapi (fun i arg ->
         Mov, [Var arg; Deref((i + 1) * wordSize, R11)]) args
+
+/// Prepare arguments for call. First move them to corresponding registers (registersForArgs).
+/// If registers are not enough then move to stack locations.
+let moveArgsForCall args =
+    let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
+    List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
+
+let getCallResultVar label blocks =
+    let argsOfBlock = getArgsOfBlock blocks label
+    if List.length argsOfBlock <> 1 then
+        failwith "handleTransfer: wrong number of vars"
+    List.head argsOfBlock
 
 let convertNumber n = n <<< fixnumShift
 
@@ -202,20 +216,15 @@ let transferToInstrs blocks = function
          Cmp, [Operand.Int falseLiteral; Reg Rax]
          JmpIf (E, labelf), []]
     | Transfer.Call(NonTail label, func, args) ->
-        let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
-        let moveToArgPositions =
-            List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
-        let argsOfBlock = getArgsOfBlock blocks label
-        let argOfBlock = List.head argsOfBlock
-        if List.length argsOfBlock <> 1 then
-            failwith "handleTransfer: wrong number of vars"
+        let moveToArgPositions = moveArgsForCall args
+        let resultVar = getCallResultVar label blocks
         moveToArgPositions @
         [Mov, [Reg Rsi; Deref(0, Rsp)]
          Mov, [Var func; Reg Rsi]
          Mov, [Deref(-closureTag, Rsi); Reg Rax]
          CallIndirect, [Reg Rax]
          Mov, [Deref(0, Rsp); Reg Rsi]
-         Mov, [Reg Rax; Var argOfBlock]
+         Mov, [Reg Rax; Var resultVar]
          InstrName.Jmp label, []]
     | Transfer.Call(Tail, func, args) ->
         let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
@@ -235,6 +244,14 @@ let transferToInstrs blocks = function
          Mov, [Deref(-closureTag, Rsi); Reg Rax]
          RestoreStack, []
          JmpIndirect, [Reg Rax]]
+    | ForeignCall(label, foreignName, args) ->
+        let moveToArgPositions = moveArgsForCall args
+        let resultVar = getCallResultVar label blocks
+        let name = foreignFuncPrefix + foreignName
+        moveToArgPositions @
+        [Call name, []
+         Mov, [Reg Rax; Var resultVar]
+         InstrName.Jmp label, []]
 
 let saveArgs args instrs =
     let args =

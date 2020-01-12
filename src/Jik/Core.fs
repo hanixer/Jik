@@ -41,6 +41,7 @@ type Prim =
 type Expr =
     | Int of int
     | Bool of bool
+    | String of string
     | EmptyList
     | Ref of string
     | If of Expr * Expr * Expr
@@ -49,6 +50,7 @@ type Expr =
     | Begin of Expr list
     | App of Expr * Expr list
     | PrimApp of Prim * Expr list
+    | ForeignCall of foreignName : string * args : Expr list
 
 and LambdaData = string list * bool * Expr list
 
@@ -253,6 +255,7 @@ let rec sexprToExpr sexpr =
     | SExpr.Number n -> Int n
     | SExpr.Bool n -> Bool n
     | SExpr.Symbol name -> Ref name
+    | SExpr.String string -> String string
     | List [SExpr.Symbol "if"; cond; conseq; altern] ->
         If(sexprToExpr cond, sexprToExpr conseq, sexprToExpr altern)
     | List(Symbol "begin" :: e :: exprs) ->
@@ -265,6 +268,10 @@ let rec sexprToExpr sexpr =
     | List [Symbol "quote"; List []] -> EmptyList
     | List [Symbol "quote"; form] ->
         failwith "sexprToExpr: quote is not supported"
+    | List (Symbol "foreign-call" :: SExpr.String foreignName :: tail) ->
+        printfn "%A" tail
+        let args = convertList tail
+        ForeignCall(foreignName, args)
     | List(Symbol op :: tail) when isPrimop op ->
         let op = tryStringToPrimop op
         PrimApp(Option.get op, convertList tail)
@@ -286,10 +293,14 @@ let stringToProgram str : Program =
         | sexpr ->
             globals, sexpr :: sexprs
 
-    match desugar2 [] sexpr with
+    let desugared = desugar2 [] sexpr
+
+    match desugared with
     | List sexprs when not (sexprs.IsEmpty) ->
         let globals, sexprs = List.fold parseSExpr ([], []) sexprs
-        { Main = List.map sexprToExpr sexprs |> List.rev
+        let exprList = List.map sexprToExpr sexprs
+        printfn "%A" exprList
+        { Main = exprList |> List.rev
           Globals = List.rev globals }
     | _ -> failwith "stringToProgram: parsing failed"
 

@@ -398,16 +398,16 @@ let letrecTests =
         ((fix f) 5)))", "120\n" ]
 
 let listTests =
-  [
-    "(define length
+    [ "(define length
        (lambda (l)
          (if (null? l)
            0
            (+ 1 (length (cdr l))))))
      (length '())", "0\n"
-    "(let ((f (lambda () (null? 1)))) (f))", "#f\n"
+      "(let ((f (lambda () (null? 1)))) (f))", "#f\n" ]
 
-  ]
+let foreignCallTests =
+    [ "(foreign-call \"write\" 1 \"hello!\" 6)", "hello!\n" ]
 
 let tak = [
     "(define (tak x y z)
@@ -453,8 +453,6 @@ let main argv =
     // runTestsWithName testMainTest "letrec" letrecTests
     // runTestsWithName testMainTest "list" listTests
     // runTestsWithName testMainTest "tak" tak
+    runTestsWithName testMainTest "foreign-call" foreignCallTests
     // testLambda e8
-    let l = generateBigLet 2000
-    let l = toIntermediate l
-    printfn "%A" l
     0
