@@ -101,85 +101,93 @@ let vectorAddress vec index =
      Sar, [Int fixnumShift; Reg R12]
      Add, [Int 1; Reg R12]]
 
-let rec declToInstrs (var, x) =
+let rec declToInstrs (dest, x) =
     match x with
-    | Simple.EmptyList -> moveInt nilLiteral var
-    | Simple.Int n -> moveInt (convertNumber n) var
-    | Simple.Char c -> moveInt (((int c) <<< charShift) ||| charTag) var
-    | Simple.Bool true -> moveInt trueLiteral var
-    | Simple.Bool false -> moveInt falseLiteral var
+    | Simple.EmptyList -> moveInt nilLiteral dest
+    | Simple.Int n -> moveInt (convertNumber n) dest
+    | Simple.Char c -> moveInt (((int c) <<< charShift) ||| charTag) dest
+    | Simple.Bool true -> moveInt trueLiteral dest
+    | Simple.Bool false -> moveInt falseLiteral dest
     | Simple.Prim(Prim.Add, [var1; var2]) ->
-        [InstrName.Mov, [Var var1; Var var]
-         InstrName.Add, [Var var2; Var var]]
+        [InstrName.Mov, [Var var1; Var dest]
+         InstrName.Add, [Var var2; Var dest]]
     | Simple.Prim(Prim.Mul, [var1; var2]) ->
-        [InstrName.Mov, [Var var1; Var var]
-         InstrName.IMul, [Var var2; Var var]
-         InstrName.Sar, [Int fixnumShift; Var var]]
+        [InstrName.Mov, [Var var1; Var dest]
+         InstrName.IMul, [Var var2; Var dest]
+         InstrName.Sar, [Int fixnumShift; Var dest]]
     | Simple.Prim(Prim.Sub, [var1; var2]) ->
-        [InstrName.Mov, [Var var1; Var var]
-         InstrName.Sub, [Var var2; Var var]]
+        [InstrName.Mov, [Var var1; Var dest]
+         InstrName.Sub, [Var var2; Var dest]]
     | Simple.Prim(Prim.Sub, [var1]) ->
-        [InstrName.Mov, [Var var1; Var var]
-         InstrName.Neg, [Var var]]
+        [InstrName.Mov, [Var var1; Var dest]
+         InstrName.Neg, [Var dest]]
     | Simple.Prim(Prim.Lt, [var1; var2]) ->
-        comparisonInstrs var1 var2 Cc.L (Some(Var var))
+        comparisonInstrs var1 var2 Cc.L (Some(Var dest))
     | Simple.Prim(Prim.Not, [var1]) ->
         [Cmp, [Operand.Int falseLiteral; Var var1]] @
-        setOnEqualInstrs var
+        setOnEqualInstrs dest
     | Simple.Prim(Prim.Eq, [var1; var2]) ->
         [Cmp, [Var var1; Var var2]] @
-        setOnEqualInstrs var
+        setOnEqualInstrs dest
     | Simple.Prim(Prim.IsFixnum, [var1]) ->
-        [Mov, [Var var1; Var var]
-         And, [Int fixnumMask; Var var]
-         Cmp, [Int fixnumTag; Var var]] @
-         setOnEqualInstrs var
+        [Mov, [Var var1; Var dest]
+         And, [Int fixnumMask; Var dest]
+         Cmp, [Int fixnumTag; Var dest]] @
+         setOnEqualInstrs dest
     | Simple.Prim(Prim.IsChar, [var1]) ->
-        isOfTypeInstrs var var1 charMask charTag
+        isOfTypeInstrs dest var1 charMask charTag
     | Simple.Prim(Prim.CharToNumber, [var1]) ->
-        [Sar, [Int charShift; Reg Rax]
+        [Mov, [Var var1; Reg Rax]
+         Sar, [Int charShift; Reg Rax]
          Movzb, [Reg Al; Reg Rax]
          Sal, [Int fixnumShift; Reg Rax]
-         Mov, [Reg Rax; Var var]]
+         Mov, [Reg Rax; Var dest]]
+    | Simple.Prim(Prim.NumberToChar, [var1]) ->
+        [Mov, [Var var1; Reg Rax]
+         Sar, [Int fixnumShift; Reg Rax]
+         Movzb, [Reg Al; Reg Rax]
+         Sal, [Int charShift; Reg Rax]
+         Or, [Int charTag; Reg Rax]
+         Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Cons, [var1; var2]) ->
         [Mov, [GlobalValue(freePointer); Reg R11]
          Mov, [Var var1; Deref(0, R11)]
          Mov, [Var var2; Deref(wordSize, R11)]
          Or, [Int pairTag; Reg R11]
-         Mov, [Reg R11; Var var]
+         Mov, [Reg R11; Var dest]
          Add, [Int (2 * wordSize); GlobalValue(freePointer)]]
     | Simple.Prim(Prim.IsPair, [var1]) ->
-        isOfTypeInstrs var var1 pairMask pairTag
+        isOfTypeInstrs dest var1 pairMask pairTag
     | Simple.Prim(Prim.IsNull, [var1]) ->
-        isOfTypeInstrs var var1 nilMask nilLiteral
+        isOfTypeInstrs dest var1 nilMask nilLiteral
     | Simple.Prim(Prim.Car, [pair]) ->
         [Mov, [Var pair; Reg R11]
-         Mov, [Deref(-pairTag, R11); Var var]]
+         Mov, [Deref(-pairTag, R11); Var dest]]
     | Simple.Prim(Prim.Cdr, [pair]) ->
         [Mov, [Var pair; Reg R11]
-         Mov, [Deref(-pairTag + wordSize, R11); Var var]]
+         Mov, [Deref(-pairTag + wordSize, R11); Var dest]]
     | Simple.Prim(Prim.SetCar, [pair; value]) ->
         [Mov, [Var pair; Reg R11]
          Mov, [Var value; Deref(-pairTag, R11)]
-         Mov, [Var value; Var var]]
+         Mov, [Var value; Var dest]]
     | Simple.Prim(Prim.SetCdr, [pair; value]) ->
         [Mov, [Var pair; Reg R11]
          Mov, [Var value; Deref(-pairTag + wordSize, R11)]
-         Mov, [Var value; Var var]]
+         Mov, [Var value; Var dest]]
     // Vectors.
     | Simple.Prim(Prim.MakeVector, [var1]) ->
-        makeVectorInstrs (Var var1) var
+        makeVectorInstrs (Var var1) dest
     | Simple.Prim(Prim.VectorLength, [var1]) ->
         [Mov, [Var var1; Reg R11]
-         Mov, [Deref(-vectorTag, R11); Var var]]
+         Mov, [Deref(-vectorTag, R11); Var dest]]
     | Simple.Prim(Prim.IsVector, [var1]) ->
-        isOfTypeInstrs var var1 vectorMask vectorTag
+        isOfTypeInstrs dest var1 vectorMask vectorTag
     | Simple.Prim(Prim.VectorSet, [vec; index; value]) ->
         vectorAddress vec (Var index) @
         [Mov, [Var value; Deref4(-vectorTag, R11, R12, wordSize)]]
     | Simple.Prim(Prim.VectorRef, [vec; index]) ->
         vectorAddress vec (Var index) @
-        [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var var]]
+        [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var dest]]
     // Strings.
     // | Simple.Prim(Prim.MakeVector, [var1]) ->
         // makeVectorInstrs (Var var1) var
@@ -192,36 +200,36 @@ let rec declToInstrs (var, x) =
         [Mov, [Int offset; Reg R12]
          Add, [Reg R12; GlobalValue(freePointer)]
          Or, [Int closureTag; Reg R11]
-         Mov, [Reg R11; Var var]]
+         Mov, [Reg R11; Var dest]]
     | Simple.Prim(Prim.ClosureRef, [var1]) ->
         [Mov, [Var var1; Reg Rax]
          Sar, [Int fixnumShift; Reg Rax]
-         Mov, [Deref4(-closureTag + wordSize, Rsi, Rax, wordSize); Var var]]
+         Mov, [Deref4(-closureTag + wordSize, Rsi, Rax, wordSize); Var dest]]
     | Simple.Prim(Prim.IsProcedure, [var1]) ->
-        isOfTypeInstrs var var1 closureMask closureTag
+        isOfTypeInstrs dest var1 closureMask closureTag
     | Simple.Prim(Prim.BoxCreate, [var1]) ->
-        makeVectorInstrs (Int (1 <<< fixnumShift)) var @
-        vectorAddress var (Int 0) @
+        makeVectorInstrs (Int (1 <<< fixnumShift)) dest @
+        vectorAddress dest (Int 0) @
         [Mov, [Var var1; Deref4(-vectorTag, R11, R12, wordSize)]
-         Mov, [Var var; Var var1]]
+         Mov, [Var dest; Var var1]]
     | Simple.Prim(Prim.BoxRead, [var1]) ->
         vectorAddress var1 (Int 0) @
-        [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var var]]
+        [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var dest]]
     | Simple.Prim(Prim.BoxWrite, [box; value]) ->
         vectorAddress box (Int 0) @
         [Mov, [Var value; Deref4(-vectorTag, R11, R12, wordSize)]]
     | Simple.Prim(Prim.GlobalSet, [glob; value]) ->
         [Mov, [Var value; GlobalValue(glob)]]
     | Simple.Prim(Prim.GlobalRef, [glob]) ->
-        [Mov, [GlobalValue(glob); Var var]]
+        [Mov, [GlobalValue(glob); Var dest]]
     | Simple.Prim(Prim.IsZero, [var1]) ->
         [Cmp, [Int 0; Var var1]
          Set E, [Reg Al]
          Movzb, [Reg Al; Reg Rax]
          Sal, [Operand.Int boolBit; Reg Rax]
          Or, [Operand.Int falseLiteral; Reg Rax]
-         Mov, [Reg Rax; Var var]]
-    | e -> failwithf "handleDecl: %s %A" var e
+         Mov, [Reg Rax; Var dest]]
+    | e -> failwithf "handleDecl: %s %A" dest e
 
 let transferToInstrs blocks = function
     | Return var ->

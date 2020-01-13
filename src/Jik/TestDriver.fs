@@ -52,6 +52,15 @@ let runTest compile input =
 let addTests str tests =
     testCases <- (str, tests) :: testCases
 
+let runSingleTest compile input expected =
+    try
+        let output = runTest compile input
+        if output <> expected then
+            printfn "FAIL! expected:\n<%s>\ngot:\n<%s>\ninput:\n%s\n" expected output input
+        with
+        | e ->
+            printfn "FAIL! exception:\n<%s>\nstacktrace:\n<%s>\ninput:\n%s\n"  (e.Message) (e.StackTrace) input
+
 let runTestsWithName compile testName tests =
     let fold (passed, i) (input, expected) =
         try

@@ -470,5 +470,6 @@ let main argv =
     // runTestsWithName testMainTest "tak" tak
     // runTestsWithName testMainTest "foreign-call" foreignCallTests
     runTestsWithName testMainTest "num -> char" numcharTests
+    // runSingleTest testMainTest @"(number->char 65)" "#\\A\n"
     // testLambda e8
     0
