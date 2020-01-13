@@ -32,7 +32,7 @@ let testInterf s =
         |> printIr "test.ir"
         |> selectInstructions
         |> computeLiveness
-        // |> buildInterference
+        |> buildInterference
         |> failwithf "nothing more %A"
 
     use fileOut = new StreamWriter(path)
@@ -418,7 +418,10 @@ let listTests =
       "(let ((f (lambda () (null? 1)))) (f))", "#f\n" ]
 
 let foreignCallTests =
-    [ "(foreign-call \"write\" 1 \"hello!\" 6)", "hello!\n" ]
+    [ "(let ((s (make-string 2)))
+         (string-set! s 0 #\\A)
+         (string-set! s 2 #\\B)
+         (foreign-call \"write\" 1 s 2))", "hello!\n" ]
 
 let numcharTests =
     [ @"(number->char 65)", "#\\A\n"
@@ -531,7 +534,7 @@ let toIntermediate s =
 [<EntryPoint>]
 let main argv =
     // runTestsWithName testMainTest "basic" basicTests
-    runTestsWithName testMainTest "boolean" booleanTests
+    // runTestsWithName testMainTest "boolean" booleanTests
     // runTestsWithName testMainTest "vector" vectorTests
     // runTestsWithName testMainTest "lambda" lambdaTests
     // runTestsWithName testMainTest "assignment" assignmentTests
@@ -543,21 +546,14 @@ let main argv =
     // runTestsWithName testMainTest "letrec" letrecTests
     // runTestsWithName testMainTest "list" listTests
     // runTestsWithName testMainTest "tak" tak
-    // runTestsWithName testMainTest "foreign-call" foreignCallTests
     // runTestsWithName testMainTest "num -> char" numcharTests
     // runTestsWithName testMainTest "char?" isCharTests
-    runTestsWithName testMainTest "string" stringTests
-    // runSingleTest testMainTest @"(let ((v0 (make-string 1)))
-    //       (string-set! v0 0 #\a)
-    //       (let ((v1 (make-string 1)))
-    //         (string-set! v1 0 #\A)
-    //         (string-set!
-    //           (if (string? v0) v0 v1)
-    //           (- (string-length (if (string? v0) v0 v1)) 1)
-    //           (fixnum->char
-    //             (+ (char->fixnum (string-ref (if (string? v0) v0 v1)
-    //                                          (- (string-length (if (string? v0) v0 v1)))))
-    //                1)))
-    //         (cons v0 v1)))" "(\"b\" . \"A\")\n"
+    // runTestsWithName testMainTest "string" stringTests
+    // runTestsWithName testMainTest "foreign-call" foreignCallTests
+    // runSingleTest testMainTest "source" "expectedOutput"
     // testLambda e8
+    testInterf "(let ((s (make-string 2)))
+         (string-set! s 0 #\\A)
+         (string-set! s 2 #\\B)
+         (foreign-call \"write\" 1 s 2))"
     0

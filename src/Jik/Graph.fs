@@ -14,14 +14,14 @@ let addEdge (G graph) u v =
         graph.Item u <- graph.Item u |> Set.add v
         graph.Item v <- graph.Item v |> Set.add u
 
-let adjacent (G graph) u = 
+let adjacent (G graph) u =
     graph.Item u
 
 let vertices (G graph) =
     graph.Keys
 
-let printDot (G graph as g) fileName = 
-    use out = new System.IO.StreamWriter(path=fileName)    
+let printDot (G graph as g) fileName =
+    use out = new System.IO.StreamWriter(path=fileName)
     fprintfn out "strict graph {"
     fprintfn out "layout=circo"
     Seq.iter (fun v ->
@@ -31,8 +31,11 @@ let printDot (G graph as g) fileName =
             fprintfn out "%s -- %s" u v) (adjacent g v)) (vertices g)
     fprintfn out "}\n"
 
-let printDotFunc func (G graph as g) fileName = 
-    use out = new System.IO.StreamWriter(path=fileName)    
+let printDotFunc func (G graph as g) fileName =
+    let dirName = System.IO.Path.GetDirectoryName(fileName)
+    if System.IO.Directory.Exists(dirName) |> not then
+        System.IO.Directory.CreateDirectory(dirName) |> ignore
+    use out = new System.IO.StreamWriter(path=fileName)
     fprintfn out "strict graph {"
     fprintfn out "layout=circo"
     Seq.iter (fun v ->
