@@ -195,7 +195,9 @@ let e18 = "
 (let ((s (make-string 2)))
    (string-set! s 0 #\\A)
    (string-set! s 1 #\\B)
-   (foreign-call \"write\" 1 s 2))"
+   (foreign-call \"write\" 1 s 2)
+   (foreign-call \"write\" 1 s 2)
+   1)"
 
 let basicTests =
     [ "(* 1 0)", "0\n"
@@ -423,7 +425,7 @@ let listTests =
       "(let ((f (lambda () (null? 1)))) (f))", "#f\n" ]
 
 let foreignCallTests =
-    [ e18, "AB\n" ]
+    [ e18, "ABAB1\n" ]
 
 let numcharTests =
     [ @"(number->char 65)", "#\\A\n"
@@ -551,8 +553,8 @@ let main argv =
     // runTestsWithName testMainTest "num -> char" numcharTests
     // runTestsWithName testMainTest "char?" isCharTests
     // runTestsWithName testMainTest "string" stringTests
-    // runTestsWithName testMainTest "foreign-call" foreignCallTests
-    runSingleTest testMainTest "(foreign-call \"test\" 1)" "123"
+    runTestsWithName testMainTest "foreign-call" foreignCallTests
+    // runSingleTest testMainTest e18 "123"
     // testLambda e8
     // runSingleTest testMainTest e18 ""
     0

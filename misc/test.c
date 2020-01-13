@@ -73,6 +73,6 @@ void broad(char* p) {
 }
 
 int main() {
-    manyArgs(1,2,3,4,5);
+    printf("%d, %d, %d", 1, 2, 3);
     return 0;
 }

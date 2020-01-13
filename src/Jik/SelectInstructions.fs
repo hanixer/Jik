@@ -300,7 +300,9 @@ let transferToInstrs blocks = function
         let resultVar = getCallResultVar label blocks
         let name = foreignFuncPrefix + foreignName
         moveToArgPositions @
-        [Call name, []
+        [Sub, [Int 32; Reg Rsp]
+         Call name, []
+         Add, [Int 32; Reg Rsp]
          Mov, [Reg Rax; Var resultVar]
          InstrName.Jmp label, []]
 
