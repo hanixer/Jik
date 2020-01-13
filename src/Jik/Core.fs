@@ -6,9 +6,6 @@ open System.Collections.Generic
 /// Core represents desugared form of input language.
 
 type Prim =
-    | BoxRead
-    | BoxWrite
-    | BoxCreate
     | Add
     | Sub
     | Mul
@@ -448,41 +445,57 @@ let rec findModifiedVars expr =
 
 /// Convert assignments to box writes.
 let assignmentConvert (prog : Program) : Program =
+
+    let newNamesEnv args modified =
+        List.filter (fun arg -> Set.contains arg modified) args
+        |> List.map (fun arg -> arg, freshLabel "v")
+        |> Map.ofList
+
     let rec convertRefs (modified : Set<string>) expr =
         let conv = convertRefs modified
         match expr with
         | Ref var ->
             if modified.Contains var then
-                PrimApp(BoxRead, [Ref var])
+                PrimApp(VectorRef, [Ref var; Int 0])
             else
                 Ref var
         | If(cond, conseq, altern) ->
             If(conv cond, conv conseq, conv altern)
         | Assign(var, rhs) ->
-            PrimApp(BoxWrite, [Ref var; conv rhs])
+            PrimApp(VectorSet, [Ref var; Int 0; conv rhs])
         | Lambda(args, dotted, body) ->
-            let body = convertLambda modified args body
-            Lambda(args, dotted, body)
+            let (newArgs, newBody) = convertLambda modified args body
+            Lambda(newArgs, dotted, newBody)
         | Begin exprs -> Begin(List.map conv exprs)
         | App(func, args) -> App(conv func, List.map conv args)
         | PrimApp(op, args) -> PrimApp(op, List.map conv args)
+        | ForeignCall(name, args) -> ForeignCall(name, List.map conv args)
         | e -> e
 
+    /// Change each modified arg to new name,
+    /// then introduce variable with original name,
+    /// which refers to vector.
     and convertLambda modified args body =
+        let env = newNamesEnv args modified
         let body = List.map (convertRefs modified) body
-        List.foldBack (fun arg body ->
-            if Set.contains arg modified then
-                PrimApp(BoxCreate, [Ref arg]) :: body
-            else
-                body)
-            args body
+        List.foldBack (fun arg (args, body) ->
+            match Map.tryFind arg env with
+            | Some(newArg) ->
+                let set = PrimApp(VectorSet, [Ref arg; Int 0; Ref newArg])
+                let lambda = Lambda([arg], false, set :: body)
+                let make = PrimApp(MakeVector, [Int 1])
+                newArg :: args, [App(lambda, [make])]
+            | _ ->
+                arg :: args, body)
+            args ([], body)
 
     let convertFunc (name, (args, body)) =
         let modified = findModifiedVars (Begin body)
-        let body = convertLambda modified args body
-        name, (args, body)
+        let (newArgs, newBody) = convertLambda modified args body
+        name, (newArgs, newBody)
 
     let modified = List.map findModifiedVars prog.Main |> Set.unionMany
     { prog with Main = List.map (convertRefs modified) prog.Main }
 
 let stringToExpr = stringToSExpr >> sexprToExpr
+

@@ -232,17 +232,6 @@ let rec declToInstrs (dest, x) =
          Mov, [Deref4(-closureTag + wordSize, Rsi, Rax, wordSize); Var dest]]
     | Simple.Prim(Prim.IsProcedure, [var1]) ->
         isOfTypeInstrs dest var1 closureMask closureTag
-    | Simple.Prim(Prim.BoxCreate, [var1]) ->
-        makeVectorInstrs (Int (1 <<< fixnumShift)) dest @
-        vectorAddress dest (Int 0) @
-        [Mov, [Var var1; Deref4(-vectorTag, R11, R12, wordSize)]
-         Mov, [Var dest; Var var1]]
-    | Simple.Prim(Prim.BoxRead, [var1]) ->
-        vectorAddress var1 (Int 0) @
-        [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var dest]]
-    | Simple.Prim(Prim.BoxWrite, [box; value]) ->
-        vectorAddress box (Int 0) @
-        [Mov, [Var value; Deref4(-vectorTag, R11, R12, wordSize)]]
     | Simple.Prim(Prim.GlobalSet, [glob; value]) ->
         [Mov, [Var value; GlobalValue(glob)]]
     | Simple.Prim(Prim.GlobalRef, [glob]) ->

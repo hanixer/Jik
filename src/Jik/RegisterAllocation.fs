@@ -98,7 +98,7 @@ let rec computeLiveness (prog : Program) =
 
 let rec buildInterference (prog : Program) : Program =
     let registersForUse =
-        [Rbx; Rcx; Rdx; Rsi; Rdi; Rbp;
+        [Rbx; Rcx; Rdx; Rdi; Rbp;
          R8; R9; R10; R11; R12; R13; R14; R15]
         |> Set.ofList
 
@@ -260,3 +260,6 @@ let allocateRegisters (prog : Program) =
 
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
+
+// To suppress warning FS0988
+do()

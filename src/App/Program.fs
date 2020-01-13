@@ -541,7 +541,7 @@ let main argv =
     // runTestsWithName testMainTest "boolean" booleanTests
     // runTestsWithName testMainTest "vector" vectorTests
     // runTestsWithName testMainTest "lambda" lambdaTests
-    // runTestsWithName testMainTest "assignment" assignmentTests
+    runTestsWithName testMainTest "assignment" assignmentTests
     // runTestsWithName testMainTest "andOr" andOrTests
     // runTestsWithName testMainTest "pair" pairTests
     // runTestsWithName testMainTest "setCarCdr" setCarCdrTests
@@ -553,8 +553,9 @@ let main argv =
     // runTestsWithName testMainTest "num -> char" numcharTests
     // runTestsWithName testMainTest "char?" isCharTests
     // runTestsWithName testMainTest "string" stringTests
-    runTestsWithName testMainTest "foreign-call" foreignCallTests
-    // runSingleTest testMainTest e18 "123"
-    // testLambda e8
-    // runSingleTest testMainTest e18 ""
+    // runTestsWithName testMainTest "foreign-call" foreignCallTests
+    // runSingleTest testMainTest @"(let ((t #f))
+    //    (let ((locative (cons (lambda () t) (lambda (n) (set! t n)))))
+    //     ((cdr locative) 17)
+    //     ((car locative))))" "17\n"
     0
