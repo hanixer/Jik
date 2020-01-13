@@ -19,6 +19,7 @@ type Prim =
     | Ge
     | Not
     | IsFixnum
+    | IsBoolean
     | Cons
     | IsPair
     | IsNull
@@ -83,6 +84,7 @@ let freshCodeLabel prefix = freshLabel (prefix + "/code")
 let stringPrimop = [
     "+", Add
     "-", Sub
+    "fx-", Sub
     "*", Mul
     "eq?", Eq
     "<", Lt
@@ -91,6 +93,7 @@ let stringPrimop = [
     ">=", Ge
     "not", Not
     "fixnum?", IsFixnum
+    "boolean?", IsBoolean
     "cons", Cons
     "pair?", IsPair
     "null?", IsNull
@@ -112,6 +115,8 @@ let stringPrimop = [
     "zero?", IsZero
     "number->char", NumberToChar
     "char->number", CharToNumber
+    "fixnum->char", NumberToChar
+    "char->fixnum", CharToNumber
     "char?", IsChar
 ]
 
@@ -287,7 +292,6 @@ let rec sexprToExpr sexpr =
     | List [Symbol "quote"; form] ->
         failwith "sexprToExpr: quote is not supported"
     | List (Symbol "foreign-call" :: SExpr.String foreignName :: tail) ->
-        printfn "%A" tail
         let args = convertList tail
         ForeignCall(foreignName, args)
     | List(Symbol op :: tail) when isPrimop op ->
@@ -317,7 +321,6 @@ let stringToProgram str : Program =
     | List sexprs when not (sexprs.IsEmpty) ->
         let globals, sexprs = List.fold parseSExpr ([], []) sexprs
         let exprList = List.map sexprToExpr sexprs
-        printfn "%A" exprList
         { Main = exprList |> List.rev
           Globals = List.rev globals }
     | _ -> failwith "stringToProgram: parsing failed"

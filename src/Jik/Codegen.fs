@@ -58,6 +58,7 @@ type InstrName =
     | Xor
     | Cmp
     | Set of Cc
+    | Movb
     | Movzb
     | Jmp of string
     | JmpIndirect
@@ -123,6 +124,8 @@ let showInstr out (op, args) =
             fprintf out "jmp %s" label
         | Call label ->
             fprintf out "call %s" label
+        | Movb ->
+            fprintf out "movb "
         | _ ->
             let s = sprintf "%A" op
             fprintf out "%s" (s.ToLower() + "q ")

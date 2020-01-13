@@ -26,7 +26,7 @@ let rec computeLiveness (prog : Program) =
 
     let writtenBy (op, args)  =
         match op with
-        | Add | Sub | Mov | Sar | Sal | And | Or | Xor | Movzb | Cmp ->
+        | Add | Sub | Mov | Sar | Sal | And | Or | Xor | Movzb | Movb | Cmp ->
             List.item 1 args|> Set.singleton
         | Neg | Set _ -> List.head args |> Set.singleton
         | Call _ | CallIndirect -> callerSave |> List.map Reg |> Set.ofList
@@ -40,7 +40,7 @@ let rec computeLiveness (prog : Program) =
         | CallIndirect ->
             Set.ofList (callerSave) |> Set.map Reg
             |> Set.union (Set.ofList args)
-        | Mov | Movzb -> List.head args |> Set.singleton
+        | Mov | Movzb | Movb -> List.head args |> Set.singleton
         | Set _ -> Set.empty
         | Ret -> Set.ofList (Rax :: calleeSave) |> Set.map Reg
         | JmpIndirect -> Set.ofList (Rax :: calleeSave) |> Set.map Reg

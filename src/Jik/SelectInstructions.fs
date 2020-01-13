@@ -40,16 +40,6 @@ let convertNumber n = n <<< fixnumShift
 
 let moveInt n var = [Mov, [Operand.Int n; Operand.Var var]]
 
-let isOfTypeInstrs var var1 mask tag =
-    [Mov, [Var var1; Reg Rax]
-     And, [Int mask; Reg Rax]
-     Cmp, [Int tag; Reg Rax]
-     Set E, [Reg Al]
-     Movzb, [Reg Al; Reg Rax]
-     Sal, [Operand.Int boolBit; Reg Rax]
-     Or, [Operand.Int falseLiteral; Reg Rax]
-     Mov, [Reg Rax; Var var]]
-
 let comparisonInstrs var1 var2 cc dest =
     let instrs =
         [Mov, [Var var1; Reg Rax]
@@ -64,12 +54,18 @@ let comparisonInstrs var1 var2 cc dest =
     | Some dest ->
         instrs @ [Mov, [Reg Rax; dest]]
 
-let setOnEqualInstrs var =
-     [Set E, [Reg Al]
-      Movzb, [Reg Al; Reg Rax]
-      Sal, [Operand.Int boolBit; Reg Rax]
-      Or, [Operand.Int falseLiteral; Reg Rax]
-      Mov, [Reg Rax; Var var]]
+let setOnEqualInstrs dest =
+    [Set E, [Reg Al]
+     Movzb, [Reg Al; Reg Rax]
+     Sal, [Operand.Int boolBit; Reg Rax]
+     Or, [Operand.Int falseLiteral; Reg Rax]
+     Mov, [Reg Rax; Var dest]]
+
+let isOfTypeInstrs dest var1 mask tag =
+    [Mov, [Var var1; Reg Rax]
+     And, [Int mask; Reg Rax]
+     Cmp, [Int tag; Reg Rax]]
+    @ setOnEqualInstrs dest
 
 let makeVectorInstrs size var =
     let shift = if wordSize = 8 then 3 else 2
@@ -83,16 +79,16 @@ let makeVectorInstrs size var =
      Sal, [Int shift; Reg R11]
      Add, [Reg R11; GlobalValue(freePointer)]]
 
-let makeStringInstrs size var =
-    let shift = 3
+let makeStringInstrs size dest =
     [Mov, [GlobalValue(freePointer); Reg R11]
      Mov, [size; Deref(0, R11)]
      Or, [Int stringTag; Reg R11]
-     Mov, [Reg R11; Var var]
+     Mov, [Reg R11; Var dest]
      Mov, [size; Reg R11]
      Sar, [Int fixnumShift; Reg R11]
-     Add, [Int 1; Reg R11]
-     Sal, [Int shift; Reg R11]
+     Add, [Int wordSize; Reg R11]
+     Add, [Int (wordSize - 1); Reg R11]
+     And, [Int (-wordSize); Reg R11]
      Add, [Reg R11; GlobalValue(freePointer)]]
 
 let vectorAddress vec index =
@@ -134,8 +130,16 @@ let rec declToInstrs (dest, x) =
          And, [Int fixnumMask; Var dest]
          Cmp, [Int fixnumTag; Var dest]] @
          setOnEqualInstrs dest
+    | Simple.Prim(Prim.IsZero, [var1]) ->
+        [Cmp, [Int 0; Var var1]]
+        @ setOnEqualInstrs dest
     | Simple.Prim(Prim.IsChar, [var1]) ->
         isOfTypeInstrs dest var1 charMask charTag
+    | Simple.Prim(Prim.IsBoolean, [var1]) ->
+        [Mov, [Var var1; Reg Rax]
+         And, [Int boolTag; Reg Rax]
+         Cmp, [Int boolTag; Reg Rax]]
+        @ setOnEqualInstrs dest
     | Simple.Prim(Prim.CharToNumber, [var1]) ->
         [Mov, [Var var1; Reg Rax]
          Sar, [Int charShift; Reg Rax]
@@ -189,8 +193,29 @@ let rec declToInstrs (dest, x) =
         vectorAddress vec (Var index) @
         [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var dest]]
     // Strings.
-    // | Simple.Prim(Prim.MakeVector, [var1]) ->
-        // makeVectorInstrs (Var var1) var
+    | Simple.Prim(Prim.MakeString, [var1]) ->
+        makeStringInstrs (Var var1) dest
+    | Simple.Prim(Prim.StringLength, [var1]) ->
+        [Mov, [Var var1; Reg R11]
+         Mov, [Deref(-stringTag, R11); Var dest]]
+    | Simple.Prim(Prim.IsString, [var1]) ->
+        isOfTypeInstrs dest var1 stringMask stringTag
+    | Simple.Prim(Prim.StringSet, [instance; index; value]) ->
+        [Mov, [Var instance; Reg R11]
+         Mov, [Var index; Reg R12]
+         Sar, [Int fixnumShift; Reg R12]
+         Add, [Int wordSize; Reg R12]
+         Mov, [Var value; Reg Rax]
+         Sar, [Int charShift; Reg Rax]
+         Movb, [Reg Al; Deref4(-stringTag, R11, R12, 1)]]
+    | Simple.Prim(Prim.StringRef, [instance; index]) ->
+        [Mov, [Var instance; Reg R11]
+         Mov, [Var index; Reg R12]
+         Sar, [Int fixnumShift; Reg R12]
+         Add, [Int wordSize; Reg R12]
+         Movzb, [Deref4(-stringTag, R11, R12, 1); Var dest]
+         Sal, [Int charShift; Var dest]
+         Or, [Int charTag; Var dest]]
     // Closures.
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
         let offset = (List.length args + 1) * wordSize
@@ -222,13 +247,6 @@ let rec declToInstrs (dest, x) =
         [Mov, [Var value; GlobalValue(glob)]]
     | Simple.Prim(Prim.GlobalRef, [glob]) ->
         [Mov, [GlobalValue(glob); Var dest]]
-    | Simple.Prim(Prim.IsZero, [var1]) ->
-        [Cmp, [Int 0; Var var1]
-         Set E, [Reg Al]
-         Movzb, [Reg Al; Reg Rax]
-         Sal, [Operand.Int boolBit; Reg Rax]
-         Or, [Operand.Int falseLiteral; Reg Rax]
-         Mov, [Reg Rax; Var dest]]
     | e -> failwithf "handleDecl: %s %A" dest e
 
 let transferToInstrs blocks = function

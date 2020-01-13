@@ -267,6 +267,7 @@ and convertExprJoin expr (contVar : Var) =
     | Expr.EmptyList
     | Expr.Bool _
     | Expr.Int _
+    | Expr.Char _
     | Expr.Ref _
     | Expr.Lambda _ -> convertExpr expr jump2
     | Expr.If(exprc, exprt, exprf) -> convertIf exprc exprt exprf [] contVar
@@ -299,6 +300,7 @@ and convertExprTail expr =
     | Expr.EmptyList
     | Expr.Bool _
     | Expr.Int _
+    | Expr.Char _
     | Expr.Ref _
     | Expr.ForeignCall _
     | Expr.Lambda _ ->

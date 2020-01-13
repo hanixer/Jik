@@ -65,7 +65,14 @@ void setQuick() {
     n = 1000000;
 }
 
+void broad(char* p) {
+    p[0] = 1;
+    p[1] = 1;
+    p[2] = 2;
+    p[3] = 3;
+}
+
 int main() {
-    printf("%d\n", fib(100000));
+
     return 0;
 }
