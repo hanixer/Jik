@@ -366,28 +366,30 @@ let extendMapping vars mapping =
     let folder mapping (oldVar, newVar) = Map.add oldVar newVar mapping
     newVars, List.fold folder mapping (List.zip vars newVars)
 
-let rec alphaRename2 mapping =
+// TODO: change this to use transform instead
+let rec alphaRenameImpl mapping =
     function
     | Ref v -> trySubstitute v mapping |> Ref
     | If(cond, thenExpr, elseExpr) ->
-        If
-            (alphaRename2 mapping cond, alphaRename2 mapping thenExpr,
-             alphaRename2 mapping elseExpr)
+        If(alphaRenameImpl mapping cond, alphaRenameImpl mapping thenExpr,
+             alphaRenameImpl mapping elseExpr)
     | Assign(var, rhs) ->
-        Assign(trySubstitute var mapping, alphaRename2 mapping rhs)
+        Assign(trySubstitute var mapping, alphaRenameImpl mapping rhs)
     | Lambda(args, dotted, body) ->
         let newVars, mapping = extendMapping args mapping
-        Lambda(newVars, dotted, List.map (alphaRename2 mapping) body)
-    | Begin exprs -> Begin(List.map (alphaRename2 mapping) exprs)
+        Lambda(newVars, dotted, List.map (alphaRenameImpl mapping) body)
+    | Begin exprs -> Begin(List.map (alphaRenameImpl mapping) exprs)
     | App(func, argsExprs) ->
-        App(alphaRename2 mapping func, List.map (alphaRename2 mapping) argsExprs)
+        App(alphaRenameImpl mapping func, List.map (alphaRenameImpl mapping) argsExprs)
     | PrimApp(op, args) ->
-        PrimApp(op, List.map (alphaRename2 mapping) args)
+        PrimApp(op, List.map (alphaRenameImpl mapping) args)
+    | ForeignCall(foreignName, args) ->
+        ForeignCall(foreignName, List.map (alphaRenameImpl mapping) args)
     | e -> e
 
 let alphaRename (prog : Program) : Program =
     let newGlobals, mapping = extendMapping prog.Globals Map.empty
-    let rename = alphaRename2 mapping
+    let rename = alphaRenameImpl mapping
     { prog with Main = List.map rename prog.Main
                 Globals = newGlobals }
 
@@ -405,6 +407,7 @@ let rec replaceVars mapping expr =
     | Expr.Begin(exprs) -> Expr.Begin(List.map transf exprs)
     | Expr.App(func, args) -> Expr.App(transf func, List.map transf args)
     | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
+    | Expr.ForeignCall(foreignName, args) -> Expr.ForeignCall(foreignName, List.map transf args)
     | e -> e
 
 let rec fixArithmeticPrims (prog : Program) : Program =

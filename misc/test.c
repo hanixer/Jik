@@ -73,6 +73,6 @@ void broad(char* p) {
 }
 
 int main() {
-
+    manyArgs(1,2,3,4,5);
     return 0;
 }

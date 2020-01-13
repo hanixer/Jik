@@ -191,6 +191,11 @@ let e16 = "
 ((foo 1) 2)"
 let e17 = "
 (define pair?)"
+let e18 = "
+(let ((s (make-string 2)))
+   (string-set! s 0 #\\A)
+   (string-set! s 1 #\\B)
+   (foreign-call \"write\" 1 s 2))"
 
 let basicTests =
     [ "(* 1 0)", "0\n"
@@ -418,10 +423,7 @@ let listTests =
       "(let ((f (lambda () (null? 1)))) (f))", "#f\n" ]
 
 let foreignCallTests =
-    [ "(let ((s (make-string 2)))
-         (string-set! s 0 #\\A)
-         (string-set! s 2 #\\B)
-         (foreign-call \"write\" 1 s 2))", "hello!\n" ]
+    [ e18, "AB\n" ]
 
 let numcharTests =
     [ @"(number->char 65)", "#\\A\n"
@@ -550,10 +552,7 @@ let main argv =
     // runTestsWithName testMainTest "char?" isCharTests
     // runTestsWithName testMainTest "string" stringTests
     // runTestsWithName testMainTest "foreign-call" foreignCallTests
-    // runSingleTest testMainTest "source" "expectedOutput"
+    runSingleTest testMainTest "(foreign-call \"test\" 1)" "123"
     // testLambda e8
-    testInterf "(let ((s (make-string 2)))
-         (string-set! s 0 #\\A)
-         (string-set! s 2 #\\B)
-         (foreign-call \"write\" 1 s 2))"
+    // runSingleTest testMainTest e18 ""
     0

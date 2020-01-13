@@ -340,3 +340,5 @@ misc
 references.fsx
 
 .ionide
+
+*.stackdump
