@@ -551,11 +551,11 @@ let main argv =
     // runTestsWithName testMainTest "list" listTests
     // runTestsWithName testMainTest "num -> char" numcharTests
     // runTestsWithName testMainTest "char?" isCharTests
-    // runTestsWithName testMainTest "string" stringTests
+    runTestsWithName testMainTest "string" stringTests
     // runTestsWithName testMainTest "foreign-call" foreignCallTests
     // runSingleTest testMainTest @"(let ((t #f))
     //    (let ((locative (cons (lambda () t) (lambda (n) (set! t n)))))
     //     ((cdr locative) 17)
     //     ((car locative))))" "17\n"
-    runSingleTest testMainTest "(define x 10) x" "x"
+    // runSingleTest testMainTest "(define x 10) x" "x"
     0
