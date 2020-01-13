@@ -257,11 +257,11 @@ let booleanTests =
       @"(boolean? (fixnum? (boolean? 0)))", "#t\n" ]
 
 let vectorTests =
-    [ //"(vector-length (make-vector 4))", "4\n"
-      //e12, "103\n"
-      //"(vector? (make-vector 3))", "#t\n"
-      //"(vector? #t)", "#f\n"
-      //e13, "33\n"
+    [ "(vector-length (make-vector 4))", "4\n"
+      e12, "103\n"
+      "(vector? (make-vector 3))", "#t\n"
+      "(vector? #t)", "#f\n"
+      e13, "33\n"
       e14, "#(1 2 3)\n" ]
 
 let lambdaTests =
@@ -541,7 +541,7 @@ let main argv =
     // runTestsWithName testMainTest "boolean" booleanTests
     // runTestsWithName testMainTest "vector" vectorTests
     // runTestsWithName testMainTest "lambda" lambdaTests
-    runTestsWithName testMainTest "assignment" assignmentTests
+    // runTestsWithName testMainTest "assignment" assignmentTests
     // runTestsWithName testMainTest "andOr" andOrTests
     // runTestsWithName testMainTest "pair" pairTests
     // runTestsWithName testMainTest "setCarCdr" setCarCdrTests
@@ -549,7 +549,6 @@ let main argv =
     // runTestsWithName testMainTest "cond" condTests
     // runTestsWithName testMainTest "letrec" letrecTests
     // runTestsWithName testMainTest "list" listTests
-    // runTestsWithName testMainTest "tak" tak
     // runTestsWithName testMainTest "num -> char" numcharTests
     // runTestsWithName testMainTest "char?" isCharTests
     // runTestsWithName testMainTest "string" stringTests
@@ -558,4 +557,5 @@ let main argv =
     //    (let ((locative (cons (lambda () t) (lambda (n) (set! t n)))))
     //     ((cdr locative) 17)
     //     ((car locative))))" "17\n"
+    runSingleTest testMainTest "(define x 10) x" "x"
     0
