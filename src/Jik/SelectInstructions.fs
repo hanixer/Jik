@@ -8,6 +8,12 @@ open Codegen
 
 let foreignFuncPrefix = "s_"
 
+let stackArgsCount args = List.length args - List.length registersForArgs
+
+let moveClosureArgs args =
+    List.mapi (fun i arg ->
+        Mov, [Var arg; Deref((i + 1) * wordSize, R11)]) args
+
 let argumentToLocation (siStart, siMult) reg args =
     let handleArg index arg =
         let offset = siStart + siMult * index
@@ -15,13 +21,28 @@ let argumentToLocation (siStart, siMult) reg args =
 
     Map.ofSeq (List.mapi handleArg args)
 
-let moveClosureArgs args =
-    List.mapi (fun i arg ->
-        Mov, [Var arg; Deref((i + 1) * wordSize, R11)]) args
-
 /// Generate instruction to prepare arguments for call.
 let moveArgsForCall args =
     let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
+    List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
+
+let argumentToLocationFF (siStart, siMult) reg args =
+    let fold (regs, index, pairs) arg =
+        match regs with
+        | argReg :: rest ->
+            rest, index, Map.add arg (Reg argReg) pairs
+        | _ ->
+            let offset = siStart + siMult * index
+            [], index + 1, Map.add arg (Deref(offset, reg)) pairs
+
+    let _, _, result = List.fold fold (registersForArgs, 0, Map.empty) args
+    result
+
+/// Prepare arguments for foreign call. First move them to corresponding registers (registersForArgs).
+/// If registers are not enough then move to stack locations.
+let moveArgsForCallFF args =
+    let stackArgsCount = stackArgsCount args
+    let argToLoc = argumentToLocationFF (-stackArgsCount * wordSize, wordSize) Rsp args
     List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
 
 let getCallResultVar label blocks =
@@ -280,13 +301,15 @@ let transferToInstrs blocks = function
          RestoreStack, []
          JmpIndirect, [Reg Rax]]
     | ForeignCall(label, foreignName, args) ->
-        let moveToArgPositions = moveArgsForCall args
+        let moveToArgPositions = moveArgsForCallFF args
         let resultVar = getCallResultVar label blocks
         let name = foreignFuncPrefix + foreignName
+        let stackArgsCount = args.Length - registersForArgs.Length
+        let spChange = (stackArgsCount + 4) * wordSize // 4 is 'shadow space' which caller must allocate
         moveToArgPositions @
-        [Sub, [Int 32; Reg Rsp]
+        [Sub, [Int spChange; Reg Rsp]
          Call name, []
-         Add, [Int 32; Reg Rsp]
+         Add, [Int spChange; Reg Rsp]
          Mov, [Reg Rax; Var resultVar]
          InstrName.Jmp label, []]
 

@@ -138,6 +138,17 @@ ptr s_write(ptr fd, ptr str, ptr len) {
     return intToFixnum(bytes);
 }
 
+ptr s_print6args(ptr a1, ptr a2, ptr a3, ptr a4, ptr a5, ptr a6) {
+    printPtr(a1);
+    printPtr(a2);
+    printPtr(a3);
+    printPtr(a4);
+    printPtr(a5);
+    printPtr(a6);
+
+    return 0;
+}
+
 int main() {
     int stackSize = 16 * 4096;
     char* stack = allocateProtectedSpace(stackSize);

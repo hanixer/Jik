@@ -108,6 +108,10 @@ let e18 = "
    (foreign-call \"write\" 1 s 2)
    (foreign-call \"write\" 1 s 2)
    1)"
+let e19 = "
+(foreign-call \"print6args\" 1 2 3 4 5 6)
+(foreign-call \"print6args\" 1 2 3 4 5 6)
+#t"
 
 let basicTests =
     [ "(* 1 0)", "0\n"
@@ -333,7 +337,8 @@ let listTests =
       "(let ((f (lambda () (null? 1)))) (f))", "#f\n" ]
 
 let foreignCallTests =
-    [ e18, "ABAB1\n" ]
+    [ e18, "ABAB1\n"
+      e19, "123456123456#t\n" ]
 
 let numcharTests =
     [ @"(number->char 65)", "#\\A\n"
