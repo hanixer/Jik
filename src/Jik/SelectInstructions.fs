@@ -274,9 +274,9 @@ let transferToInstrs blocks = function
                 | _ -> failwith "wrong")
 
         moveToArgPositions @
+        [Mov, [Var func; Reg Rsi]] @
         moveStackArgs @
-        [Mov, [Var func; Reg Rsi]
-         Mov, [Deref(-closureTag, Rsi); Reg Rax]
+        [Mov, [Deref(-closureTag, Rsi); Reg Rax]
          RestoreStack, []
          JmpIndirect, [Reg Rax]]
     | ForeignCall(label, foreignName, args) ->

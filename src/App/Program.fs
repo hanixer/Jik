@@ -136,6 +136,6 @@ let main argv =
     // runTestsWithName testAllStages "foreign-call" foreignCallTests
     // runSingleTest testAllStages "(define x 10) x" "x"
     // testCodegen e |> printfn "%s"
-    // runSingleTest testCodegen e6 "4\n"
+    // runSingleTest testCodegen e8 "-4\n"
     runTestsWithName testCodegen "b" basicTests
     0
