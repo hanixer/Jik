@@ -56,23 +56,47 @@ let runSingleTest compile input expected =
     try
         let output = runTest compile input
         if output <> expected then
-            printfn "FAIL! expected:\n<%s>\ngot:\n<%s>\ninput:\n%s\n" expected output input
+            printfn "-----------------------------------"
+            printfn "FAIL!"
+            printfn "expected:\n%s" expected
+            printfn "got:\n%s" output
+            printfn "input:\n%s" input
+            printfn "-----------------------------------"
+            printfn ""
         with
         | e ->
-            printfn "FAIL! exception:\n<%s>\nstacktrace:\n<%s>\ninput:\n%s\n"  (e.Message) (e.StackTrace) input
+            printfn "-----------------------------------"
+            printfn "FAIL!"
+            printfn "exception:\n%s" e.Message
+            printfn "stack trace:\n%s" e.StackTrace
+            printfn "input:\n%s" input
+            printfn "-----------------------------------"
+            printfn ""
 
 let runTestsWithName compile testName tests =
     let fold (passed, i) (input, expected) =
         try
             let output = runTest compile input
             if output <> expected then
-                printfn "FAIL! Test<%s> #%d\nexpected:\n<%s>\ngot:\n<%s>\ninput:\n%s\n" testName i expected output input
+                printfn "-----------------------------------"
+                printfn "FAIL! '%s' #%d" testName i
+                printfn "expected:\n%s" expected
+                printfn "got:\n%s" output
+                printfn "input:\n%s" input
+                printfn "-----------------------------------"
+                printfn ""
                 passed, i + 1
             else
                 passed + 1, i + 1
         with
         | e ->
-            printfn "FAIL! Test<%s> #%d\nexception:\n<%s>\nstacktrace:\n<%s>\ninput:\n%s\n" testName i (e.Message) (e.StackTrace) input
+            printfn "-----------------------------------"
+            printfn "FAIL! '%s' #%d" testName i
+            printfn "exception:\n%s" e.Message
+            printfn "stack trace:\n%s" e.StackTrace
+            printfn "input:\n%s" input
+            printfn "-----------------------------------"
+            printfn ""
             passed, i + 1
 
     let n = List.fold fold (0, 1) tests |> fst

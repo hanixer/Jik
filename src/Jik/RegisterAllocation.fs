@@ -250,11 +250,13 @@ let allocateRegisters (prog : Program) =
         op, List.map (handleArg env) args
 
     let handleDef def =
-        let vars = getSortedVars def.InterfGraph def.StackArgs
+        // def.Args referenced here should be only arguments that do not feet into registers
+        // and go to stack
+        let vars = getSortedVars def.InterfGraph def.Args
         let varsList = List.ofSeq vars
-        let initial = makeInitialColorMap def.InterfGraph (Seq.map Var def.StackArgs)
+        let initial = makeInitialColorMap def.InterfGraph (Seq.map Var def.Args)
         let operandToColor = assignColors def.InterfGraph vars initial
-        let operandToLocation, slots = geconvertMainExprsrandToLocation operandToColor def.StackArgs
+        let operandToLocation, slots = geconvertMainExprsrandToLocation operandToColor def.Args
         {def with Instrs = List.map (handleInstr operandToLocation) def.Instrs
                   SlotsOccupied = def.SlotsOccupied + slots}
 

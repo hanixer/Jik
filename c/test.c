@@ -73,6 +73,11 @@ void broad(char* p) {
 }
 
 int main() {
-    printf("%d, %d, %d", 1, 2, 3);
-    return 0;
+    int a = 1;
+    int b = 2;
+    int c = a * b;
+    int d = 3;
+    int e = 4;
+    int f = d - e;
+    return c + f;
 }

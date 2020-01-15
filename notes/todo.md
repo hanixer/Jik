@@ -17,3 +17,9 @@
 	  In LiSP book, there is a global description table,
 	  which contains information about arity of each primitive.
 	  This table is used during compilation.
+
+# Change call convention
+We could also use just stack memory, without using registers for local variables.
+
+How to do this?
+We have Slot() argument in Codegen.fs.

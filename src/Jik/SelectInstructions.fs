@@ -9,23 +9,17 @@ open Codegen
 let foreignFuncPrefix = "s_"
 
 let argumentToLocation (siStart, siMult) reg args =
-    let fold (regs, index, pairs) arg =
-        match regs with
-        | argReg :: rest ->
-            rest, index, Map.add arg (Reg argReg) pairs
-        | _ ->
-            let offset = siStart + siMult * index
-            [], index + 1, Map.add arg (Deref(offset, reg)) pairs
+    let handleArg index arg =
+        let offset = siStart + siMult * index
+        arg, Deref(offset, reg)
 
-    let _, _, result = List.fold fold (registersForArgs, 0, Map.empty) args
-    result
+    Map.ofSeq (List.mapi handleArg args)
 
 let moveClosureArgs args =
     List.mapi (fun i arg ->
         Mov, [Var arg; Deref((i + 1) * wordSize, R11)]) args
 
-/// Prepare arguments for call. First move them to corresponding registers (registersForArgs).
-/// If registers are not enough then move to stack locations.
+/// Generate instruction to prepare arguments for call.
 let moveArgsForCall args =
     let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
     List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
@@ -105,18 +99,22 @@ let rec declToInstrs (dest, x) =
     | Simple.Bool true -> moveInt trueLiteral dest
     | Simple.Bool false -> moveInt falseLiteral dest
     | Simple.Prim(Prim.Add, [var1; var2]) ->
-        [InstrName.Mov, [Var var1; Var dest]
-         InstrName.Add, [Var var2; Var dest]]
+        [InstrName.Mov, [Var var1; Reg Rax]
+         InstrName.Add, [Var var2; Reg Rax]
+         InstrName.Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Mul, [var1; var2]) ->
-        [InstrName.Mov, [Var var1; Var dest]
-         InstrName.IMul, [Var var2; Var dest]
-         InstrName.Sar, [Int fixnumShift; Var dest]]
+        [InstrName.Mov, [Var var1; Reg Rax]
+         InstrName.IMul, [Var var2; Reg Rax]
+         InstrName.Sar, [Int fixnumShift; Reg Rax]
+         InstrName.Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Sub, [var1; var2]) ->
-        [InstrName.Mov, [Var var1; Var dest]
-         InstrName.Sub, [Var var2; Var dest]]
+        [InstrName.Mov, [Var var1; Reg Rax]
+         InstrName.Sub, [Var var2; Reg Rax]
+         InstrName.Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Sub, [var1]) ->
-        [InstrName.Mov, [Var var1; Var dest]
-         InstrName.Neg, [Var dest]]
+        [InstrName.Mov, [Var var1; Reg Rax]
+         InstrName.Neg, [Reg Rax]
+         InstrName.Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Lt, [var1; var2]) ->
         comparisonInstrs var1 var2 Cc.L (Some(Var dest))
     | Simple.Prim(Prim.Not, [var1]) ->
@@ -267,17 +265,14 @@ let transferToInstrs blocks = function
          Mov, [Reg Rax; Var resultVar]
          InstrName.Jmp label, []]
     | Transfer.Call(Tail, func, args) ->
-        let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
-        let moveToArgPositions =
-            List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
+        let moveToArgPositions = moveArgsForCall args
         let moveStackArgs =
-            if List.length args > List.length registersForArgs then
-                List.skip (List.length registersForArgs) moveToArgPositions
-                |> List.mapi (fun i x ->
-                    match x with
-                    | Mov, [_; arg2] -> Mov, [arg2; Slot(i)]
-                    | _ -> failwith "wrong")
-            else []
+            moveToArgPositions
+            |> List.mapi (fun i x ->
+                match x with
+                | Mov, [_; arg2] -> Mov, [arg2; Slot(i)]
+                | _ -> failwith "wrong")
+
         moveToArgPositions @
         moveStackArgs @
         [Mov, [Var func; Reg Rsi]
@@ -295,11 +290,8 @@ let transferToInstrs blocks = function
          Mov, [Reg Rax; Var resultVar]
          InstrName.Jmp label, []]
 
+/// This was used for approach with register allocation.
 let saveArgs args instrs =
-    let args =
-        if List.length args > List.length registersForArgs then
-            List.take (List.length registersForArgs) args
-        else args
     let argToLoc = argumentToLocation (wordSize, wordSize) Rbp args
     let saveInstrs =
         List.map (fun arg -> Mov, [Map.find arg argToLoc; Var arg]) args
@@ -318,18 +310,12 @@ let selectInstructions (prog : Intermediate.Program) : Program =
     let handleDef proc =
         let instrs =
             List.collect (handleBlock proc.Blocks) proc.Blocks
-            |> saveArgs proc.Args
         let graph = makeGraph []
-        let diff = List.length proc.Args - List.length registersForArgs
-        let slots = if diff > 0 then diff else 0
-        let stackArgs = if diff > 0 then List.skip (List.length registersForArgs) proc.Args else []
+        let slots = List.length proc.Args
         { Name = proc.Name
           Free = proc.Free
           Args = proc.Args
           IsDotted = proc.IsDotted
-          StackArgs = stackArgs
-          Vars = ref []
-          MaxStack = 0
           InterfGraph = graph
           Instrs = instrs
           LiveBefore = Map.empty

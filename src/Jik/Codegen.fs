@@ -21,15 +21,13 @@ type Register =
     | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15
     | Al | Ah | Bl | Bh | Cl | Ch
 
-type Var = string
-
 type Operand =
     | Int of int
     | Reg of Register
     | ByteReg of Register
     | Deref of int * Register
     | Deref4 of int * Register * Register * int
-    | Var of Var
+    | Var of string
     | Slot of int
     | GlobalValue of string
 
@@ -75,10 +73,7 @@ type FunctionDef =
       Free : string list
       Args : string list
       IsDotted : bool
-      StackArgs : string list
       Instrs : Instr list
-      Vars : string list ref
-      MaxStack : int
       InterfGraph : Graph<Operand>
       LiveBefore : Map<int, Set<Operand>>
       LiveAfter : Map<int, Set<Operand>>
@@ -198,6 +193,14 @@ let programToString (prog : Program) =
     handleDef { prog.Main with Name = schemeEntryLabel }
     out.ToString()
 
+/// Applies transformations to instructions.
+let transformInstructions handleInstrs (prog : Program) =
+    let handleDef def =
+        {def with Instrs = handleInstrs def.Instrs}
+
+    { prog with Procedures = List.map handleDef prog.Procedures
+                Main = handleDef prog.Main }
+
 let revealGlobals (prog : Program) =
     let convertArg = function
         | Var var when List.contains var prog.Globals ->
@@ -207,11 +210,9 @@ let revealGlobals (prog : Program) =
     let convertInstr (op, args) =
         op, List.map convertArg args
 
-    let convertProc proc =
-        { proc with Instrs = List.map convertInstr proc.Instrs }
+    let handleInstrs instrs = List.map convertInstr instrs
 
-    { prog with Procedures = List.map convertProc prog.Procedures
-                Main = convertProc prog.Main}
+    transformInstructions handleInstrs prog
 
 let dbg func =
     (fun x -> let y = func x in printfn "%s" (instrsToString y); y)
@@ -258,6 +259,8 @@ let convertSlots (prog : Program) =
     let handleInstr slots (op, args) =
         op, List.map (handleArg slots) args
 
+    let handleInstrs instrs = List.map handleInstr instrs
+
     let handleDef def =
         {def with Instrs = List.map (handleInstr def.SlotsOccupied) def.Instrs}
 
@@ -278,7 +281,6 @@ let stackCorrections (prog : Program) =
     let handleMain def =
         match def.Instrs with
         | (Label _, []) as i  :: rest->
-            let n = def.MaxStack * wordSize
             let instrs =
                 [i
                  Push, [Reg R15]
@@ -318,13 +320,52 @@ let rec patchInstr (prog : Program) =
         | Lea s, [arg] ->
             [Lea s, [Reg Rax]
              Mov, [Reg Rax; arg]]
+        | op, [Int _; arg2] -> [op, args]
         | op, [arg; arg2] when isRegister arg |> not && isRegister arg2 |> not ->
             [Mov, [arg; Reg Rax];
              op, [Reg Rax; arg2]]
         | e -> [e]
 
+    let handleInstrs instrs = List.collect transform instrs |> filterMoves
+
+    transformInstructions handleInstrs prog
+
+let convertVarsToSlots (prog : Program) =
+    let handleArg env arg =
+        match arg with
+        | Var var ->
+            match Map.tryFind var env with
+            | Some(slot) -> Slot slot
+            | _ ->
+                failwithf "var %s was not found in env %A" var env
+        | _ -> arg
+
+    let handleInstr env (op, args) =
+        op, List.map (handleArg env) args
+
+    let collectVars instrs =
+        let vars = seq {
+            for (_, operands) in instrs do
+                yield! Seq.choose (function Var n -> Some n | _ -> None) operands
+        }
+        Set.ofSeq vars
+
+    let makeEnv args vars =
+        let addToEnv (env, i) var =
+            if Map.containsKey var env then
+                env, i
+            else
+                Map.add var i env, i + 1
+
+        let initial = Seq.mapi (fun i arg -> arg, i) args |> Map.ofSeq
+        let env, _ = Seq.fold addToEnv (initial, initial.Count) vars
+        env
+
     let handleDef def =
-        {def with Instrs = List.collect transform def.Instrs |> filterMoves}
+        let vars = collectVars def.Instrs
+        let env = makeEnv def.Args vars
+        {def with Instrs = List.map (handleInstr env) def.Instrs
+                  SlotsOccupied = def.SlotsOccupied + env.Count }
 
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
