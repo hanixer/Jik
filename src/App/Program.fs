@@ -118,6 +118,25 @@ let testLambda str =
 
 [<EntryPoint>]
 let main argv =
+    // runTestsWithName testCodegen "procs" procedureTests
+    // runTestsWithName testCodegen "deep procs" deeplyProcedureTests
+    // runTestsWithName testCodegen "basic" basicTests
+    // runTestsWithName testCodegen "boolean" booleanTests
+    // runTestsWithName testCodegen "vector" vectorTests
+    // runTestsWithName testCodegen "lambda" lambdaTests
+    // runTestsWithName testCodegen "assignment" assignmentTests
+    // runTestsWithName testCodegen "andOr" andOrTests
+    // runTestsWithName testCodegen "pair" pairTests
+    // runTestsWithName testCodegen "setCarCdr" setCarCdrTests
+    // runTestsWithName testCodegen "whenUnless" whenUnlessTests
+    // runTestsWithName testCodegen "cond" condTests
+    // runTestsWithName testCodegen "letrec" letrecTests
+    // runTestsWithName testCodegen "list" listTests
+    // runTestsWithName testCodegen "num -> char" numcharTests
+    // runTestsWithName testCodegen "char?" isCharTests
+    // runTestsWithName testCodegen "string" stringTests
+    runTestsWithName testCodegen "foreign-call" foreignCallTests
+
     // runTestsWithName testAllStages "basic" basicTests
     // runTestsWithName testAllStages "boolean" booleanTests
     // runTestsWithName testAllStages "vector" vectorTests
@@ -136,6 +155,10 @@ let main argv =
     // runTestsWithName testAllStages "foreign-call" foreignCallTests
     // runSingleTest testAllStages "(define x 10) x" "x"
     // testCodegen e |> printfn "%s"
-    // runSingleTest testCodegen e8 "-4\n"
-    runTestsWithName testCodegen "b" basicTests
+    // runTestsWithName testCodegen "b" basicTests
+
+    // runSingleTest testCodegen @"(let ((s (make-string 1)))
+    //       (string-set! s 0 #\a)
+    //       (string-ref s 0))" "#\\a\n"
+
     0

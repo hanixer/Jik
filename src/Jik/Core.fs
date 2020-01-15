@@ -81,8 +81,10 @@ let freshCodeLabel prefix = freshLabel (prefix + "/code")
 let stringPrimop = [
     "+", Add
     "-", Sub
+    "fx+", Add
     "fx-", Sub
     "*", Mul
+    "fx*", Mul
     "eq?", Eq
     "<", Lt
     "<=", Le
@@ -110,6 +112,7 @@ let stringPrimop = [
     "string-set!", StringSet
     "procedure?", IsProcedure
     "zero?", IsZero
+    "fxzero?", IsZero
     "number->char", NumberToChar
     "char->number", CharToNumber
     "fixnum->char", NumberToChar

@@ -321,8 +321,11 @@ let rec patchInstr (prog : Program) =
             [Lea s, [Reg Rax]
              Mov, [Reg Rax; arg]]
         | op, [Int _; arg2] -> [op, args]
+        | Movzb, [arg; arg2] when isRegister arg2 |> not ->
+            [Movzb, [arg; Reg Rax]
+             Mov, [Reg Rax; arg2]]
         | op, [arg; arg2] when isRegister arg |> not && isRegister arg2 |> not ->
-            [Mov, [arg; Reg Rax];
+            [Mov, [arg; Reg Rax]
              op, [Reg Rax; arg2]]
         | e -> [e]
 
