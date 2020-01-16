@@ -451,6 +451,52 @@ let callFailure =
 (let ((f (lambda (y) y)))
   (f 1 2))", "error\n" ]
 
+let variableArity =
+  [ "(let ([f (lambda args 12)])
+      (f))", "12\n"
+    "(let ([f (lambda args 12)])
+      (f 10))", "12\n"
+    "(let ([f (lambda args 12)])
+      (f 10 20))", "12\n"
+    "(let ([f (lambda args 12)])
+      (f 10 20 30))", "12\n"
+    "(let ([f (lambda args 12)])
+      (f 10 20 30 40))", "12\n"
+    "(let ([f (lambda args 12)])
+      (f 10 20 30 40 50))", "12\n"
+    "(let ([f (lambda args 12)])
+      (f 10 20 30 40 50 60 70 80 90))", "12\n"
+    "(let ([f (lambda (a0 . args) 12)])
+      (f 10))", "12\n"
+    "(let ([f (lambda (a0 . args) a0)])
+      (f 10))", "10\n"
+    "(let ([f (lambda (a0 . args) 12)])
+      (f 10 20))", "12\n"
+    "(let ([f (lambda (a0 . args) a0)])
+      (f 10 20))", "10\n"
+    "(let ([f (lambda (a0 a1 . args) (cons a0 a1))])
+      (f 10 20 30 40 50 60 70 80 90 100))", "(10 . 20)\n"
+    "(let ([f (lambda (a0 a1 a3 a4 . args) (cons a0 (cons a1 (cons a3 (cons a4 '())))))])
+      (f 10 20 30 40 50 60 70 80 90 100))", "(10 20 30 40)\n" ]
+
+let variableArityUsingRest =
+  [ "(let ([f (lambda args args)])
+      (f))", "()\n"
+    "(let ([f (lambda args args)])
+      (f 10))", "(10)\n"
+    "(let ([f (lambda args args)])
+      (f 10 20))", "(10 20)\n"
+    "(let ([f (lambda args args)])
+      (f 10 20 30 40 50 60 70 80 90))", "(10 20 30 40 50 60 70 80 90)\n"
+    "(let ([f (lambda (a0 . args) 12)])
+      (f 10))", "12\n"
+    "(let ([f (lambda (a0 . args) a0)])
+      (f 10))", "10\n"
+    "(let ([f (lambda (a0 . args) (cons a0 args))])
+      (f 10 20))", "(10 20)\n"
+    "(let ([f (lambda (a0 a1 . args) (cons a0 (cons a1 args)))])
+      (f 10 20 30 40 50 60 70 80 90 100))", "(10 20 30 40 50 60 70 80 90 100)\n"  ]
+
 let tak =
     [ "(define (tak x y z)
        (if (not (< y x))

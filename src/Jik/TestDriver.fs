@@ -100,4 +100,4 @@ let runTestsWithName compile testName tests =
             passed, i + 1
 
     let n = List.fold fold (0, 1) tests |> fst
-    printfn "Test<%s> run: completed %d / %d" testName n tests.Length
+    printfn "Test \"%s\": completed %d / %d" testName n tests.Length

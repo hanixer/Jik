@@ -321,7 +321,7 @@ and convertExprTail expr =
     | Expr.Begin(exprs) ->
         let heads, tail = List.splitAt (List.length exprs - 1) exprs
         convertMany heads (fun _ -> convertExprTail tail.Head)
-    | Expr.App(Expr.Lambda(formals, dotted, body), args) ->
+    | Expr.App(Expr.Lambda(formals, false, body), args) ->
         convertMany args (fun vars ->
             let mapping = List.zip formals vars |> Map.ofList
             let body = replaceVars mapping (Begin body)

@@ -87,11 +87,20 @@ int thing222(int a) {
     return 0;
 }
 
-int checkFlags(int a) {
+int compare(int a, int b) {
+    if (a < b) {
+        printf("l");
+    }
+    else if (a <= b) {
+        printf("le");
+    }
+    else if (a == b) {
+        printf ("eq");
+    }
 
 }
 
 int main() {
-    printf("%d%d%d%d%d%d%d", 2, 3, 4, 5, 6, 7, 8);
+    compare(1, 2);
     return 1;
 }

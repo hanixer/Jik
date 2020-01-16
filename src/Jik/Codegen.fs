@@ -42,6 +42,7 @@ type Cc =
     | Le
     | G
     | Ge
+    | S // if sign
 
 type InstrName =
     | Add
@@ -125,6 +126,8 @@ let showInstr out (op, args) =
             fprintf out "je %s" label
         | JmpIf (Ne, label) ->
             fprintf out "jne %s" label
+        | JmpIf (S, label) ->
+            fprintf out "js %s" label
         | Jmp label ->
             fprintf out "jmp %s" label
         | Call label ->
@@ -278,7 +281,64 @@ let convertSlots (prog : Program) =
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
 
-let stackCorrections (prog : Program) =
+let constructDottedArgument args =
+    let loopStart = freshLabel "loopStart"
+    let loopEnd = freshLabel "loopEnd"
+    let finalPos = -wordSize * (List.length args)
+
+    // r9 - points to argument on stack
+    // r11 - points to allocated cell
+    // r10 - previous cell or nil
+    // rcx - number of remaining arguments
+    [Mov, [Reg Rcx; Reg Rax]
+     Sub, [Int (List.length args - 1); Reg Rcx]
+     JmpIf(S, errorHandlerLabel), []
+
+     // initialize registers
+     IMul, [Int wordSize; Reg Rax]
+     Mov, [Reg Rsp; Reg R9]
+     Sub, [Reg Rax; Reg R9] // point to the last argument
+     Mov, [Int nilLiteral; Reg R10]
+
+     // loop start
+     Label(loopStart), []
+     Cmp, [Int 0; Reg Rcx]
+     JmpIf(E, loopEnd), []
+
+     // Allocate cons
+     Mov, [GlobalValue(freePointer); Reg R11]
+     Mov, [Deref(0, R9); Deref(0, R11)]
+     Mov, [Reg R10; Deref(wordSize, R11)]
+     Add, [Int (2 * wordSize); GlobalValue(freePointer)]
+     Mov, [Reg R11; Reg R10]
+     Or, [Int pairTag; Reg R10]
+     Sub, [Int 1; Reg Rcx]
+     Add, [Int wordSize; Reg R9]
+
+     // Repeat
+     Jmp(loopStart), []
+
+     // loop end
+     Label(loopEnd), []
+     Mov, [Reg R10; Deref(finalPos, Rsp)]]
+
+/// If function has variable arity (isDotted = true)
+/// then construct last argument as list,
+/// otherwise just check for number of arguments.
+/// Allocate stack space for local variables.
+let argumentCheckAndStackAlloc args isDotted space =
+    if isDotted then
+        constructDottedArgument args @
+        [Sub, [Int space; Reg Rsp]]
+    else
+        [Cmp, [Int (List.length args); Reg Rcx]
+         JmpIf(Ne, errorHandlerLabel), []
+         Sub, [Int space; Reg Rsp]]
+
+/// Add code in the beginning and the end of functions:
+/// stack corrections, number of arguments checking,
+/// dotted arguments construction.
+let addFuncPrologAndEpilog (prog : Program) =
     let restoreStack n = function
         | RestoreStack, [] -> Add, [Operand.Int n; Reg Rsp]
         | x -> x
@@ -287,36 +347,35 @@ let stackCorrections (prog : Program) =
         let firstInstr, rest = List.head def.Instrs, List.tail def.Instrs
         let n = (def.SlotsOccupied + 1) * wordSize
         let rest = List.map (restoreStack n) rest
-        let instrs =
-            [Cmp, [Int def.Args.Length; Reg Rcx]
-             JmpIf(Ne, errorHandlerLabel), []
-             Sub, [Int n; Reg Rsp]]
+        let instrs = argumentCheckAndStackAlloc def.Args def.IsDotted n
         { def with Instrs = firstInstr :: instrs @ rest }
+
+    let wrapMainFunction instr rest =
+        [instr
+         Push, [Reg R15]
+         Mov, [Reg Rsp; Reg R15]
+         Mov, [Reg Rcx; Reg Rsp]
+         Push, [Reg Rbp]
+         Push, [Reg R15]
+         Push, [Reg R14]
+         Push, [Reg R13]
+         Push, [Reg R12]
+         Push, [Reg Rbx]] @
+        rest @
+        [Pop, [Reg Rbx]
+         Pop, [Reg R12]
+         Pop, [Reg R13]
+         Pop, [Reg R14]
+         Pop, [Reg R15]
+         Pop, [Reg Rbp]
+         Mov, [Reg R15; Reg Rsp]
+         Pop, [Reg R15]
+         Ret, []]
 
     let handleMain def =
         match def.Instrs with
         | (Label _, []) as instr :: rest ->
-            let instrs =
-                [instr
-                 Push, [Reg R15]
-                 Mov, [Reg Rsp; Reg R15]
-                 Mov, [Reg Rcx; Reg Rsp]
-                 Push, [Reg Rbp]
-                 Push, [Reg R15]
-                 Push, [Reg R14]
-                 Push, [Reg R13]
-                 Push, [Reg R12]
-                 Push, [Reg Rbx]] @
-                rest @
-                [Pop, [Reg Rbx]
-                 Pop, [Reg R12]
-                 Pop, [Reg R13]
-                 Pop, [Reg R14]
-                 Pop, [Reg R15]
-                 Pop, [Reg Rbp]
-                 Mov, [Reg R15; Reg Rsp]
-                 Pop, [Reg R15]
-                 Ret, []]
+            let instrs = wrapMainFunction instr rest
             {def with Instrs = instrs}
         | _ -> failwith "addFunction...: expected label"
 

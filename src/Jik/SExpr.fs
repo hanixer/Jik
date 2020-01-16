@@ -104,14 +104,19 @@ type SExpr =
     | Bool of bool
 and Frame = Map<string, SExpr ref> ref
 
-let (|List|_|) (e:SExpr) =
-    let rec loop = function
+let (|List|ListImproper|ListWrong|) (e: SExpr) =
+    let rec loop acc = function
+        | Cons (x, (Cons(_) as y)) ->
+            loop (x :: acc) y
+        | Cons (x, Nil) ->
+            let lst = List.rev (x :: acc)
+            Choice1Of3(lst)
         | Cons (x, y) ->
-            loop y
-            |> Option.map (fun y -> x :: y)
-        | Nil -> Some []
-        | _ -> None
-    let retu = loop e
+            let lst = List.rev (y :: x :: acc)
+            Choice2Of3(lst)
+        | Nil -> Choice1Of3([])
+        | _ -> Choice3Of3(())
+    let retu = loop [] e
     retu
 
 

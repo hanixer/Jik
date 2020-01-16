@@ -163,11 +163,21 @@ let rec desugar2 env sexpr =
 and expand env sexpr =
     let desugar = desugar2 env
     match sexpr with
+    | List(Symbol "lambda" :: Symbol arg :: body) ->
+        let env = arg :: env
+        let body = List.map (desugar2 env) body
+        exprsToList (Symbol "lambda" :: Symbol arg :: body)
     | List(Symbol "lambda" :: List args :: body) ->
         let argsString = symbolsToStrings args
         let env = argsString @ env
         let body = List.map (desugar2 env) body
         exprsToList (Symbol "lambda" :: exprsToList args :: body)
+    | List(Symbol "lambda" :: ListImproper args :: body) ->
+        let argsString = symbolsToStrings args
+        let env = argsString @ env
+        let body = List.map (desugar2 env) body
+        let argsRevert = exprsToDottedList args
+        SExpr.Cons(Symbol "lambda", SExpr.Cons(argsRevert, exprsToList body))
     | List(Symbol "let" :: List bindings :: body) ->
         let folder sexpr (names, initExprs) =
             match sexpr with
@@ -257,22 +267,11 @@ and expand env sexpr =
         sexpr
 
 let parseArgs args =
-    let rec loop processed = function
-        | S.Cons(a, S.Cons(b, c)) ->
-            loop (a :: processed) (S.Cons(b, c))
-        | S.Cons(a, Nil) ->
-            List.rev (a :: processed), false
-        | S.Cons(a, b) ->
-            List.rev (b :: a :: processed), true
-        | Nil ->
-            List.rev processed, false
-        | _ -> failwith "parseArgs: parsing fails"
-
     match args with
-    | Symbol arg -> [arg], true
-    | _ ->
-        let args, dotted = loop [] args
-        symbolsToStrings args, dotted
+    | List args -> args, false
+    | ListImproper (args) -> args, true
+    | Symbol arg -> [Symbol arg], true
+    | _ -> failwithf "wrong argument SExpr for lambda form:\n%A" args
 
 let rec sexprToExpr sexpr =
     let convertList = List.map sexprToExpr
@@ -290,7 +289,8 @@ let rec sexprToExpr sexpr =
     | List [Symbol "set!"; Symbol name; rhs] -> Assign(name, sexprToExpr rhs)
     | List(Symbol "lambda" :: args :: body) ->
         let args, dotted = parseArgs args
-        Lambda(args, dotted, convertList body)
+        let strings = symbolsToStrings args
+        Lambda(strings, dotted, convertList body)
     | List [Symbol "quote"; List []] -> EmptyList
     | List [Symbol "quote"; form] ->
         failwith "sexprToExpr: quote is not supported"
