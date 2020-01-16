@@ -17,9 +17,16 @@
 	  In LiSP book, there is a global description table,
 	  which contains information about arity of each primitive.
 	  This table is used during compilation.
+3. Implement variable arity functions.
+   For that we need to implement error reporting, when function has wrong number of arguments.
+   As simple implementation we can just report that error happend.
+   Then we can also pass some symbol describing the procedure
+   and actual and expected numbers of arguments.
+   We will append error handler code to the main function. Label name will be visible to compiled code.
+   If error condition happens, then we jump to that label.
+   Then call to C function error() happens and we exit with -1 or 1.
+   Now we need to change so that call the closure directly without moving it to rax.
 
-# Change call convention
-We could also use just stack memory, without using registers for local variables.
-
-How to do this?
-We have Slot() argument in Codegen.fs.
+# Call convention
+Arguments are passed via stack. When function is called first passed argument
+is at rsp - 16, second at rsp - 24, etc.

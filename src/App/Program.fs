@@ -118,8 +118,8 @@ let testLambda str =
 
 [<EntryPoint>]
 let main argv =
-    // runTestsWithName testCodegen "procs" procedureTests
-    // runTestsWithName testCodegen "deep procs" deeplyProcedureTests
+    runTestsWithName testCodegen "procs" procedureTests
+    runTestsWithName testCodegen "deep procs" deeplyProcedureTests
     // runTestsWithName testCodegen "basic" basicTests
     // runTestsWithName testCodegen "boolean" booleanTests
     // runTestsWithName testCodegen "vector" vectorTests
@@ -162,6 +162,6 @@ let main argv =
     (let ((args (cons 1 (cons 2 '()))))
         (apply sum args)))"
 
-    runSingleTest testCodegen apply "3"
+    // runSingleTest testCodegen apply "3"
 
     0

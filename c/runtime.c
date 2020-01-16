@@ -149,6 +149,11 @@ ptr s_print6args(ptr a1, ptr a2, ptr a3, ptr a4, ptr a5, ptr a6) {
     return 0;
 }
 
+void error() {
+    printf("error");
+    exit(1);
+}
+
 int main() {
     int stackSize = 16 * 4096;
     char* stack = allocateProtectedSpace(stackSize);

@@ -6,6 +6,12 @@ open Intermediate
 open RuntimeConstants
 open Codegen
 
+// A function of n arguments will be compiled as a function of n+1 arguments.
+// A call with m arguments will be compiled as a call with m+1 arguments,
+// where the value of the first argument is m. The emitted code for a function
+// should now check that the value of the first argument is equal to n and
+// signal an error when it is not.
+
 let foreignFuncPrefix = "s_"
 
 let stackArgsCount args = List.length args - List.length registersForArgs
@@ -54,9 +60,43 @@ let getCallResultVar label blocks =
 let makeIndirectCall func =
     [Mov, [Reg Rsi; Deref(0, Rsp)] // Save current closure pointer
      Mov, [Var func; Reg Rsi]
-     Mov, [Deref(-closureTag, Rsi); Reg Rax]
-     CallIndirect, [Reg Rax]
-     Mov, [Deref(0, Rsp); Reg Rsi]] // Restore closure pointer
+     CallIndirect, [Deref(-closureTag, Rsi)]
+     Mov, [Deref(0, Rsp); Reg Rsi]] //
+
+let compileCall label blocks func args =
+    let resultVar = getCallResultVar label blocks
+    moveArgsForCall args @
+    makeIndirectCall func @
+    [Mov, [Reg Rax; Var resultVar]
+     InstrName.Jmp label, []]
+
+let compileTailCall func args =
+    let moveToArgPositions = moveArgsForCall args
+    let moveStackArgs =
+        moveToArgPositions
+        |> List.mapi (fun i x ->
+            match x with
+            | Mov, [_; arg2] -> Mov, [arg2; Slot(i)]
+            | _ -> failwith "wrong")
+
+    moveToArgPositions @
+    [Mov, [Var func; Reg Rsi]] @
+    moveStackArgs @
+    [RestoreStack, []
+     JmpIndirect, [Deref(-closureTag, Rsi)]]
+
+let compileForeignCall label blocks foreignName args =
+    let moveToArgPositions = moveArgsForCallFF args
+    let resultVar = getCallResultVar label blocks
+    let name = foreignFuncPrefix + foreignName
+    let stackArgsCount = args.Length - registersForArgs.Length
+    let spChange = (stackArgsCount + 4) * wordSize // 4 is 'shadow space' which caller must allocate
+    moveToArgPositions @
+    [Sub, [Int spChange; Reg Rsp]
+     Call name, []
+     Add, [Int spChange; Reg Rsp]
+     Mov, [Reg Rax; Var resultVar]
+     Jmp label, []]
 
 let convertNumber n = n <<< fixnumShift
 
@@ -76,20 +116,20 @@ let comparisonInstrs var1 var2 cc dest =
     | Some dest ->
         instrs @ [Mov, [Reg Rax; dest]]
 
-let setOnEqualInstrs dest =
+let compileSetOnEqual dest =
     [Set E, [Reg Al]
      Movzb, [Reg Al; Reg Rax]
      Sal, [Operand.Int boolBit; Reg Rax]
      Or, [Operand.Int falseLiteral; Reg Rax]
      Mov, [Reg Rax; Var dest]]
 
-let isOfTypeInstrs dest var1 mask tag =
+let compileIsOfType dest var1 mask tag =
     [Mov, [Var var1; Reg Rax]
      And, [Int mask; Reg Rax]
      Cmp, [Int tag; Reg Rax]]
-    @ setOnEqualInstrs dest
+    @ compileSetOnEqual dest
 
-let makeVectorInstrs size var =
+let compileMakeVector size var =
     let shift = if wordSize = 8 then 3 else 2
     [Mov, [GlobalValue(freePointer); Reg R11]
      Mov, [size; Deref(0, R11)]
@@ -101,7 +141,7 @@ let makeVectorInstrs size var =
      Sal, [Int shift; Reg R11]
      Add, [Reg R11; GlobalValue(freePointer)]]
 
-let makeStringInstrs size dest =
+let compileMakeString size dest =
     [Mov, [GlobalValue(freePointer); Reg R11]
      Mov, [size; Deref(0, R11)]
      Or, [Int stringTag; Reg R11]
@@ -131,45 +171,45 @@ let rec declToInstrs (dest, x) =
     | Simple.Bool true -> moveInt trueLiteral dest
     | Simple.Bool false -> moveInt falseLiteral dest
     | Simple.Prim(Prim.Add, [var1; var2]) ->
-        [InstrName.Mov, [Var var1; Reg Rax]
-         InstrName.Add, [Var var2; Reg Rax]
-         InstrName.Mov, [Reg Rax; Var dest]]
+        [Mov, [Var var1; Reg Rax]
+         Add, [Var var2; Reg Rax]
+         Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Mul, [var1; var2]) ->
-        [InstrName.Mov, [Var var1; Reg Rax]
-         InstrName.IMul, [Var var2; Reg Rax]
-         InstrName.Sar, [Int fixnumShift; Reg Rax]
-         InstrName.Mov, [Reg Rax; Var dest]]
+        [Mov, [Var var1; Reg Rax]
+         IMul, [Var var2; Reg Rax]
+         Sar, [Int fixnumShift; Reg Rax]
+         Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Sub, [var1; var2]) ->
-        [InstrName.Mov, [Var var1; Reg Rax]
-         InstrName.Sub, [Var var2; Reg Rax]
-         InstrName.Mov, [Reg Rax; Var dest]]
+        [Mov, [Var var1; Reg Rax]
+         Sub, [Var var2; Reg Rax]
+         Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Sub, [var1]) ->
-        [InstrName.Mov, [Var var1; Reg Rax]
-         InstrName.Neg, [Reg Rax]
-         InstrName.Mov, [Reg Rax; Var dest]]
+        [Mov, [Var var1; Reg Rax]
+         Neg, [Reg Rax]
+         Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Lt, [var1; var2]) ->
         comparisonInstrs var1 var2 Cc.L (Some(Var dest))
     | Simple.Prim(Prim.Not, [var1]) ->
         [Cmp, [Operand.Int falseLiteral; Var var1]] @
-        setOnEqualInstrs dest
+        compileSetOnEqual dest
     | Simple.Prim(Prim.Eq, [var1; var2]) ->
         [Cmp, [Var var1; Var var2]] @
-        setOnEqualInstrs dest
+        compileSetOnEqual dest
     | Simple.Prim(Prim.IsFixnum, [var1]) ->
         [Mov, [Var var1; Var dest]
          And, [Int fixnumMask; Var dest]
          Cmp, [Int fixnumTag; Var dest]] @
-         setOnEqualInstrs dest
+         compileSetOnEqual dest
     | Simple.Prim(Prim.IsZero, [var1]) ->
         [Cmp, [Int 0; Var var1]]
-        @ setOnEqualInstrs dest
+        @ compileSetOnEqual dest
     | Simple.Prim(Prim.IsChar, [var1]) ->
-        isOfTypeInstrs dest var1 charMask charTag
+        compileIsOfType dest var1 charMask charTag
     | Simple.Prim(Prim.IsBoolean, [var1]) ->
         [Mov, [Var var1; Reg Rax]
          And, [Int boolTag; Reg Rax]
          Cmp, [Int boolTag; Reg Rax]]
-        @ setOnEqualInstrs dest
+        @ compileSetOnEqual dest
     | Simple.Prim(Prim.CharToNumber, [var1]) ->
         [Mov, [Var var1; Reg Rax]
          Sar, [Int charShift; Reg Rax]
@@ -191,9 +231,9 @@ let rec declToInstrs (dest, x) =
          Mov, [Reg R11; Var dest]
          Add, [Int (2 * wordSize); GlobalValue(freePointer)]]
     | Simple.Prim(Prim.IsPair, [var1]) ->
-        isOfTypeInstrs dest var1 pairMask pairTag
+        compileIsOfType dest var1 pairMask pairTag
     | Simple.Prim(Prim.IsNull, [var1]) ->
-        isOfTypeInstrs dest var1 nilMask nilLiteral
+        compileIsOfType dest var1 nilMask nilLiteral
     | Simple.Prim(Prim.Car, [pair]) ->
         [Mov, [Var pair; Reg R11]
          getCar R11 (Var dest)]
@@ -210,12 +250,12 @@ let rec declToInstrs (dest, x) =
          Mov, [Var value; Var dest]]
     // Vectors.
     | Simple.Prim(Prim.MakeVector, [var1]) ->
-        makeVectorInstrs (Var var1) dest
+        compileMakeVector (Var var1) dest
     | Simple.Prim(Prim.VectorLength, [var1]) ->
         [Mov, [Var var1; Reg R11]
          Mov, [Deref(-vectorTag, R11); Var dest]]
     | Simple.Prim(Prim.IsVector, [var1]) ->
-        isOfTypeInstrs dest var1 vectorMask vectorTag
+        compileIsOfType dest var1 vectorMask vectorTag
     | Simple.Prim(Prim.VectorSet, [vec; index; value]) ->
         vectorAddress vec (Var index) @
         [Mov, [Var value; Deref4(-vectorTag, R11, R12, wordSize)]]
@@ -224,12 +264,12 @@ let rec declToInstrs (dest, x) =
         [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var dest]]
     // Strings.
     | Simple.Prim(Prim.MakeString, [var1]) ->
-        makeStringInstrs (Var var1) dest
+        compileMakeString (Var var1) dest
     | Simple.Prim(Prim.StringLength, [var1]) ->
         [Mov, [Var var1; Reg R11]
          Mov, [Deref(-stringTag, R11); Var dest]]
     | Simple.Prim(Prim.IsString, [var1]) ->
-        isOfTypeInstrs dest var1 stringMask stringTag
+        compileIsOfType dest var1 stringMask stringTag
     | Simple.Prim(Prim.StringSet, [instance; index; value]) ->
         [Mov, [Var instance; Reg R11]
          Mov, [Var index; Reg R12]
@@ -261,7 +301,7 @@ let rec declToInstrs (dest, x) =
          Sar, [Int fixnumShift; Reg Rax]
          Mov, [Deref4(-closureTag + wordSize, Rsi, Rax, wordSize); Var dest]]
     | Simple.Prim(Prim.IsProcedure, [var1]) ->
-        isOfTypeInstrs dest var1 closureMask closureTag
+        compileIsOfType dest var1 closureMask closureTag
     | Simple.Prim(Prim.GlobalSet, [glob; value]) ->
         [Mov, [Var value; GlobalValue(glob)]]
     | Simple.Prim(Prim.GlobalRef, [glob]) ->
@@ -305,38 +345,11 @@ let transferToInstrs blocks = function
          Cmp, [Operand.Int falseLiteral; Reg Rax]
          JmpIf (E, labelf), []]
     | Transfer.Call(NonTail label, func, args) ->
-        let resultVar = getCallResultVar label blocks
-        moveArgsForCall args @
-        makeIndirectCall func @
-        [Mov, [Reg Rax; Var resultVar]
-         InstrName.Jmp label, []]
+        compileCall label blocks func args
     | Transfer.Call(Tail, func, args) ->
-        let moveToArgPositions = moveArgsForCall args
-        let moveStackArgs =
-            moveToArgPositions
-            |> List.mapi (fun i x ->
-                match x with
-                | Mov, [_; arg2] -> Mov, [arg2; Slot(i)]
-                | _ -> failwith "wrong")
-
-        moveToArgPositions @
-        [Mov, [Var func; Reg Rsi]] @
-        moveStackArgs @
-        [Mov, [Deref(-closureTag, Rsi); Reg Rax]
-         RestoreStack, []
-         JmpIndirect, [Reg Rax]]
+        compileTailCall func args
     | ForeignCall(label, foreignName, args) ->
-        let moveToArgPositions = moveArgsForCallFF args
-        let resultVar = getCallResultVar label blocks
-        let name = foreignFuncPrefix + foreignName
-        let stackArgsCount = args.Length - registersForArgs.Length
-        let spChange = (stackArgsCount + 4) * wordSize // 4 is 'shadow space' which caller must allocate
-        moveToArgPositions @
-        [Sub, [Int spChange; Reg Rsp]
-         Call name, []
-         Add, [Int spChange; Reg Rsp]
-         Mov, [Reg Rax; Var resultVar]
-         InstrName.Jmp label, []]
+        compileForeignCall label blocks foreignName args
 
 /// This was used for approach with register allocation.
 let saveArgs args instrs =
@@ -354,6 +367,10 @@ let selectInstructions (prog : Intermediate.Program) : Program =
 
     let handleBlock blocks (name, _, stmts) =
         (InstrName.Label name, []) :: List.collect (handleStmt blocks) stmts
+
+    let errorHandler =
+        [Label(errorHandlerLabel), []
+         Call("error"), []]
 
     let handleDef proc =
         let instrs =
@@ -383,5 +400,6 @@ let selectInstructions (prog : Intermediate.Program) : Program =
     let main = { main with Instrs = [Label schemeEntryLabel, []; Call impl, []] }
     { Procedures = List.map handleDef procs
       Main = main
-      Globals = prog.Globals }
+      Globals = prog.Globals
+      ErrorHandler = errorHandler }
 

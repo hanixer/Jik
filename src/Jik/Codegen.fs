@@ -82,9 +82,12 @@ type FunctionDef =
 type Program =
     { Procedures : FunctionDef list
       Main : FunctionDef
-      Globals : string list }
+      Globals : string list
+      ErrorHandler : Instr list }
 
 let freePointer = "freePointer"
+
+let errorHandlerLabel = ".L_errorHandler"
 
 let allRegisters =
     [Rsp; Rbp; Rax; Rbx; Rcx; Rdx; Rsi; Rdi;
@@ -191,6 +194,7 @@ let programToString (prog : Program) =
     List.iter printGlobal prog.Globals
     List.iter handleDef prog.Procedures
     handleDef { prog.Main with Name = schemeEntryLabel }
+    showInstrs out prog.ErrorHandler
     out.ToString()
 
 /// Applies transformations to instructions.
