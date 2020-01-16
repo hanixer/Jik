@@ -492,3 +492,8 @@ let closureConversion (prog : Program) : Program =
     let procs1, main = convertFunction prog.Main
     { prog with Procedures = defs @ procs @ procs1
                 Main = main }
+
+let allIntermediateTransformations =
+    convertProgram
+    >> analyzeFreeVars
+    >> closureConversion

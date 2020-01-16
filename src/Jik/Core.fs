@@ -505,3 +505,8 @@ let assignmentConvert (prog : Program) : Program =
 
 let stringToExpr = stringToSExpr >> sexprToExpr
 
+let allCoreTransformations =
+    fixArithmeticPrims
+    >> convertGlobalRefs
+    >> alphaRename
+    >> assignmentConvert

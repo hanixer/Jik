@@ -1,7 +1,6 @@
 After variable arity functions, we can implement library functions like (vector 1 2 3) => #(1 2 3).
 So we return to separate compilation.
 
-
 1. Basic IO. Done.
 	- Add support in code gen.
 	- Add support in Core language - add separate case for foreign call.
@@ -143,3 +142,7 @@ So we will add a project called CompilerDriver - command line utility, that will
 Test driver can use functions from CompilerDriver.dll.
 
 For beginning, we will support just one library file and just one user file.
+
+We need to pass to all our functions to say that main scheme entry should not (or should) be generated.
+This option should be present per file. And should be added to all Program structures.
+Some boolean flag like "IsMainFile", i.e. main file contains main entry point.
