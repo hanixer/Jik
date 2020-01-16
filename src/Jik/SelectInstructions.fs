@@ -10,6 +10,9 @@ let foreignFuncPrefix = "s_"
 
 let stackArgsCount args = List.length args - List.length registersForArgs
 
+let getCar reg dest = Mov, [Deref(-pairTag, reg); dest]
+let getCdr reg dest = Mov, [Deref(-pairTag + wordSize, reg); dest]
+
 let moveClosureArgs args =
     List.mapi (fun i arg ->
         Mov, [Var arg; Deref((i + 1) * wordSize, R11)]) args
@@ -64,13 +67,38 @@ let makeIndirectCall func =
     checkForClosureTag @
     [Mov, [Deref(0, Rsp); Reg Rsi]]
 
+/// Main function for indirect non-tail call.
 let compileCall label blocks func args =
     let resultVar = getCallResultVar label blocks
     moveArgsForCall args @
+    [Mov, [Int args.Length; Reg Rax]] @
     makeIndirectCall func @
     [Mov, [Reg Rax; Var resultVar]
-     InstrName.Jmp label, []]
+     Jmp label, []]
 
+/// TODO: rework this so that apply could receive more than 2 arguments
+let compileApply func argsList dest =
+    let loopBegin = freshLabel "loopBegin"
+    let loopEnd = freshLabel "loopEnd"
+    [Mov, [Var func; Reg Rcx]
+     Mov, [Var argsList; Reg Rdx]
+     Mov, [Int 0; Reg R8] // r8 contains negated number of arguments
+     Label loopBegin, []
+     Mov, [Int nilLiteral; Reg Rax]
+     Cmp, [Reg Rdx; Reg Rax]
+     JmpIf(E, loopEnd), []
+     getCar Rdx (Reg Rax)
+     Sub, [Int 1; Reg R8] // Change argument counter
+     Mov, [Reg Rax; Deref4(-wordSize, Rsp, R8, wordSize)] // Save argument to its pos in stack
+     getCdr Rdx (Reg Rdx)
+     Jmp(loopBegin), []
+     Label(loopEnd), []
+     Neg, [Reg R8]
+     Mov, [Reg R8; Reg Rax]] @
+    makeIndirectCall func @
+    [Mov, [Reg Rax; Var dest]]
+
+/// Main function for tail call.
 let compileTailCall func args =
     let moveToArgPositions = moveArgsForCall args
     let moveStackArgs =
@@ -85,7 +113,8 @@ let compileTailCall func args =
     moveStackArgs @
     [RestoreStack, []] @
     checkForClosureTag @
-    [JmpIndirect, [Deref(-closureTag, Rsi)]]
+    [Mov, [Int (List.length args); Reg Rax]
+     JmpIndirect, [Deref(-closureTag, Rsi)]]
 
 let compileForeignCall label blocks foreignName args =
     let moveToArgPositions = moveArgsForCallFF args
@@ -162,8 +191,6 @@ let vectorAddress vec index =
      Add, [Int 1; Reg R12]]
 
 
-let getCar reg dest = Mov, [Deref(-pairTag, reg); dest]
-let getCdr reg dest = Mov, [Deref(-pairTag + wordSize, reg); dest]
 
 let rec declToInstrs (dest, x) =
     match x with
@@ -309,23 +336,7 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.GlobalRef, [glob]) ->
         [Mov, [GlobalValue(glob); Var dest]]
     | Simple.Prim(Prim.Apply, [func; argsList]) ->
-        let loopBegin = freshLabel "loopBegin"
-        let loopEnd = freshLabel "loopEnd"
-        [Mov, [Var func; Reg Rcx]
-         Mov, [Var argsList; Reg Rdx]
-         Mov, [Int 0; Reg R8]
-         Label loopBegin, []
-         Mov, [Int nilLiteral; Reg Rax]
-         Cmp, [Reg Rdx; Reg Rax]
-         JmpIf(E, loopEnd), []
-         getCar Rdx (Reg Rax)
-         Sub, [Int 1; Reg R8] // Change argument counter
-         Mov, [Reg Rax; Deref4(-wordSize, Rsp, R8, wordSize)] // Save argument to its pos in stack
-         getCdr Rdx (Reg Rdx)
-         Jmp(loopBegin), []
-         Label(loopEnd), []] @
-        makeIndirectCall func @
-        [Mov, [Reg Rax; Var dest]]
+        compileApply func argsList dest
 
     | e -> failwithf "handleDecl: %s %A" dest e
 

@@ -462,7 +462,13 @@ let callFailure =
             (if (number? x)
                 (lambda (y) y)
                 #f))))
-  ((f #t) #f))", "error\n" ]
+  ((f #t) #f))", "error\n"
+      "
+(let ((f (lambda (y) y)))
+  (f))", "error\n"
+      "
+(let ((f (lambda (y) y)))
+  (f 1 2))", "error\n" ]
 
 let tak =
     [ "(define (tak x y z)

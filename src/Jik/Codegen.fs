@@ -284,16 +284,20 @@ let stackCorrections (prog : Program) =
         | x -> x
 
     let handleDef def =
-        let h, rest = List.head def.Instrs, List.tail def.Instrs
+        let firstInstr, rest = List.head def.Instrs, List.tail def.Instrs
         let n = (def.SlotsOccupied + 1) * wordSize
         let rest = List.map (restoreStack n) rest
-        { def with Instrs = h :: (Sub, [Operand.Int n; Reg Rsp]) :: rest }
+        let instrs =
+            [Cmp, [Int def.Args.Length; Reg Rax]
+             JmpIf(Ne, errorHandlerLabel), []
+             Sub, [Int n; Reg Rsp]]
+        { def with Instrs = firstInstr :: instrs @ rest }
 
     let handleMain def =
         match def.Instrs with
-        | (Label _, []) as i  :: rest->
+        | (Label _, []) as instr :: rest ->
             let instrs =
-                [i
+                [instr
                  Push, [Reg R15]
                  Mov, [Reg Rsp; Reg R15]
                  Mov, [Reg Rcx; Reg Rsp]
@@ -331,7 +335,7 @@ let rec patchInstr (prog : Program) =
         | Lea s, [arg] ->
             [Lea s, [Reg Rax]
              Mov, [Reg Rax; arg]]
-        | op, [Int _; arg2] -> [op, args]
+        | op, [Int _; _] -> [op, args]
         | Movzb, [arg; arg2] when isRegister arg2 |> not ->
             [Movzb, [arg; Reg Rax]
              Mov, [Reg Rax; arg2]]

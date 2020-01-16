@@ -127,7 +127,7 @@ let tryStringToPrimop s =
     List.tryFind (fst >> ((=) s)) stringPrimop
     |> Option.map snd
 
-let isPrimop = (fun x -> printfn "isPrimop? %A" x; x) >> tryStringToPrimop >> (fun x -> printfn "isPrimop? %A" x; x) >> Option.isSome
+let isPrimop = tryStringToPrimop >> Option.isSome
 
 let wrapInLet var value body =
     exprsToList [S.Symbol "let"
