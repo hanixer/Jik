@@ -58,20 +58,20 @@ let checkForClosureTag =
     [Mov, [Int closureMask; Reg Rax]
      And, [Reg Rsi; Reg Rax]
      Cmp, [Int closureTag; Reg Rax]
-     JmpIf(Ne, errorHandlerLabel), []
-     CallIndirect, [Deref(-closureTag, Rsi)]]
+     JmpIf(Ne, errorHandlerLabel), []]
 
 let makeIndirectCall func =
     [Mov, [Reg Rsi; Deref(0, Rsp)] // Save current closure pointer
      Mov, [Var func; Reg Rsi]] @
     checkForClosureTag @
-    [Mov, [Deref(0, Rsp); Reg Rsi]]
+    [CallIndirect, [Deref(-closureTag, Rsi)]
+     Mov, [Deref(0, Rsp); Reg Rsi]]
 
 /// Main function for indirect non-tail call.
 let compileCall label blocks func args =
     let resultVar = getCallResultVar label blocks
     moveArgsForCall args @
-    [Mov, [Int args.Length; Reg Rax]] @
+    [Mov, [Int args.Length; Reg Rcx]] @
     makeIndirectCall func @
     [Mov, [Reg Rax; Var resultVar]
      Jmp label, []]
@@ -94,7 +94,7 @@ let compileApply func argsList dest =
      Jmp(loopBegin), []
      Label(loopEnd), []
      Neg, [Reg R8]
-     Mov, [Reg R8; Reg Rax]] @
+     Mov, [Reg R8; Reg Rcx]] @
     makeIndirectCall func @
     [Mov, [Reg Rax; Var dest]]
 
@@ -113,7 +113,7 @@ let compileTailCall func args =
     moveStackArgs @
     [RestoreStack, []] @
     checkForClosureTag @
-    [Mov, [Int (List.length args); Reg Rax]
+    [Mov, [Int (List.length args); Reg Rcx]
      JmpIndirect, [Deref(-closureTag, Rsi)]]
 
 let compileForeignCall label blocks foreignName args =
@@ -410,7 +410,11 @@ let selectInstructions (prog : Intermediate.Program) : Program =
         | _ -> failwith "selectInstructions: wrong main function"
     let procs = entryImplFunc :: prog.Procedures
     let main = handleDef { emptyFunction with Name = schemeEntryLabel }
-    let main = { main with Instrs = [Label schemeEntryLabel, []; Call impl, []] }
+    let instrs =
+        [Label schemeEntryLabel, [];
+         Mov, [Int 0; Reg Rcx]
+         Call impl, []]
+    let main = { main with Instrs = instrs }
     { Procedures = List.map handleDef procs
       Main = main
       Globals = prog.Globals

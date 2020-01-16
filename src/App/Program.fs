@@ -119,24 +119,23 @@ let testLambda str =
 [<EntryPoint>]
 let main argv =
     runTestsWithName testCodegen "calls" callFailure
-    // runTestsWithName testCodegen "procs" procedureTests
-    // runTestsWithName testCodegen "deep procs" deeplyProcedureTests
-    // runTestsWithName testCodegen "basic" basicTests
-    // runTestsWithName testCodegen "boolean" booleanTests
-    // runTestsWithName testCodegen "vector" vectorTests
-    // runTestsWithName testCodegen "lambda" lambdaTests
-    // runTestsWithName testCodegen "assignment" assignmentTests
-    // runTestsWithName testCodegen "andOr" andOrTests
-    // runTestsWithName testCodegen "pair" pairTests
-    // runTestsWithName testCodegen "setCarCdr" setCarCdrTests
-    // runTestsWithName testCodegen "whenUnless" whenUnlessTests
-    // runTestsWithName testCodegen "cond" condTests
-    // runTestsWithName testCodegen "letrec" letrecTests
-    // runTestsWithName testCodegen "list" listTests
-    // runTestsWithName testCodegen "num -> char" numcharTests
-    // runTestsWithName testCodegen "char?" isCharTests
-    // runTestsWithName testCodegen "string" stringTests
-    // runTestsWithName testCodegen "foreign-call" foreignCallTests
+    runTestsWithName testCodegen "deep procs" deeplyProcedureTests
+    runTestsWithName testCodegen "lambda" lambdaTests
+    runTestsWithName testCodegen "basic" basicTests
+    runTestsWithName testCodegen "boolean" booleanTests
+    runTestsWithName testCodegen "vector" vectorTests
+    runTestsWithName testCodegen "assignment" assignmentTests
+    runTestsWithName testCodegen "andOr" andOrTests
+    runTestsWithName testCodegen "pair" pairTests
+    runTestsWithName testCodegen "setCarCdr" setCarCdrTests
+    runTestsWithName testCodegen "whenUnless" whenUnlessTests
+    runTestsWithName testCodegen "cond" condTests
+    runTestsWithName testCodegen "letrec" letrecTests
+    runTestsWithName testCodegen "list" listTests
+    runTestsWithName testCodegen "num -> char" numcharTests
+    runTestsWithName testCodegen "char?" isCharTests
+    runTestsWithName testCodegen "string" stringTests
+    runTestsWithName testCodegen "foreign-call" foreignCallTests
 
     // runTestsWithName testAllStages "basic" basicTests
     // runTestsWithName testAllStages "boolean" booleanTests
@@ -159,6 +158,6 @@ let main argv =
     // runTestsWithName testCodegen "b" basicTests
 
 
-    // runSingleTest testCodegen apply "3"
+    // runSingleTest testCodegen "(let ((n 12)) (let ((f (lambda (m) (+ n m)))) (f 100)))" "112"
 
     0

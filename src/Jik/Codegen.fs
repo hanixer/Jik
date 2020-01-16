@@ -16,7 +16,7 @@ open Display
 /// Register %rsi is used as closure pointer.
 /// It is saved and restored at each function call.
 ///
-/// Calling function should pass number of arguments in %rax,
+/// Calling function should pass number of arguments in %rcx,
 /// so that called function could check if the number is correct.
 
 type Register =
@@ -288,7 +288,7 @@ let stackCorrections (prog : Program) =
         let n = (def.SlotsOccupied + 1) * wordSize
         let rest = List.map (restoreStack n) rest
         let instrs =
-            [Cmp, [Int def.Args.Length; Reg Rax]
+            [Cmp, [Int def.Args.Length; Reg Rcx]
              JmpIf(Ne, errorHandlerLabel), []
              Sub, [Int n; Reg Rsp]]
         { def with Instrs = firstInstr :: instrs @ rest }

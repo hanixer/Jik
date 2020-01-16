@@ -183,26 +183,6 @@ let vectorTests =
       e13, "33\n"
       e14, "#(1 2 3)\n" ]
 
-let lambdaTests =
-    [ "(procedure? (lambda (x) x))", "#t\n"
-      "(procedure? ((lambda ()
-                  (lambda () 1))))", "#t\n"
-      @"(let ((f (lambda () 12))) (f))", "12\n"
-      @"(let ((f (lambda () (+ 12 13)))) (f))", "25\n"
-      @"(let ((f (lambda () 13))) (+ (f) (f)))", "26\n"
-      @"(let ((f (lambda () (let ((g (lambda () (+ 2 3)))) (* (g) (g)))))) (+ (f) (f)))", "50\n"
-      @"(let ((f (lambda () (let ((f (lambda () (+ 2 3)))) (* (f) (f)))))) (+ (f) (f)))", "50\n"
-      @"(let ((f (if (vector? (lambda () 12)) (lambda () 13) (lambda () 14)))) (f))", "14\n"
-      @"(let ((f (lambda (x) x))) (f 12))", "12\n"
-      @"(let ((f (lambda (x y) (+ x y)))) (f 12 13))", "25\n"
-      @"(let ((f (lambda (x) (let ((g (lambda (x y) (+ x y)))) (g x 100))))) (f 1000))", "1100\n"
-      @"(let ((f (lambda (g) (g 2 13)))) (f (lambda (n m) (* n m))))", "26\n"
-      @"(let ((f (lambda (g) (+ (g 10) (g 100))))) (f (lambda (x) (* x x))))", "10100\n"
-      @"(let ((f (lambda (f n m) (if (zero? n) m (f f (- n 1) (* n m)))))) (f f 5 1))", "120\n"
-      @"(let ((f (lambda (f n) (if (zero? n) 1 (* n (f f (- n 1))))))) (f f 5))", "120\n"
-      @"(let ((n 12)) (let ((f (lambda () n))) (f)))", "12\n"
-      @"(let ((n 12)) (let ((f (lambda (m) (+ n m)))) (f 100)))", "112\n" ]
-
 let assignmentTests =
     [ "(let ((x 0)) (set! x 1) x)", "1\n"
       @"(let ((x 12)) (set! x 13) x)", "13\n"
@@ -310,6 +290,26 @@ let condTests =
       @"(let ((=> 12)) (cond (=> => =>)))", "12\n"
       @"(let ((let 12)) (cond (let => (lambda (x) (+ let x))) (else 14)))", "24\n" ]
 
+let lambdaTests =
+    [ "(procedure? (lambda (x) x))", "#t\n"
+      "(procedure? ((lambda ()
+                  (lambda () 1))))", "#t\n"
+      @"(let ((f (lambda () 12))) (f))", "12\n"
+      @"(let ((f (lambda () (+ 12 13)))) (f))", "25\n"
+      @"(let ((f (lambda () 13))) (+ (f) (f)))", "26\n"
+      @"(let ((f (lambda () (let ((g (lambda () (+ 2 3)))) (* (g) (g)))))) (+ (f) (f)))", "50\n"
+      @"(let ((f (lambda () (let ((f (lambda () (+ 2 3)))) (* (f) (f)))))) (+ (f) (f)))", "50\n"
+      @"(let ((f (if (vector? (lambda () 12)) (lambda () 13) (lambda () 14)))) (f))", "14\n"
+      @"(let ((f (lambda (x) x))) (f 12))", "12\n"
+      @"(let ((f (lambda (x y) (+ x y)))) (f 12 13))", "25\n"
+      @"(let ((f (lambda (x) (let ((g (lambda (x y) (+ x y)))) (g x 100))))) (f 1000))", "1100\n"
+      @"(let ((f (lambda (g) (g 2 13)))) (f (lambda (n m) (* n m))))", "26\n"
+      @"(let ((f (lambda (g) (+ (g 10) (g 100))))) (f (lambda (x) (* x x))))", "10100\n"
+      @"(let ((f (lambda (f n m) (if (zero? n) m (f f (- n 1) (* n m)))))) (f f 5 1))", "120\n"
+      @"(let ((f (lambda (f n) (if (zero? n) 1 (* n (f f (- n 1))))))) (f f 5))", "120\n"
+      @"(let ((n 12)) (let ((f (lambda () n))) (f)))", "12\n"
+      @"(let ((n 12)) (let ((f (lambda (m) (+ n m)))) (f 100)))", "112\n" ]
+
 // " (let ((cond +)) (cond (+ 1) (- 2)))", "1\n"
 let letrecTests =
     [ @"(letrec () 12)", "12\n"
@@ -333,6 +333,14 @@ let letrecTests =
                       (f (lambda (n)
                           ((fix f) n))))))
         ((fix f) 5)))", "120\n" ]
+
+let deeplyProcedureTests =
+    [ @"(letrec ((sum (lambda (n ac)
+                  (if (fxzero? n)
+                      ac
+                      (sum (- n 1) (fx+ n ac))))))
+          (sum 10000 0))", "50005000\n"
+      @"(letrec ((e (lambda (x) (if (fxzero? x) #t (o (- x 1))))) (o (lambda (x) (if (fxzero? x) #f (e (- x 1)))))) (e 5000000))", "#t\n" ]
 
 let listTests =
     [ "(define length
@@ -425,33 +433,6 @@ let stringTests =
             (cons v0 v1)))", "(\"b\" . \"A\")\n"
       "(let ((s (make-string 1))) (string-set! s 0 #\\\") s)", "\"\"\"\n"
       "(let ((s (make-string 1))) (string-set! s 0 #\\\\) s)", "\"\\\"\n" ]
-
-let procedureTests =
-    [ @"(letrec () 12)", "12\n"
-      @"(letrec () (let ((x 5)) (fx+ x x)))", "10\n"
-      @"(letrec ((f (lambda () 5))) 7)", "7\n"
-      @"(letrec ((f (lambda () 5))) (let ((x 12)) x))", "12\n"
-      @"(letrec ((f (lambda () 5))) (f))", "5\n"
-      @"(letrec ((f (lambda () 5))) (let ((x (f))) x))", "5\n"
-      @"(letrec ((f (lambda () 5))) (fx+ (f) 6))", "11\n"
-      @"(letrec ((f (lambda () 5))) (fx- 20 (f)))", "15\n"
-      @"(letrec ((f (lambda () 5))) (fx+ (f) (f)))", "10\n"
-      @"(letrec ((f (lambda () (fx+ 5 7))) (g (lambda () 13))) (fx+ (f) (g)))", "25\n"
-      @"(letrec ((f (lambda (x) (fx+ x 12)))) (f 13))", "25\n"
-      @"(letrec ((f (lambda (x) (fx+ x 12)))) (f (f 10)))", "34\n"
-      @"(letrec ((f (lambda (x) (fx+ x 12)))) (f (f (f 0))))", "36\n"
-      @"(letrec ((f (lambda (x y) (fx+ x y))) (g (lambda (x) (fx+ x 12)))) (f 16 (f (g 0) (fx+ 1 (g 0)))))", "41\n"
-      @"(letrec ((f (lambda (x) (g x x))) (g (lambda (x y) (fx+ x y)))) (f 12))", "24\n"
-      @"(letrec ((f (lambda (x) (if (fxzero? x) 1 (fx* x (f (- x 1))))))) (f 5))", "120\n"
-      @"(letrec ((e (lambda (x) (if (fxzero? x) #t (o (- x 1))))) (o (lambda (x) (if (fxzero? x) #f (e (- x 1)))))) (e 25))", "#f\n" ]
-
-let deeplyProcedureTests =
-    [ @"(letrec ((sum (lambda (n ac)
-                  (if (fxzero? n)
-                      ac
-                      (sum (- n 1) (fx+ n ac))))))
-          (sum 10000 0))", "50005000\n"
-      @"(letrec ((e (lambda (x) (if (fxzero? x) #t (o (- x 1))))) (o (lambda (x) (if (fxzero? x) #f (e (- x 1)))))) (e 5000000))", "#t\n" ]
 
 let callFailure =
     [ "(1 2)", "error\n"
