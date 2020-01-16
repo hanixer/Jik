@@ -27,6 +27,20 @@
    Then call to C function error() happens and we exit with -1 or 1.
    Now we need to change so that call the closure directly without moving it to rax.
 
+   So how should we implement varargs?
+
+   Caller should:
+     - Just pass arguments as usual and pass number of arguments in rcx
+
+   Callee should:
+     - Check number of arguments. The number of arguments should be >= then number of parameters.
+	 - Construct the list from rest arguments.
+
+   How list construction should be performed?
+
+   Take last argument (if it available) cons it with null.
+   Take next argument cons it.
+
 # Call convention
 Arguments are passed via stack. When function is called first passed argument
 is at rsp - 16, second at rsp - 24, etc.
