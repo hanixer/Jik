@@ -93,6 +93,7 @@ let stringPrimop = [
     ">=", Ge
     "not", Not
     "fixnum?", IsFixnum
+    "number?", IsFixnum
     "boolean?", IsBoolean
     "cons", Cons
     "pair?", IsPair
@@ -126,7 +127,7 @@ let tryStringToPrimop s =
     List.tryFind (fst >> ((=) s)) stringPrimop
     |> Option.map snd
 
-let isPrimop = tryStringToPrimop >> Option.isSome
+let isPrimop = (fun x -> printfn "isPrimop? %A" x; x) >> tryStringToPrimop >> (fun x -> printfn "isPrimop? %A" x; x) >> Option.isSome
 
 let wrapInLet var value body =
     exprsToList [S.Symbol "let"

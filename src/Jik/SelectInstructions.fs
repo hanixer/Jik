@@ -6,12 +6,6 @@ open Intermediate
 open RuntimeConstants
 open Codegen
 
-// A function of n arguments will be compiled as a function of n+1 arguments.
-// A call with m arguments will be compiled as a call with m+1 arguments,
-// where the value of the first argument is m. The emitted code for a function
-// should now check that the value of the first argument is equal to n and
-// signal an error when it is not.
-
 let foreignFuncPrefix = "s_"
 
 let stackArgsCount args = List.length args - List.length registersForArgs
@@ -57,11 +51,18 @@ let getCallResultVar label blocks =
         failwith "handleTransfer: wrong number of vars"
     List.head argsOfBlock
 
+let checkForClosureTag =
+    [Mov, [Int closureMask; Reg Rax]
+     And, [Reg Rsi; Reg Rax]
+     Cmp, [Int closureTag; Reg Rax]
+     JmpIf(Ne, errorHandlerLabel), []
+     CallIndirect, [Deref(-closureTag, Rsi)]]
+
 let makeIndirectCall func =
     [Mov, [Reg Rsi; Deref(0, Rsp)] // Save current closure pointer
-     Mov, [Var func; Reg Rsi]
-     CallIndirect, [Deref(-closureTag, Rsi)]
-     Mov, [Deref(0, Rsp); Reg Rsi]] //
+     Mov, [Var func; Reg Rsi]] @
+    checkForClosureTag @
+    [Mov, [Deref(0, Rsp); Reg Rsi]]
 
 let compileCall label blocks func args =
     let resultVar = getCallResultVar label blocks
@@ -82,8 +83,9 @@ let compileTailCall func args =
     moveToArgPositions @
     [Mov, [Var func; Reg Rsi]] @
     moveStackArgs @
-    [RestoreStack, []
-     JmpIndirect, [Deref(-closureTag, Rsi)]]
+    [RestoreStack, []] @
+    checkForClosureTag @
+    [JmpIndirect, [Deref(-closureTag, Rsi)]]
 
 let compileForeignCall label blocks foreignName args =
     let moveToArgPositions = moveArgsForCallFF args

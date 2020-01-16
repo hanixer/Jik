@@ -15,6 +15,9 @@ open Display
 ///
 /// Register %rsi is used as closure pointer.
 /// It is saved and restored at each function call.
+///
+/// Calling function should pass number of arguments in %rax,
+/// so that called function could check if the number is correct.
 
 type Register =
     | Rsp | Rbp | Rax | Rbx | Rcx | Rdx | Rsi | Rdi
@@ -31,8 +34,10 @@ type Operand =
     | Slot of int
     | GlobalValue of string
 
+/// Condition for jump: Equal, Less than, Less than or equal, etc.
 type Cc =
     | E
+    | Ne
     | L
     | Le
     | G
@@ -118,6 +123,8 @@ let showInstr out (op, args) =
             fprintf out "%s:" label
         | JmpIf (E, label) ->
             fprintf out "je %s" label
+        | JmpIf (Ne, label) ->
+            fprintf out "jne %s" label
         | Jmp label ->
             fprintf out "jmp %s" label
         | Call label ->
