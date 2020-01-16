@@ -51,6 +51,13 @@ let getCallResultVar label blocks =
         failwith "handleTransfer: wrong number of vars"
     List.head argsOfBlock
 
+let makeIndirectCall func =
+    [Mov, [Reg Rsi; Deref(0, Rsp)] // Save current closure pointer
+     Mov, [Var func; Reg Rsi]
+     Mov, [Deref(-closureTag, Rsi); Reg Rax]
+     CallIndirect, [Reg Rax]
+     Mov, [Deref(0, Rsp); Reg Rsi]] // Restore closure pointer
+
 let convertNumber n = n <<< fixnumShift
 
 let moveInt n var = [Mov, [Operand.Int n; Operand.Var var]]
@@ -111,6 +118,10 @@ let vectorAddress vec index =
      Mov, [index; Reg R12]
      Sar, [Int fixnumShift; Reg R12]
      Add, [Int 1; Reg R12]]
+
+
+let getCar reg dest = Mov, [Deref(-pairTag, reg); dest]
+let getCdr reg dest = Mov, [Deref(-pairTag + wordSize, reg); dest]
 
 let rec declToInstrs (dest, x) =
     match x with
@@ -185,10 +196,10 @@ let rec declToInstrs (dest, x) =
         isOfTypeInstrs dest var1 nilMask nilLiteral
     | Simple.Prim(Prim.Car, [pair]) ->
         [Mov, [Var pair; Reg R11]
-         Mov, [Deref(-pairTag, R11); Var dest]]
+         getCar R11 (Var dest)]
     | Simple.Prim(Prim.Cdr, [pair]) ->
         [Mov, [Var pair; Reg R11]
-         Mov, [Deref(-pairTag + wordSize, R11); Var dest]]
+         getCdr R11 (Var dest)]
     | Simple.Prim(Prim.SetCar, [pair; value]) ->
         [Mov, [Var pair; Reg R11]
          Mov, [Var value; Deref(-pairTag, R11)]
@@ -255,6 +266,25 @@ let rec declToInstrs (dest, x) =
         [Mov, [Var value; GlobalValue(glob)]]
     | Simple.Prim(Prim.GlobalRef, [glob]) ->
         [Mov, [GlobalValue(glob); Var dest]]
+    | Simple.Prim(Prim.Apply, [func; argsList]) ->
+        let loopBegin = freshLabel "loopBegin"
+        let loopEnd = freshLabel "loopEnd"
+        [Mov, [Var func; Reg Rcx]
+         Mov, [Var argsList; Reg Rdx]
+         Mov, [Int 0; Reg R8]
+         Label loopBegin, []
+         Mov, [Int nilLiteral; Reg Rax]
+         Cmp, [Reg Rdx; Reg Rax]
+         JmpIf(E, loopEnd), []
+         getCar Rdx (Reg Rax)
+         Sub, [Int 1; Reg R8] // Change argument counter
+         Mov, [Reg Rax; Deref4(-wordSize, Rsp, R8, wordSize)] // Save argument to its pos in stack
+         getCdr Rdx (Reg Rdx)
+         Jmp(loopBegin), []
+         Label(loopEnd), []] @
+        makeIndirectCall func @
+        [Mov, [Reg Rax; Var dest]]
+
     | e -> failwithf "handleDecl: %s %A" dest e
 
 let transferToInstrs blocks = function
@@ -275,15 +305,10 @@ let transferToInstrs blocks = function
          Cmp, [Operand.Int falseLiteral; Reg Rax]
          JmpIf (E, labelf), []]
     | Transfer.Call(NonTail label, func, args) ->
-        let moveToArgPositions = moveArgsForCall args
         let resultVar = getCallResultVar label blocks
-        moveToArgPositions @
-        [Mov, [Reg Rsi; Deref(0, Rsp)]
-         Mov, [Var func; Reg Rsi]
-         Mov, [Deref(-closureTag, Rsi); Reg Rax]
-         CallIndirect, [Reg Rax]
-         Mov, [Deref(0, Rsp); Reg Rsi]
-         Mov, [Reg Rax; Var resultVar]
+        moveArgsForCall args @
+        makeIndirectCall func @
+        [Mov, [Reg Rax; Var resultVar]
          InstrName.Jmp label, []]
     | Transfer.Call(Tail, func, args) ->
         let moveToArgPositions = moveArgsForCall args

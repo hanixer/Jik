@@ -43,6 +43,7 @@ type Prim =
     | NumberToChar
     | CharToNumber
     | IsChar
+    | Apply
 
 type Expr =
     | Int of int
@@ -118,6 +119,7 @@ let stringPrimop = [
     "fixnum->char", NumberToChar
     "char->fixnum", CharToNumber
     "char?", IsChar
+    "apply", Apply
 ]
 
 let tryStringToPrimop s =

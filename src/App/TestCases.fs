@@ -112,6 +112,9 @@ let e19 = "
 (foreign-call \"print6args\" 1 2 3 4 5 6)
 (foreign-call \"print6args\" 1 2 3 4 5 6)
 #t"
+let e20 = "
+(define (sum x y) (+ x y))
+(foreign-call \"apply\" sum (cons 1 (cons 2 '())))"
 
 let basicTests =
     [ "(* 1 0)", "0\n"

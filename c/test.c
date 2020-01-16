@@ -71,6 +71,21 @@ void broad(char* p) {
     p[2] = 2;
     p[3] = 3;
 }
+int fing(int* a) {
+    int b = 0;
+    for (size_t i = 0; i < 5; i++)
+    {
+        b = a[i];
+    }
+    return b;
+}
+
+int thing222(int a) {
+    if (a == 0x8) {
+        return 100500;
+    }
+    return 0;
+}
 
 int main() {
     printf("%d%d%d%d%d%d%d", 2, 3, 4, 5, 6, 7, 8);
