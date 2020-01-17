@@ -48,7 +48,7 @@ let stringToAsmForm s =
 let main argv =
     let paths =
         if argv.Length > 0 then List.ofArray argv
-        else [getPathRelativeToRoot "library/library.scm"; getPathRelativeToRoot "examples/one.scm"]
+        else [getPathRelativeToRoot "library/library.mscm"; getPathRelativeToRoot "examples/one.scm"]
     let source = SourceFileReader.readFilesExpandingModules paths
     let compiled = stringToAsmForm source
     let outFile = Util.getPathRelativeToRoot ("misc/" + "a.exe")

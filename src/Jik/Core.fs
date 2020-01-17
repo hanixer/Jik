@@ -346,18 +346,52 @@ let rec transform f expr =
 
     transform expr
 
+//   (define (convert-char char)
+//     (case char
+//       ((#\_)   '(#\_ #\_))
+//       ((#\?)   '(#\p))
+//       ((#\!)   '(#\i))
+//       ((#\<)   '(#\l))
+//       ((#\>)   '(#\g))
+//       ((#\=)   '(#\e))
+//       ((#\- #\/ #\* #\:)   '())
+//       (else (list char))))
+
+let convertSchemeIdentifToAsm name =
+    let convertChar = function
+        | '?' -> "Qmark"
+        | '!' -> "Bang"
+        | '<' -> "Less"
+        | '>' -> "Greater"
+        | '=' -> "Eq"
+        | '-' -> "Minus"
+        | '+' -> "Plus"
+        | '*' -> "Times"
+        | '/' -> "Divide"
+        | '.' -> "Dot"
+        | c -> sprintf "%c" c
+
+    Seq.map convertChar name
+    |> System.String.Concat
+
 let convertGlobalRefs (prog : Program) : Program =
+    let newNames = List.map convertSchemeIdentifToAsm prog.Globals
+    let env = List.zip prog.Globals newNames |> Map.ofSeq
+
     let convertHelper propagate transform expr =
         match expr with
         | Expr.Ref var when List.contains var prog.Globals ->
-            PrimApp(GlobalRef, [Ref var])
+            let newName = Map.find var env
+            PrimApp(GlobalRef, [Ref newName])
         | Expr.Assign(var, rhs) when List.contains var prog.Globals ->
-            PrimApp(GlobalSet, [Ref var; rhs])
+            let newName = Map.find var env
+            PrimApp(GlobalSet, [Ref newName; rhs])
         | _ -> propagate expr
 
     let convertExpr expr = transform convertHelper expr
 
-    { prog with Main = List.map convertExpr prog.Main }
+    { prog with Main = List.map convertExpr prog.Main
+                Globals = newNames }
 
 let trySubstitute v mapping =
     match Map.tryFind v mapping with
