@@ -42,14 +42,15 @@ let stringToAsmForm s =
     |> allIntermediateTransformations
     |> printIr "test.ir"
     |> allCodegenTransformations
-
-let compileLibrary =
-    let filename = __SOURCE_DIRECTORY__ + "\\..\\..\\library\\library.scm"
-    let source = File.ReadAllText(filename)
-    let codegen = stringToAsmForm source
-    ()
+    |> Codegen.programToString
 
 [<EntryPoint>]
 let main argv =
-    printfn "Hello World from F#!"
+    let paths =
+        if argv.Length > 0 then List.ofArray argv
+        else [getPathRelativeToRoot "library/library.scm"; getPathRelativeToRoot "examples/one.scm"]
+    let source = SourceFileReader.readFilesExpandingModules paths
+    let compiled = stringToAsmForm source
+    let outFile = Util.getPathRelativeToRoot ("misc/" + "a.exe")
+    compileToBinary compiled outFile
     0 // return an integer exit code

@@ -5,15 +5,16 @@ open System.IO
 
 let cygwin = @"C:\cygwin64\bin\"
 
-let sd = __SOURCE_DIRECTORY__
-let root = sd + "/../../"
-let miscPath = root + "misc/"
+let root = Util.getPathRelativeToRoot ""
+let miscPath = Util.getPathRelativeToRoot "misc/"
 
 let getTempFile () =
-    System.IO.Path.Combine(miscPath, Guid.NewGuid().ToString() + ".s")
+    let filename = Guid.NewGuid().ToString() + ".s"
+    Util.getPathRelativeToRoot ("misc/" + filename)
 
-let gccCompile filename =
-    let res = Util.executeProcess("gcc", filename + " -g -std=c99 ../c/runtime.c")
+let gccCompile filename outFile =
+    let runtime = Util.getPathRelativeToRoot "c/runtime.c"
+    let res = Util.executeProcess("gcc", filename + " -g -std=c99 " + runtime + " -o " + outFile)
     if res.stderr.Trim().Length > 0 then
         failwithf "gcc error:\n%s\n\n" res.stderr
     if res.stdout.Trim().Length > 0 then
@@ -24,6 +25,17 @@ let runCompiled () =
     res.stdout
 
 let mutable testCases : List<string * (List<string * string>)> = []
+
+let compileToBinary asmSource outFile =
+    let filename = getTempFile()
+
+    File.WriteAllText(filename, asmSource)
+    File.WriteAllText(Util.getPathRelativeToRoot "misc/test.s", asmSource)
+
+    try
+        gccCompile filename outFile
+    finally
+        File.Delete filename
 
 let runTest compile input =
     let prevCD = Environment.CurrentDirectory
@@ -37,7 +49,8 @@ let runTest compile input =
     File.WriteAllText(filename, compiled)
     File.WriteAllText("test.s", compiled)
     try
-        gccCompile filename
+        let outFile = Util.getPathRelativeToRoot ("misc/" + "a.exe")
+        gccCompile filename outFile
         let output = runCompiled()
         let lminus1 = output.Length - 1
         if output.Length > 0 && output.[lminus1] = '\n' then

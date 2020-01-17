@@ -17,6 +17,18 @@
          "internalConsoleOptions": "openOnSessionStart"
       },
       {
+         "name": "Compiler driver",
+         "type": "coreclr",
+         "request": "launch",
+         "preLaunchTask": "build",
+         "program": "${workspaceFolder}/src/CompilerDriver/bin/Debug/netcoreapp3.0/CompilerDriver.dll",
+         "args": [],
+         "cwd": "${workspaceFolder}",
+         "console": "internalConsole",
+         "stopAtEntry": false,
+         "internalConsoleOptions": "openOnSessionStart"
+      },
+      {
          "name": ".NET Core Launch (console) 2",
          "type": "coreclr",
          "request": "launch",

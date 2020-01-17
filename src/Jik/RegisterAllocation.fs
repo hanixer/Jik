@@ -135,7 +135,7 @@ let rec buildInterference (prog : Program) : Program =
         let regs = registersForUse |> Set.map Reg
         let graph = makeGraph (Set.union vars regs)
         Seq.iteri (iter def.LiveAfter graph) def.Instrs
-        printDotFunc (function | Var var -> var | Reg reg -> reg.ToString().ToLower() | _ -> "ERROR") graph (__SOURCE_DIRECTORY__ + "/../../misc/graphs/" + def.Name + ".dot")
+        printDotFunc (function | Var var -> var | Reg reg -> reg.ToString().ToLower() | _ -> "ERROR") graph (Util.getPathRelativeToRoot "misc/graphs/" + def.Name + ".dot")
         {def with InterfGraph = graph}
 
     { prog with Procedures = List.map handleDef prog.Procedures

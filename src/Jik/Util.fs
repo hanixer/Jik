@@ -17,8 +17,6 @@ let executeProcess (exe,cmdline) =
     p.WaitForExit()
     { exitCode = p.ExitCode; stdout = output.ToString(); stderr = error.ToString() }
 
-
-
 let zipp def a b =
     let rec loop acc a b =
         if Seq.isEmpty a |> not && Seq.isEmpty b |> not then
@@ -42,3 +40,9 @@ let appendStringsByCol (str1 : string) (str2 : string) =
     |> Seq.map (fun (s1, s2) ->
         s1.PadRight(maxColumn) + s2)
     |> String.concat "\n"
+
+let getPathRelativeToRoot path =
+    let sd = __SOURCE_DIRECTORY__
+    let p = sd + "\\..\\..\\" + path
+    let p = System.IO.Path.GetFullPath p
+    p

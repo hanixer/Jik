@@ -14,7 +14,7 @@ open System.Text
 open TestCases
 
 let saveToFile filename str = System.IO.File.WriteAllText(filename, str)
-let miscPath = __SOURCE_DIRECTORY__ + "\\..\\..\\misc\\"
+let miscPath = getPathRelativeToRoot "misc\\"
 
 let printIr s =
     (fun prog ->

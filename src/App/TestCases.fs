@@ -508,7 +508,6 @@ let tak =
       "(cons 1 2)", "3\n" ]
 
 let generateBigLet n =
-    let sb = StringBuilder()
     use f = new StringWriter()
     fprintfn f "(let ("
     for i in 0..n do
