@@ -1,5 +1,11 @@
+;;; Lists
+
 (define list
     (lambda args args))
+
+(define empty?
+    (lambda (ls)
+        (null? ls)))
 
 (define memq
     (lambda (x ls)
@@ -20,3 +26,7 @@
                         (null? h)))
                 (null? h)))])
     (lambda (x) (loop x x))))
+
+(define length
+    (lambda (ls)
+        (if (empty? ls) 0 (+ 1 (length (cdr ls))))))

@@ -58,8 +58,16 @@ let tokenize source =
         | cs ->
             acc, cs
 
+    let rec skipUntilNewline = function
+        | '\n' :: cs | '\r' :: '\n' :: cs | '\r' :: cs ->
+            cs
+        | _ :: cs -> skipUntilNewline cs
+        | [] -> []
+
+
     let rec loop acc = function
         | w :: cs when System.Char.IsWhiteSpace(w) -> loop acc cs
+        | ';' :: cs -> loop acc (skipUntilNewline cs)
         | '(' :: cs -> loop (Open :: acc) cs
         | ')' :: cs -> loop (Close :: acc) cs
         | '[' :: cs -> loop (OpenBr :: acc) cs

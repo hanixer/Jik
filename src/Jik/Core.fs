@@ -75,7 +75,10 @@ let freshLabel =
             dict.Add(prefix, 0)
         let count = dict.Item prefix
         dict.Item prefix <- count + 1
-        sprintf "%s%d" prefix count
+        if count = 0 then
+            prefix
+        else
+            sprintf "%s%d" prefix count
 
 let freshCodeLabel prefix = freshLabel (prefix + "/code")
 
@@ -316,10 +319,12 @@ let stringToProgram str : Program =
     let parseSExpr (globals, sexprs) sexpr =
         match sexpr with
         | List (Symbol "define" :: List (Symbol name :: args) :: body) ->
+            printfn "global: %s" name
             let lambda = exprsToList (Symbol "lambda" :: exprsToList args :: body)
             let sexpr = exprsToList [Symbol "set!"; Symbol name; lambda]
             name :: globals, sexpr :: sexprs
         | List [Symbol "define"; Symbol name; sexpr] ->
+            printfn "global: %s" name
             let sexpr = exprsToList [Symbol "set!"; Symbol name; sexpr]
             name :: globals, sexpr :: sexprs
         | sexpr ->
@@ -393,7 +398,8 @@ let convertGlobalRefs (prog : Program) : Program =
             PrimApp(GlobalRef, [Ref newName])
         | Expr.Assign(var, rhs) when List.contains var prog.Globals ->
             let newName = Map.find var env
-            PrimApp(GlobalSet, [Ref newName; rhs])
+            let newRhs = transform rhs
+            PrimApp(GlobalSet, [Ref newName; newRhs])
         | _ -> propagate expr
 
     let convertExpr expr = transform convertHelper expr

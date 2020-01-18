@@ -127,8 +127,8 @@ let runTestString source expected =
 let main argv =
     let c = Compile.stringToAsmForm
     // runSingleTest c "(letrec ([f (lambda (x) (+ x 1))]) (f 1))" "2\n"
-    runTestGroup c "letLoop" letLoop
-    // runTestStringWithLibrary "(memq 1 '())" "#f\n"
+    // runTestGroup c "letLoop" letLoop
+    runTestStringWithLibrary "(length (list 1 2 3))" "3\n"
     // runTestGroup c "variable arity without rest arguments" variableArity
     // runTestGroup c "variable arity using rest arguments" variableArityUsingRest
     // runTestGroup c "calls" callFailure
