@@ -1,6 +1,14 @@
 (define list
     (lambda args args))
 
+(define $memq
+    (lambda (x ls)
+      (let f ([x x] [ls ls])
+        (and (pair? ls)
+             (if (eq? x (car ls))
+                 ls
+                 (f x (cdr ls)))))))
+
 (define list?
     (letrec ([loop
             (lambda (h t)

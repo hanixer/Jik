@@ -31,7 +31,7 @@ let printDot (G graph as g) fileName =
             fprintfn out "%s -- %s" u v) (adjacent g v)) (vertices g)
     fprintfn out "}\n"
 
-let printDotFunc func (G graph as g) fileName =
+let printDotFunc func (G graph as g) (fileName: string) =
     let dirName = System.IO.Path.GetDirectoryName(fileName)
     if System.IO.Directory.Exists(dirName) |> not then
         System.IO.Directory.CreateDirectory(dirName) |> ignore
