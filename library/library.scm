@@ -1,7 +1,7 @@
 (define list
     (lambda args args))
 
-(define $memq
+(define memq
     (lambda (x ls)
       (let f ([x x] [ls ls])
         (and (pair? ls)

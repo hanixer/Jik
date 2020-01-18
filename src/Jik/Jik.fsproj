@@ -9,7 +9,6 @@
     <Compile Include="Display.fs" />
     <Compile Include="Util.fs" />
     <Compile Include="CompileOld.fs" />
-    <Compile Include="TestDriver.fs" />
     <Compile Include="Graph.fs" />
     <Compile Include="Core.fs" />
     <Compile Include="Intermediate.fs" />
@@ -18,5 +17,6 @@
     <Compile Include="RegisterAllocation.fs" />
     <Compile Include="SourceFileReader.fs" />
     <Compile Include="Compile.fs" />
+    <Compile Include="TestDriver.fs" />
   </ItemGroup>
 </Project>

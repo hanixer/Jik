@@ -127,27 +127,28 @@ let runTestString source expected =
 let main argv =
     let c = Compile.stringToAsmForm
     // runSingleTest c "(letrec ([f (lambda (x) (+ x 1))]) (f 1))" "2\n"
-    runTestsWithName c "letLoop" letLoop
-    // runTestString "($memq 1 '())" "#f"
-    // runTestsWithName c "variable arity without rest arguments" variableArity
-    // runTestsWithName c "variable arity using rest arguments" variableArityUsingRest
-    // runTestsWithName c "calls" callFailure
-    // runTestsWithName c "deep procs" deeplyProcedureTests
-    // runTestsWithName c "lambda" lambdaTests
-    // runTestsWithName c "basic" basicTests
-    // runTestsWithName c "boolean" booleanTests
-    // runTestsWithName c "vector" vectorTests
-    // runTestsWithName c "assignment" assignmentTests
-    // runTestsWithName c "andOr" andOrTests
-    // runTestsWithName c "pair" pairTests
-    // runTestsWithName c "setCarCdr" setCarCdrTests
-    // runTestsWithName c "whenUnless" whenUnlessTests
-    // runTestsWithName c "cond" condTests
-    // runTestsWithName c "letrec" letrecTests
-    // runTestsWithName c "list" listTests
-    // runTestsWithName c "num -> char" numcharTests
-    // runTestsWithName c "char?" isCharTests
-    // runTestsWithName c "string" stringTests
-    // runTestsWithName c "foreign-call" foreignCallTests
+    runTestGroup c "letLoop" letLoop
+    // runTestStringWithLibrary "(memq 1 '())" "#f\n"
+    // runTestGroup c "variable arity without rest arguments" variableArity
+    // runTestGroup c "variable arity using rest arguments" variableArityUsingRest
+    // runTestGroup c "calls" callFailure
+    // runTestGroup c "deep procs" deeplyProcedureTests
+    // runTestGroup c "lambda" lambdaTests
+    // runTestGroup c "basic" basicTests
+    // runTestGroup c "boolean" booleanTests
+    // runTestGroup c "vector" vectorTests
+    // runTestGroup c "assignment" assignmentTests
+    // runTestGroup c "andOr" andOrTests
+    // runTestGroup c "pair" pairTests
+    // runTestGroup c "setCarCdr" setCarCdrTests
+    // runTestGroup c "whenUnless" whenUnlessTests
+    // runTestGroup c "cond" condTests
+    // runTestGroup c "letrec" letrecTests
+    // runTestGroup c "list" listTests
+    // runTestGroup c "num -> char" numcharTests
+    // runTestGroup c "char?" isCharTests
+    // runTestGroup c "string" stringTests
+    // runTestGroup c "foreign-call" foreignCallTests
+
 
     0

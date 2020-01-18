@@ -162,7 +162,6 @@ int main() {
     char* heap = allocateProtectedSpace(heapSize);
     freePointer = heap;
     printPtr(schemeEntry(stackHigherAddr, heap));
-    printf("\n");
     deallocateProtectedSpace(stackHigherAddr, stackSize);
     return 0;
 }

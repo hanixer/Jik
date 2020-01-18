@@ -376,6 +376,7 @@ let convertSchemeIdentifToAsm name =
         | '*' -> "Times"
         | '/' -> "Divide"
         | '.' -> "Dot"
+        | '$' -> "Dollar"
         | c -> sprintf "%c" c
 
     Seq.map convertChar name

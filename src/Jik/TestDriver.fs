@@ -1,41 +1,21 @@
 module TestDriver
 
+
 open System
 open System.IO
+open Compile
 
 let cygwin = @"C:\cygwin64\bin\"
 
 let root = Util.getPathRelativeToRoot ""
-let miscPath = Util.getPathRelativeToRoot "misc/"
 
-let getTempFile () =
-    let filename = Guid.NewGuid().ToString() + ".s"
-    Util.getPathRelativeToRoot ("misc/" + filename)
 
-let gccCompile filename outFile =
-    let runtime = Util.getPathRelativeToRoot "c/runtime.c"
-    let res = Util.executeProcess("gcc", filename + " -g -std=c99 " + runtime + " -o " + outFile)
-    if res.stderr.Trim().Length > 0 then
-        failwithf "gcc error:\n%s\n\n" res.stderr
-    if res.stdout.Trim().Length > 0 then
-        printfn "gcc output:\n%s\n\n" res.stdout
 
 let runCompiled () =
     let res = Util.executeProcess("./a.exe", "")
     res.stdout
 
 let mutable testCases : List<string * (List<string * string>)> = []
-
-let compileToBinary asmSource outFile =
-    let filename = getTempFile()
-
-    File.WriteAllText(filename, asmSource)
-    File.WriteAllText(Util.getPathRelativeToRoot "misc/test.s", asmSource)
-
-    try
-        gccCompile filename outFile
-    finally
-        File.Delete filename
 
 let runTest compile input =
     let prevCD = Environment.CurrentDirectory
@@ -51,11 +31,7 @@ let runTest compile input =
     try
         let outFile = Util.getPathRelativeToRoot ("misc/" + "a.exe")
         gccCompile filename outFile
-        let output = runCompiled()
-        let lminus1 = output.Length - 1
-        if output.Length > 0 && output.[lminus1] = '\n' then
-            output.Substring(0, lminus1)
-        else output
+        runCompiled()
     finally
         File.Delete filename
 
@@ -65,9 +41,9 @@ let runTest compile input =
 let addTests str tests =
     testCases <- (str, tests) :: testCases
 
-let runSingleTest compile input expected =
+let singleTestWrapper action input expected =
     try
-        let output = runTest compile input
+        let output = action input
         if output <> expected then
             printfn "-----------------------------------"
             printfn "FAIL!"
@@ -86,7 +62,11 @@ let runSingleTest compile input expected =
             printfn "-----------------------------------"
             printfn ""
 
-let runTestsWithName compile testName tests =
+let runSingleTest compile input expected =
+    let action input = runTest compile input
+    singleTestWrapper action input expected
+
+let runTestGroup compile testName tests =
     let fold (passed, i) (input, expected) =
         try
             let output = runTest compile input
@@ -114,3 +94,10 @@ let runTestsWithName compile testName tests =
 
     let n = List.fold fold (0, 1) tests |> fst
     printfn "Test \"%s\": completed %d / %d" testName n tests.Length
+
+let runTestStringWithLibrary source expected =
+    let action input =
+        let exe = Util.getPathRelativeToRoot ("misc/a.exe")
+        Compile.compileSchemeString true source exe
+        Util.executeProcess(exe, "").stdout
+    singleTestWrapper action source expected
