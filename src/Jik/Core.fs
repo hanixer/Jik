@@ -461,6 +461,39 @@ let rec replaceVars mapping expr =
     | Expr.ForeignCall(foreignName, args) -> Expr.ForeignCall(foreignName, List.map transf args)
     | e -> e
 
+let convertStrings (prog : Program) =
+    let stringsAndNames = System.Collections.Generic.List<string * string>()
+
+    let handleExpr propagate transform expr =
+        match expr with
+        | Expr.String(literal) ->
+            let name = freshLabel "str_lit"
+            stringsAndNames.Add(literal, name)
+            Ref name
+        | _ -> propagate expr
+
+    let exprs = List.map (transform handleExpr) prog.Main
+
+    let assignments =
+        stringsAndNames
+        |> Seq.collect (fun (literal, name) ->
+            literal
+            |> Seq.mapi (fun i ch ->
+                PrimApp(StringSet, [Ref name; Int i; Char ch])))
+
+    let combined = Seq.append assignments exprs |> Seq.toList
+
+    let argsForInit =
+        stringsAndNames
+        |> Seq.map (fun (literal, name) ->
+            PrimApp(MakeString, [Int (Seq.length literal)]))
+
+    let names = Seq.map snd stringsAndNames |> Seq.toList
+    let lambda = Lambda(names, false, combined)
+    let app = App(lambda, argsForInit |> Seq.toList)
+
+    {prog with Main = [app]}
+
 let rec fixArithmeticPrims (prog : Program) : Program =
     let ops = [Add; Mul;]
 
@@ -554,7 +587,8 @@ let assignmentConvert (prog : Program) : Program =
 let stringToExpr = stringToSExpr >> sexprToExpr
 
 let allCoreTransformations =
-    fixArithmeticPrims
+    convertStrings
+    >> fixArithmeticPrims
     >> convertGlobalRefs
     >> alphaRename
     >> assignmentConvert

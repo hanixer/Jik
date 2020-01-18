@@ -128,7 +128,9 @@ let main argv =
     let c = Compile.stringToAsmForm
     // runSingleTest c "(letrec ([f (lambda (x) (+ x 1))]) (f 1))" "2\n"
     // runTestGroup c "letLoop" letLoop
-    runTestStringWithLibrary "(length (list 1 2 3))" "3\n"
+    // runTestStringWithLibrary "(length (list 1 2 3))" "3\n"
+
+    runTestGroup c "complexConstants" complexConstants
     // runTestGroup c "variable arity without rest arguments" variableArity
     // runTestGroup c "variable arity using rest arguments" variableArityUsingRest
     // runTestGroup c "calls" callFailure

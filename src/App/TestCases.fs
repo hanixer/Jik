@@ -505,6 +505,9 @@ let variableArityUsingRest =
     "(let ([f (lambda (a0 a1 . args) (cons a0 (cons a1 args)))])
       (f 10 20 30 40 50 60 70 80 90 100))", "(10 20 30 40 50 60 70 80 90 100)\n"  ]
 
+let complexConstants =
+    [ "\"Hello World\"", "\"Hello World\"\n"]
+
 let tak =
     [ "(define (tak x y z)
        (if (not (< y x))

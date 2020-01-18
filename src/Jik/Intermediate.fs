@@ -7,8 +7,8 @@ open Display
 type Var = string
 
 /// Intermediate language. It is a mix of SSA and CPS.
-/// Blocks with arguments consist of statements. The last
-/// statement in block is transfer statement.
+/// Blocks with arguments consist of statements.
+/// The last statement in block is a transfer statement.
 /// Other statements are declarations.
 type CallCont =
     | NonTail of string
@@ -259,7 +259,7 @@ let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
                 let blocks, stmts = cont fresh
                 let block = (blockName, [ fresh ], stmts)
                 block :: blocks, [ Transfer(ForeignCall(blockName, foreignName, args)) ])
-    | Expr.String _ -> failwith "string literals are not implemented"
+    | Expr.String _ -> failwith "string literals should be removed before this stage"
 
 and convertExprJoin expr (contVar : Var) =
     let jump var = Transfer(Jump(contVar, [ var ]))
@@ -294,7 +294,7 @@ and convertExprJoin expr (contVar : Var) =
     | Expr.ForeignCall(foreignName, args) ->
         convertMany args (fun args ->
             [], [ Transfer(ForeignCall(contVar, foreignName, args)) ])
-    | Expr.String _ -> failwith "string literals are not implemented"
+    | Expr.String _ -> failwith "string literals should be removed before this stage"
 
 and convertExprTail expr =
     let jump2 var = [], [ Transfer(Return var) ]
@@ -336,7 +336,7 @@ and convertExprTail expr =
             [],
             [ Decl(var, Prim(op, vars))
               Transfer(Return var) ])
-    | Expr.String _ -> failwith "string literals are not implemented"
+    | Expr.String _ -> failwith "string literals should be removed before this stage"
 
 and convertIf exprc exprt exprf blocks join =
     convertExpr exprc (fun var ->

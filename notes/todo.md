@@ -56,3 +56,20 @@ So we return to separate compilation.
 # Call convention
 Arguments are passed via stack. When function is called first passed argument
 is at rsp - 16, second at rsp - 24, etc.
+
+# String constants
+Add new primitives: constant ref and constant set.
+```
+(cons "123" "abc")
+=>
+((lambda (str1 str2)
+	(string-set! str1 0 '1')
+	(string-set! str1 1 '2')
+	...
+	(string-set! str2 0 'a')
+	(string-set! str2 1 'b')
+	...
+	...
+	...
+	(cons str1 str2)) (make-string 3) (make-string 3))
+```
