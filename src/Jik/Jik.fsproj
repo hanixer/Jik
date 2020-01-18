@@ -8,7 +8,7 @@
     <Compile Include="SExpr.fs" />
     <Compile Include="Display.fs" />
     <Compile Include="Util.fs" />
-    <Compile Include="Compile.fs" />
+    <Compile Include="CompileOld.fs" />
     <Compile Include="TestDriver.fs" />
     <Compile Include="Graph.fs" />
     <Compile Include="Core.fs" />
@@ -16,5 +16,7 @@
     <Compile Include="Codegen.fs" />
     <Compile Include="SelectInstructions.fs" />
     <Compile Include="RegisterAllocation.fs" />
+    <Compile Include="SourceFileReader.fs" />
+    <Compile Include="Compile.fs" />
   </ItemGroup>
 </Project>

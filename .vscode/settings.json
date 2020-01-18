@@ -1,5 +1,6 @@
 {
     "files.associations": {
         "windows.h": "c"
-    }
+    },
+    "search.useIgnoreFiles": true
 }

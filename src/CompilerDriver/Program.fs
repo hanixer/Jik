@@ -14,35 +14,9 @@ open RegisterAllocation
 open SelectInstructions
 open System.IO
 open System.Text
+open Compile
 
 
-let saveToFile filename str = System.IO.File.WriteAllText(filename, str)
-
-let printIr s =
-    (fun prog ->
-    prog
-    |> Intermediate.programToString
-    |> saveToFile (miscPath + s)
-    prog)
-
-let sourceFile = ""
-
-let allCodegenTransformations =
-    selectInstructions
-    >> revealGlobals
-    >> convertVarsToSlots
-    >> convertSlots
-    >> addFuncPrologAndEpilog
-    >> patchInstr
-
-let stringToAsmForm s =
-    s
-    |> stringToProgram
-    |> allCoreTransformations
-    |> allIntermediateTransformations
-    |> printIr "test.ir"
-    |> allCodegenTransformations
-    |> Codegen.programToString
 
 [<EntryPoint>]
 let main argv =

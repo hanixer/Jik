@@ -190,6 +190,14 @@ and expand env sexpr =
         let lam = exprsToList (Symbol "lambda" :: exprsToList args :: body)
         exprsToList (lam :: initExprs)
         |> desugar2 env
+    | List(Symbol "let" :: Symbol name :: List bindings :: body) ->
+        let bindings = List.map (function | List [Symbol name; sexpr] -> Symbol name, sexpr | _ -> failwith "wrong binding") bindings
+        let names, initExprs = List.unzip bindings
+        let lambda = exprsToList (Symbol "lambda" :: exprsToList names :: body)
+        let call = exprsToList (Symbol name :: initExprs)
+        let binding = exprsToList [exprsToList [Symbol name; lambda]]
+        let letrec = exprsToList [Symbol "letrec"; binding; call]
+        desugar letrec
     | List(Symbol "letrec" :: List bindings :: body) ->
         let folder sexpr (bindings) =
             match sexpr with
@@ -199,8 +207,7 @@ and expand env sexpr =
 
         let bindings = List.foldBack folder bindings []
         let names = List.map fst bindings
-        let bindInitial name =
-            S.Cons (Symbol name, S.Cons (Number 0, Nil))
+        let bindInitial name = exprsToList [Symbol name; Number 0]
         let letBindings =
             names
             |> List.map bindInitial

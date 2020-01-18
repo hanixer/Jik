@@ -116,53 +116,38 @@ let testLambda str =
     let r = Intermediate.closureConversion r
     printIr "test.ir" r |> ignore
 
+let runTestString source expected =
+    let exe = Util.getPathRelativeToRoot ("misc/a.exe")
+    Compile.compileSchemeString true source exe
+    let res = runCompiled()
+    if res <> expected then
+        printfn "got: %s" res
+
 [<EntryPoint>]
 let main argv =
-    runTestsWithName testCodegen "variable arity without rest arguments" variableArity
-    runTestsWithName testCodegen "variable arity using rest arguments" variableArityUsingRest
-    runTestsWithName testCodegen "calls" callFailure
-    runTestsWithName testCodegen "deep procs" deeplyProcedureTests
-    runTestsWithName testCodegen "lambda" lambdaTests
-    runTestsWithName testCodegen "basic" basicTests
-    runTestsWithName testCodegen "boolean" booleanTests
-    runTestsWithName testCodegen "vector" vectorTests
-    runTestsWithName testCodegen "assignment" assignmentTests
-    runTestsWithName testCodegen "andOr" andOrTests
-    runTestsWithName testCodegen "pair" pairTests
-    runTestsWithName testCodegen "setCarCdr" setCarCdrTests
-    runTestsWithName testCodegen "whenUnless" whenUnlessTests
-    runTestsWithName testCodegen "cond" condTests
-    runTestsWithName testCodegen "letrec" letrecTests
-    runTestsWithName testCodegen "list" listTests
-    runTestsWithName testCodegen "num -> char" numcharTests
-    runTestsWithName testCodegen "char?" isCharTests
-    runTestsWithName testCodegen "string" stringTests
-    runTestsWithName testCodegen "foreign-call" foreignCallTests
-
-    // runTestsWithName testAllStages "basic" basicTests
-    // runTestsWithName testAllStages "boolean" booleanTests
-    // runTestsWithName testAllStages "vector" vectorTests
-    // runTestsWithName testAllStages "lambda" lambdaTests
-    // runTestsWithName testAllStages "assignment" assignmentTests
-    // runTestsWithName testAllStages "andOr" andOrTests
-    // runTestsWithName testAllStages "pair" pairTests
-    // runTestsWithName testAllStages "setCarCdr" setCarCdrTests
-    // runTestsWithName testAllStages "whenUnless" whenUnlessTests
-    // runTestsWithName testAllStages "cond" condTests
-    // runTestsWithName testAllStages "letrec" letrecTests
-    // runTestsWithName testAllStages "list" listTests
-    // runTestsWithName testAllStages "num -> char" numcharTests
-    // runTestsWithName testAllStages "char?" isCharTests
-    // runTestsWithName testAllStages "string" stringTests
-    // runTestsWithName testAllStages "foreign-call" foreignCallTests
-    // runSingleTest testAllStages "(define x 10) x" "x"
-    // runTestsWithName testCodegen "b" basicTests
-
-
-    // runSingleTest testCodegen "(let ((n 12)) (let ((f (lambda (m) (+ n m)))) (f 100)))" "112"
-
-    // testCodegen "((lambda (x y . z) x) 1 2)" |> printfn "%s"
-    // runSingleTest testCodegen "((lambda (x y . z) z) 1 2 3 4 5)" ""
-    // runSingleTest testCodegen "((lambda (x y . z) z) 1 2)" ""
+    let c = Compile.stringToAsmForm
+    // runSingleTest c "(letrec ([f (lambda (x) (+ x 1))]) (f 1))" "2\n"
+    runTestsWithName c "letLoop" letLoop
+    // runTestString "($memq 1 '())" "#f"
+    // runTestsWithName c "variable arity without rest arguments" variableArity
+    // runTestsWithName c "variable arity using rest arguments" variableArityUsingRest
+    // runTestsWithName c "calls" callFailure
+    // runTestsWithName c "deep procs" deeplyProcedureTests
+    // runTestsWithName c "lambda" lambdaTests
+    // runTestsWithName c "basic" basicTests
+    // runTestsWithName c "boolean" booleanTests
+    // runTestsWithName c "vector" vectorTests
+    // runTestsWithName c "assignment" assignmentTests
+    // runTestsWithName c "andOr" andOrTests
+    // runTestsWithName c "pair" pairTests
+    // runTestsWithName c "setCarCdr" setCarCdrTests
+    // runTestsWithName c "whenUnless" whenUnlessTests
+    // runTestsWithName c "cond" condTests
+    // runTestsWithName c "letrec" letrecTests
+    // runTestsWithName c "list" listTests
+    // runTestsWithName c "num -> char" numcharTests
+    // runTestsWithName c "char?" isCharTests
+    // runTestsWithName c "string" stringTests
+    // runTestsWithName c "foreign-call" foreignCallTests
 
     0

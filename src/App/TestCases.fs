@@ -334,6 +334,14 @@ let letrecTests =
                           ((fix f) n))))))
         ((fix f) 5)))", "120\n" ]
 
+let letLoop =
+    [ "(let f () 12)", "12\n"
+      "(let f ([x 1]) (+ x 1))", "2\n"
+      "(let sum ([n 10000] [ac 0])
+          (if (zero? n)
+                      ac
+                      (sum (- n 1) (+ n ac))))", "50005000\n" ]
+
 let deeplyProcedureTests =
     [ @"(letrec ((sum (lambda (n ac)
                   (if (fxzero? n)

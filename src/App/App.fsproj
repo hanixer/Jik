@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Jik\Jik.fsproj" />
+    <ProjectReference Include="..\CompilerDriver\CompilerDriver.fsproj" />
   </ItemGroup>
 
 </Project>
