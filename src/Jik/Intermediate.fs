@@ -406,6 +406,7 @@ let analyzeFreeVars (prog : Program) : Program =
     let main = transformFunction prog.Main
 
     if not main.Free.IsEmpty then
+        printfn "%A" (programToString prog)
         failwithf "Names %A are not defined" main.Free
 
     { prog with Procedures = procedures

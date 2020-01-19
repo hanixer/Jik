@@ -27,3 +27,6 @@ let stringMask = 0x07
 
 let closureTag = 0x02
 let closureMask = 0x07
+
+let symbolTag = 0x03
+let symbolMask = 0x07

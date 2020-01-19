@@ -67,13 +67,17 @@ let compileToBinary asmSource outFile =
     finally
         File.Delete filename
 
-let compileSchemeString useLibrary source outFile =
+let compileSchemeStringToString useLibrary source =
     let source =
         if useLibrary then
-            let lib = SourceFileReader.readFilesExpandingModules ["library/library.mscm"]
+            let libPath = Util.getPathRelativeToRoot "library/library.mscm"
+            let lib = SourceFileReader.readFilesExpandingModules [libPath]
             lib + "\n" + source
         else
             source
 
-    let compiled = stringToAsmForm source
+    stringToAsmForm source
+
+let compileSchemeStringToBinary useLibrary source outFile =
+    let compiled = compileSchemeStringToString useLibrary source
     compileToBinary compiled outFile

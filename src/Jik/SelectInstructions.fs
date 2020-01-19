@@ -331,13 +331,28 @@ let rec declToInstrs (dest, x) =
          Mov, [Deref4(-closureTag + wordSize, Rsi, Rax, wordSize); Var dest]]
     | Simple.Prim(Prim.IsProcedure, [var1]) ->
         compileIsOfType dest var1 closureMask closureTag
+    // Globals.
     | Simple.Prim(Prim.GlobalSet, [glob; value]) ->
         [Mov, [Var value; GlobalValue(glob)]]
     | Simple.Prim(Prim.GlobalRef, [glob]) ->
         [Mov, [GlobalValue(glob); Var dest]]
+    // Symbols.
+    | Simple.Prim(Prim.MakeSymbol, [var1]) ->
+        [Mov, [Var var1; Var dest]
+         Sub, [Int stringTag; Var dest]
+         Or, [Int symbolTag; Var dest]]
+    | Simple.Prim(Prim.SymbolString, [var1]) ->
+        [Mov, [Var var1; Var dest]
+         Sub, [Int symbolTag; Var dest]
+         Or, [Int stringTag; Var dest]]
+    | Simple.Prim(Prim.IsSymbol, [var1]) ->
+        compileIsOfType dest var1 symbolMask symbolTag
+
     | Simple.Prim(Prim.Apply, [func; argsList]) ->
         compileApply func argsList dest
-
+    | Simple.Prim(Prim.Error, [describe]) ->
+        [Mov, [Var describe; Reg Rcx]
+         Jmp(errorHandlerLabel), []]
     | e -> failwithf "handleDecl: %s %A" dest e
 
 let transferToInstrs blocks = function

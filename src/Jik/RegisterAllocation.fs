@@ -8,6 +8,9 @@ open Codegen
 open System.IO
 open System.Collections.Generic
 
+/// Register allocation is not used currently.
+/// When it will be needed it should be reworked.
+
 let collectVars instrs =
     List.map snd instrs
     |> List.map (fun args ->

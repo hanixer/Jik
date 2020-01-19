@@ -518,6 +518,33 @@ let tak =
      (tak 32 16 8)", "9\n";
       "(cons 1 2)", "3\n" ]
 
+let symbols =
+    [ //"(let ([s1 (string->symbol \"look\")]
+      //       [s2 (string->symbol \"look\")])
+      //   (eq? s1 s2))", "#t\n"
+      "(let ([s1 (make-string 1)]
+             [s2 (make-string 1)])
+         (string-set! s1 0 #\\a)
+         (string-set! s2 0 #\\a)
+         (strings-two=? s1 s2))", "#t\n"
+      "(let ([s1 (make-string 1)]
+             [s2 (make-string 1)])
+         (string-set! s1 0 #\\a)
+         (string-set! s2 0 #\\b)
+         (strings-two=? s1 s2))", "#f\n"
+      "(let ([s1 (make-string 2)]
+             [s2 (make-string 2)])
+         (string-set! s1 0 #\\a)
+         (string-set! s2 0 #\\a)
+         (string-set! s1 1 #\\b)
+         (string-set! s2 1 #\\b)
+         (strings-two=? s1 s2))", "#t\n"
+      "(strings-two=? \"one\" \"two\")", "#f\n"
+      "(strings-two=? \"one\" \"\")", "#f\n"
+      "(string=? \"one\")", "#t\n"
+      "(string=? \"one\" \"two\")", "#f\n"
+      "(string=? \"one\" \"one\" \"one\")", "#t\n" ]
+
 let generateBigLet n =
     use f = new StringWriter()
     fprintfn f "(let ("

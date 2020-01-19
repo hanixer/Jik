@@ -44,6 +44,10 @@ type Prim =
     | CharToNumber
     | IsChar
     | Apply
+    | MakeSymbol
+    | SymbolString
+    | IsSymbol
+    | Error // this primitive receive one arguments - a string. Should be called from scheme library.
 
 type Expr =
     | Int of int
@@ -124,6 +128,10 @@ let stringPrimop = [
     "char->fixnum", CharToNumber
     "char?", IsChar
     "apply", Apply
+    "make-symbol", MakeSymbol
+    "symbol-string", SymbolString
+    "symbol?", IsSymbol
+    "error", Error
 ]
 
 let tryStringToPrimop s =
@@ -293,6 +301,8 @@ let rec sexprToExpr sexpr =
     | SExpr.String string -> String string
     | List [SExpr.Symbol "if"; cond; conseq; altern] ->
         If(sexprToExpr cond, sexprToExpr conseq, sexprToExpr altern)
+    | List (SExpr.Symbol "if" :: _) ->
+        failwithf "wrong 'if' form:\n%A" (sexprToString sexpr)
     | List(Symbol "begin" :: e :: exprs) ->
         let es = convertList exprs
         Begin(sexprToExpr e :: es)
@@ -319,12 +329,10 @@ let stringToProgram str : Program =
     let parseSExpr (globals, sexprs) sexpr =
         match sexpr with
         | List (Symbol "define" :: List (Symbol name :: args) :: body) ->
-            printfn "global: %s" name
             let lambda = exprsToList (Symbol "lambda" :: exprsToList args :: body)
             let sexpr = exprsToList [Symbol "set!"; Symbol name; lambda]
             name :: globals, sexpr :: sexprs
         | List [Symbol "define"; Symbol name; sexpr] ->
-            printfn "global: %s" name
             let sexpr = exprsToList [Symbol "set!"; Symbol name; sexpr]
             name :: globals, sexpr :: sexprs
         | sexpr ->
@@ -358,17 +366,6 @@ let rec transform f expr =
 
     transform expr
 
-//   (define (convert-char char)
-//     (case char
-//       ((#\_)   '(#\_ #\_))
-//       ((#\?)   '(#\p))
-//       ((#\!)   '(#\i))
-//       ((#\<)   '(#\l))
-//       ((#\>)   '(#\g))
-//       ((#\=)   '(#\e))
-//       ((#\- #\/ #\* #\:)   '())
-//       (else (list char))))
-
 let convertSchemeIdentifToAsm name =
     let convertChar = function
         | '?' -> "Qmark"
@@ -382,6 +379,7 @@ let convertSchemeIdentifToAsm name =
         | '/' -> "Divide"
         | '.' -> "Dot"
         | '$' -> "Dollar"
+        | '%' -> "Percent"
         | c -> sprintf "%c" c
 
     Seq.map convertChar name

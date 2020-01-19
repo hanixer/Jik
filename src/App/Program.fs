@@ -118,7 +118,7 @@ let testLambda str =
 
 let runTestString source expected =
     let exe = Util.getPathRelativeToRoot ("misc/a.exe")
-    Compile.compileSchemeString true source exe
+    Compile.compileSchemeStringToBinary true source exe
     let res = runCompiled()
     if res <> expected then
         printfn "got: %s" res
@@ -126,11 +126,12 @@ let runTestString source expected =
 [<EntryPoint>]
 let main argv =
     let c = Compile.stringToAsmForm
-    // runSingleTest c "(letrec ([f (lambda (x) (+ x 1))]) (f 1))" "2\n"
-    // runTestGroup c "letLoop" letLoop
-    // runTestStringWithLibrary "(length (list 1 2 3))" "3\n"
+    runTestWithLib "(string=? \"one\" \"one\")" "#t\n"
+    // runSingleTest c "(string=? \"one\" \"one\" \"one\")" "#t\n"
 
-    runTestGroup c "complexConstants" complexConstants
+    // runTestGroupWithLib "symbols" symbols
+    // runTestGroup c "letLoop" letLoop
+    // runTestGroup c "complexConstants" complexConstants
     // runTestGroup c "variable arity without rest arguments" variableArity
     // runTestGroup c "variable arity using rest arguments" variableArityUsingRest
     // runTestGroup c "calls" callFailure

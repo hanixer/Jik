@@ -95,9 +95,12 @@ let runTestGroup compile testName tests =
     let n = List.fold fold (0, 1) tests |> fst
     printfn "Test \"%s\": completed %d / %d" testName n tests.Length
 
-let runTestStringWithLibrary source expected =
+let runTestGroupWithLib =
+    runTestGroup (Compile.compileSchemeStringToString true)
+
+let runTestWithLib source expected =
     let action input =
         let exe = Util.getPathRelativeToRoot ("misc/a.exe")
-        Compile.compileSchemeString true source exe
+        Compile.compileSchemeStringToBinary true source exe
         Util.executeProcess(exe, "").stdout
     singleTestWrapper action source expected

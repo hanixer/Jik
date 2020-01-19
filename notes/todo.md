@@ -1,3 +1,8 @@
+- [ ] Complex constants.
+- [ ] Output ports.
+- [ ] Safe primitives.
+- [ ] Symbols.
+
 After variable arity functions, we can implement library functions like (vector 1 2 3) => #(1 2 3).
 So we return to separate compilation.
 
@@ -73,3 +78,14 @@ Add new primitives: constant ref and constant set.
 	...
 	(cons str1 str2)) (make-string 3) (make-string 3))
 ```
+
+# Complex constants
+
+# Symbols
+For symbols support we need to add primitive make-symbol.
+
+How to traslate symbols?
+
+We first need to allocate string, that corresponds to it,
+and then allocate symbol and bind it to unique location.
+Later all references should be to that location.
