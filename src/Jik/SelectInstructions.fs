@@ -4,7 +4,9 @@ open Graph
 open Core
 open Intermediate
 open RuntimeConstants
+open Primitive
 open Codegen
+open Common
 
 let foreignFuncPrefix = "s_"
 

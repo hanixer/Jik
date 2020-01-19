@@ -3,6 +3,8 @@ module Intermediate
 open Core
 open Graph
 open Display
+open Common
+open Primitive
 
 type Var = string
 

@@ -5,11 +5,14 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="RuntimeConstants.fs" />
+    <Compile Include="Common.fs" />
     <Compile Include="SExpr.fs" />
     <Compile Include="Display.fs" />
     <Compile Include="Util.fs" />
     <Compile Include="CompileOld.fs" />
     <Compile Include="Graph.fs" />
+    <Compile Include="Desugar.fs" />
+    <Compile Include="Primitive.fs" />
     <Compile Include="Core.fs" />
     <Compile Include="Intermediate.fs" />
     <Compile Include="Codegen.fs" />

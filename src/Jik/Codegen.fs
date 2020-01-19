@@ -7,6 +7,8 @@ open Intermediate
 open System.IO
 open System.Collections.Generic
 open Display
+open Common
+open Primitive
 
 /// Code generation.
 /// Language resembles x86 instruction set.

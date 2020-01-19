@@ -80,6 +80,17 @@ Add new primitives: constant ref and constant set.
 ```
 
 # Complex constants
+Now we need to collect all constants.
+We walk through the Core program. If constant was already seen, we replace it with reference to global
+variable.
+
+How to transfer constants from SExpressions to core?
+We could pass the SExpr piece, and then transform it.
+
+String is passed as it is.
+We could make  a case for symbols and pass symbols like strings.
+What about lists?
+'(1 2 3) => (prim cons 1 (prim cons 2 (prim cons 3 '())))
 
 # Symbols
 For symbols support we need to add primitive make-symbol.
