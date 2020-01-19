@@ -46,14 +46,36 @@ let parseArgs args =
     | S.Symbol arg -> [S.Symbol arg], true
     | _ -> failwithf "wrong argument SExpr for lambda form:\n%A" args
 
-let rec sexprToExpr sexpr =
-    let convertList = List.map sexprToExpr
-    match sexpr with
+let isSimple = function
+    | S.Char _
+    | S.Number _
+    | S.Bool _
+    | S.String _ -> true
+    | _ -> false
+
+let convertSimple = function
     | S.Char c -> Char c
     | S.Number n -> Int n
     | S.Bool n -> Bool n
-    | S.Symbol name -> Ref name
     | S.String string -> String string
+    | S.Nil -> EmptyList
+    | _ -> failwith "simple sexpr expected"
+
+let rec quotedFormToExpr form =
+    match form with
+    | _ when isSimple form -> convertSimple form
+    | S.Nil -> EmptyList
+    | S.Symbol s -> Symbol s
+    | S.Cons(x, y) ->
+        let xx = quotedFormToExpr x
+        let yy = quotedFormToExpr y
+        PrimApp(Cons, [xx; yy])
+
+let rec sexprToExpr sexpr =
+    let convertList = List.map sexprToExpr
+    match sexpr with
+    | _ when isSimple sexpr -> convertSimple sexpr
+    | S.Symbol name -> Ref name
     | List [S.Symbol "if"; cond; conseq; altern] ->
         If(sexprToExpr cond, sexprToExpr conseq, sexprToExpr altern)
     | List (S.Symbol "if" :: _) ->
@@ -68,7 +90,7 @@ let rec sexprToExpr sexpr =
         Lambda(strings, dotted, convertList body)
     | List [S.Symbol "quote"; List []] -> EmptyList
     | List [S.Symbol "quote"; form] ->
-        failwith "sexprToExpr: quote is not supported"
+        Quote(quotedFormToExpr form)
     | List (S.Symbol "foreign-call" :: S.String foreignName :: tail) ->
         let args = convertList tail
         ForeignCall(foreignName, args)
@@ -106,12 +128,12 @@ let stringToProgram str : Program =
 let rec transform f expr =
     let rec propagate expr =
         match expr with
-        | Expr.If(cond, conseq, altern) -> Expr.If(transform cond, transform conseq, transform altern)
-        | Expr.Assign(var, rhs) -> Expr.Assign(var, transform rhs)
-        | Expr.Lambda(args, dotted, body) -> Expr.Lambda(args, dotted, List.map transform body)
-        | Expr.Begin(exprs) -> Expr.Begin(List.map transform exprs)
-        | Expr.App(func, args) -> Expr.App(transform func, List.map transform args)
-        | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transform args)
+        | If(cond, conseq, altern) -> If(transform cond, transform conseq, transform altern)
+        | Assign(var, rhs) -> Assign(var, transform rhs)
+        | Lambda(args, dotted, body) -> Lambda(args, dotted, List.map transform body)
+        | Begin(exprs) -> Begin(List.map transform exprs)
+        | App(func, args) -> App(transform func, List.map transform args)
+        | PrimApp(op, args) -> PrimApp(op, List.map transform args)
         | e -> e
 
     and transform expr =
@@ -146,10 +168,10 @@ let convertGlobalRefs (prog : Program) : Program =
 
     let convertHelper propagate transform expr =
         match expr with
-        | Expr.Ref var when List.contains var prog.Globals ->
+        | Ref var when List.contains var prog.Globals ->
             let newName = Map.find var env
             PrimApp(GlobalRef, [Ref newName])
-        | Expr.Assign(var, rhs) when List.contains var prog.Globals ->
+        | Assign(var, rhs) when List.contains var prog.Globals ->
             let newName = Map.find var env
             let newRhs = transform rhs
             PrimApp(GlobalSet, [Ref newName; newRhs])
@@ -204,14 +226,14 @@ let rec replaceVars mapping expr =
         | Some var2 -> var2
         | _ -> var
     match expr with
-    | Expr.Ref var -> replace var |> Expr.Ref
-    | Expr.If(cond, conseq, altern) -> Expr.If(transf cond, transf conseq, transf altern)
-    | Expr.Assign(var, rhs) -> Expr.Assign(replace var, transf rhs)
-    | Expr.Lambda(args, dotted, body) -> Expr.Lambda(args, dotted, List.map transf body)
-    | Expr.Begin(exprs) -> Expr.Begin(List.map transf exprs)
-    | Expr.App(func, args) -> Expr.App(transf func, List.map transf args)
-    | Expr.PrimApp(op, args) -> Expr.PrimApp(op, List.map transf args)
-    | Expr.ForeignCall(foreignName, args) -> Expr.ForeignCall(foreignName, List.map transf args)
+    | Ref var -> replace var |> Ref
+    | If(cond, conseq, altern) -> If(transf cond, transf conseq, transf altern)
+    | Assign(var, rhs) -> Assign(replace var, transf rhs)
+    | Lambda(args, dotted, body) -> Lambda(args, dotted, List.map transf body)
+    | Begin(exprs) -> Begin(List.map transf exprs)
+    | App(func, args) -> App(transf func, List.map transf args)
+    | PrimApp(op, args) -> PrimApp(op, List.map transf args)
+    | ForeignCall(foreignName, args) -> ForeignCall(foreignName, List.map transf args)
     | e -> e
 
 let convertStrings (prog : Program) =
@@ -219,7 +241,7 @@ let convertStrings (prog : Program) =
 
     let handleExpr propagate transform expr =
         match expr with
-        | Expr.String(literal) ->
+        | String(literal) ->
             let name = freshLabel "str_lit"
             stringsAndNames.Add(literal, name)
             Ref name
@@ -247,6 +269,76 @@ let convertStrings (prog : Program) =
 
     {prog with Main = [app]}
 
+let makeStringExprs literal =
+    let tmp = freshLabel "tmp"
+
+    let assignments =
+        literal
+        |> Seq.mapi (fun i ch ->
+            PrimApp(StringSet, [Ref tmp; Int i; Char ch]))
+        |> Seq.toList
+    let lambda = Lambda([tmp], false, assignments)
+    let make = PrimApp(MakeString, [Int (Seq.length literal)])
+    App(lambda, [make])
+
+let collectComplexConstants (prog : Program) =
+    // expr, name
+    let exprToName = System.Collections.Generic.Dictionary<Expr, string>()
+    let assignments = System.Collections.Generic.List<string * Expr>()
+
+    let rec add expr =
+        match expr with
+        | (PrimApp(Cons, [x; y])) ->
+            if exprToName.ContainsKey(expr) then
+                Ref exprToName.[expr]
+            else
+                let xname = add x
+                let yname = add y
+                let thisName = freshLabel "cconst"
+                exprToName.Add(expr, thisName)
+                assignments.Add(thisName, PrimApp(Cons, [xname; yname]))
+                Ref thisName
+        | Symbol s ->
+            if exprToName.ContainsKey(expr) then
+                Ref exprToName.[expr]
+            else
+                let sname = add (String s)
+                let thisName = freshLabel "cconst"
+                exprToName.Add(expr, thisName)
+                let app = App(Ref "string->symbol", [sname])
+                assignments.Add(thisName, app)
+                Ref thisName
+        | String s ->
+            if exprToName.ContainsKey(expr) then
+                Ref exprToName.[expr]
+            else
+                let thisName = freshLabel "cconst"
+                exprToName.Add(expr, thisName)
+                let makeString = makeStringExprs s
+                assignments.Add(thisName, makeString)
+                Ref thisName
+        | _ -> expr
+
+    let convertHelper propagate transform expr =
+        match expr with
+        | Quote((PrimApp(Cons(_), _)) as subExpr) -> add subExpr
+        | Quote(_) -> failwith "In Core quote can contain only PrimApp(Cons...)"
+        | Symbol _ | String _ -> add expr
+        | _ -> propagate expr
+
+    let convertExpr expr = transform convertHelper expr
+
+    let assignExprs =
+        assignments
+        |> Seq.map (fun (name, expr) ->
+            PrimApp(GlobalSet, [Ref name; expr]))
+        |> Seq.toList
+
+    let names = assignments |> Seq.map fst |> Seq.toList
+
+    { prog with Main = assignExprs @ List.map convertExpr prog.Main
+                Globals = prog.Globals @ names }
+
 let rec fixArithmeticPrims (prog : Program) : Program =
     let ops = [Add; Mul;]
 
@@ -255,7 +347,7 @@ let rec fixArithmeticPrims (prog : Program) : Program =
 
     let rec handleExpr propagate transform expr =
         match expr with
-        | Expr.PrimApp(op, args) when (List.contains op ops) && (args.Length > 1) ->
+        | PrimApp(op, args) when (List.contains op ops) && (args.Length > 1) ->
             let args = List.map transform args
             List.fold (fold op) args.Head args.Tail
         | e -> propagate e
@@ -275,11 +367,11 @@ let rec findModifiedVars expr =
         Set.add v (find rhs)
     | App (head, tail) ->
         findMany (head :: tail)
-    | Lambda (args, dotted, body) ->
+    | Lambda (_, _, body) ->
         findMany body
     | Begin exprs ->
         findMany exprs
-    | PrimApp(op, tail) ->
+    | PrimApp(_, tail) ->
         findMany tail
     | _ -> Set.empty
 
@@ -340,7 +432,7 @@ let assignmentConvert (prog : Program) : Program =
 let stringToExpr = stringToSExpr >> sexprToExpr
 
 let allCoreTransformations =
-    convertStrings
+    collectComplexConstants
     >> fixArithmeticPrims
     >> convertGlobalRefs
     >> alphaRename

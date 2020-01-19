@@ -506,7 +506,8 @@ let variableArityUsingRest =
       (f 10 20 30 40 50 60 70 80 90 100))", "(10 20 30 40 50 60 70 80 90 100)\n"  ]
 
 let complexConstants =
-    [ "\"Hello World\"", "\"Hello World\"\n"]
+    [ //"\"Hello World\"", "\"Hello World\"\n"
+      "'(1 2 3)", "5\n"]
 
 let tak =
     [ "(define (tak x y z)
