@@ -100,3 +100,11 @@ How to traslate symbols?
 We first need to allocate string, that corresponds to it,
 and then allocate symbol and bind it to unique location.
 Later all references should be to that location.
+
+# Apply
+It is neccessary to change 'apply' behaviour.
+Currently, only (apply f list) is supported.
+We also need to support (apply f x y z list) form.
+That is, pass x, y and z as in regular call, but split list argument into components.
+Also, tail call form for apply is not supported.
+Last arguments must be list, or nil.

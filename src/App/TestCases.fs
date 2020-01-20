@@ -334,6 +334,15 @@ let letrecTests =
                           ((fix f) n))))))
         ((fix f) 5)))", "120\n" ]
 
+let applyNonTail =
+    [ apply, "3\n"
+      "(let ([f (lambda (x y z) (+ x (* y z)))])
+        (+ (apply f 12 '(7 2)) 1))", "27\n"
+      "(cons (apply vector '(1 2 3 4 5 6 7 8)) '())", "(#(1 2 3 4 5 6 7 8))\n"
+      "(cons (apply vector 1 2 3 4 '(5 6 7 8)) '())", "(#(1 2 3 4 5 6 7 8))\n"
+      "(cons (apply vector 1 2 3 4 5 6 7 8 '()) '())", "(#(1 2 3 4 5 6 7 8))\n"
+    ]
+
 let letLoop =
     [ "(let f () 12)", "12\n"
       "(let f ([x 1]) (+ x 1))", "2\n"

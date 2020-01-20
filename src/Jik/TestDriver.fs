@@ -17,7 +17,7 @@ let runCompiled () =
 
 let mutable testCases : List<string * (List<string * string>)> = []
 
-let runTest compile input =
+let private runTestImpl compile input =
     let prevCD = Environment.CurrentDirectory
     Environment.CurrentDirectory <- miscPath
     let prevPath = System.Environment.GetEnvironmentVariable("PATH")
@@ -62,14 +62,14 @@ let singleTestWrapper action input expected =
             printfn "-----------------------------------"
             printfn ""
 
-let runSingleTest compile input expected =
-    let action input = runTest compile input
+let runTest input expected =
+    let action input = runTestImpl Compile.stringToAsmForm input
     singleTestWrapper action input expected
 
 let runTestGroup compile testName tests =
     let fold (passed, i) (input, expected) =
         try
-            let output = runTest compile input
+            let output = runTestImpl compile input
             if output <> expected then
                 printfn "-----------------------------------"
                 printfn "FAIL! '%s' #%d" testName i

@@ -80,22 +80,27 @@ let compileCall label blocks func args =
 
 /// TODO: rework this so that apply could receive more than 2 arguments
 let compileApply func argsList dest =
+    let total = List.length argsList
+    let simpleArgs = List.take (total - 1) argsList
+    let lastArg = List.skip (total - 1) argsList |> List.head
     let loopBegin = freshLabel "loopBegin"
     let loopEnd = freshLabel "loopEnd"
+    moveArgsForCall simpleArgs @ // move all but last arguments like in a regular call
     [Mov, [Var func; Reg Rcx]
-     Mov, [Var argsList; Reg Rdx]
-     Mov, [Int 0; Reg R8] // r8 contains negated number of arguments
+     Mov, [Var lastArg; Reg Rdx]
+     Mov, [Int 0; Reg R8] // r8 contains negated number of arguments in list
      Label loopBegin, []
      Mov, [Int nilLiteral; Reg Rax]
      Cmp, [Reg Rdx; Reg Rax]
      JmpIf(E, loopEnd), []
      getCar Rdx (Reg Rax)
      Sub, [Int 1; Reg R8] // Change argument counter
-     Mov, [Reg Rax; Deref4(-wordSize, Rsp, R8, wordSize)] // Save argument to its pos in stack
+     Mov, [Reg Rax; Deref4(-wordSize * total, Rsp, R8, wordSize)] // Save argument to its pos in stack
      getCdr Rdx (Reg Rdx)
      Jmp(loopBegin), []
      Label(loopEnd), []
      Neg, [Reg R8]
+     Add, [Int (total - 1); Reg R8]
      Mov, [Reg R8; Reg Rcx]] @
     makeIndirectCall func @
     [Mov, [Reg Rax; Var dest]]
@@ -220,6 +225,8 @@ let rec declToInstrs (dest, x) =
          Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Lt, [var1; var2]) ->
         comparisonInstrs var1 var2 Cc.L (Some(Var dest))
+    | Simple.Prim(Prim.Ge, [var1; var2]) ->
+        comparisonInstrs var1 var2 Cc.Ge (Some(Var dest))
     | Simple.Prim(Prim.Not, [var1]) ->
         [Cmp, [Operand.Int falseLiteral; Var var1]] @
         compileSetOnEqual dest
@@ -350,12 +357,12 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.IsSymbol, [var1]) ->
         compileIsOfType dest var1 symbolMask symbolTag
 
-    | Simple.Prim(Prim.Apply, [func; argsList]) ->
+    | Simple.Prim(Prim.Apply, (func :: argsList)) ->
         compileApply func argsList dest
     | Simple.Prim(Prim.Error, [describe]) ->
         [Mov, [Var describe; Reg Rcx]
          Jmp(errorHandlerLabel), []]
-    | e -> failwithf "handleDecl: %s %A" dest e
+    | e -> failwithf "declToInstrs: %s %A" dest e
 
 let transferToInstrs blocks = function
     | Return var ->

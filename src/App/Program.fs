@@ -126,12 +126,13 @@ let runTestString source expected =
 [<EntryPoint>]
 let main argv =
     let c = Compile.stringToAsmForm
-    // runTestWithLib "(string=? \"one\" \"one\")" "#t\n"
     // runSingleTest c "(string=? \"one\" \"one\" \"one\")" "#t\n"
+    // runTest apply "333\n"
 
     // runTestGroupWithLib "symbols" symbols
     // runTestGroup c "letLoop" letLoop
-    runTestGroup c "complexConstants" complexConstants
+    runTestGroupWithLib "apply nontail" applyNonTail
+    // runTestGroup c "complexConstants" complexConstants
     // runTestGroup c "variable arity without rest arguments" variableArity
     // runTestGroup c "variable arity using rest arguments" variableArityUsingRest
     // runTestGroup c "calls" callFailure
@@ -150,7 +151,7 @@ let main argv =
     // runTestGroup c "list" listTests
     // runTestGroup c "num -> char" numcharTests
     // runTestGroup c "char?" isCharTests
-    runTestGroup c "string" stringTests
+    // runTestGroup c "string" stringTests
     // runTestGroup c "foreign-call" foreignCallTests
 
 
