@@ -1,7 +1,7 @@
-- [ ] Complex constants.
+- [x] Complex constants.
 - [ ] Output ports.
 - [ ] Safe primitives.
-- [ ] Symbols.
+- [x] Symbols.
 
 After variable arity functions, we can implement library functions like (vector 1 2 3) => #(1 2 3).
 So we return to separate compilation.
@@ -108,3 +108,20 @@ We also need to support (apply f x y z list) form.
 That is, pass x, y and z as in regular call, but split list argument into components.
 Also, tail call form for apply is not supported.
 Last arguments must be list, or nil.
+
+# Output ports
+Unique identifier - which to choose?
+
+Structure:
+0. id
+1. string filename
+2. int file desc
+3. string output buf
+4. int next pos
+5. int buf size
+
+# Issue with library initialization
+We have a problem:
+String symbol uses string->symbol function for its creation, but function
+is not yet initialized.
+How to initialize library before anything else?

@@ -149,9 +149,20 @@ ptr s_print6args(ptr a1, ptr a2, ptr a3, ptr a4, ptr a5, ptr a6) {
     return 0;
 }
 
-void error() {
+void asmError() {
     printf("error");
     exit(1);
+}
+
+void s_error(ptr x) {
+    fprintf(stderr, "error!\n");
+    printf("error!\n");
+    printPtr(x);
+    exit(1);
+}
+
+void s_exit(ptr p) {
+    exit(fixnumToInt(p));
 }
 
 int main() {

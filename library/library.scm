@@ -1,3 +1,8 @@
+;;; Error
+(define error
+    (lambda args
+        (foreign-call "error" args)))
+
 ;;; Lists
 
 (define list
@@ -88,3 +93,22 @@
                 (begin
                   (vector-set! v i (car args))
                   (loop (+ i 1) (cdr args)))))))))
+
+;;; Foreign calls
+(define %output-port-id 1999817)
+(define %output-port-length 6)
+(define %output-buf-size 4096)
+
+(define output-port?
+    (lambda (port)
+        (and (vector? port)
+             (eq? (vector-length port) %output-port-length)
+             (eq? (vector-ref port 0) %output-port-id))))
+
+(define open-output-file
+    (lambda (filename)
+    ; call open(filename)
+    ; get file descriptor
+    ;
+    1
+        ))

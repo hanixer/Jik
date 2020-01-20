@@ -556,6 +556,9 @@ let symbols =
             [s2 (string->symbol \"look\")])
         (eq? s1 s2))", "#t\n" ]
 
+let exitTest =
+    [ "(foreign-call \"exit\" 0)", "" ]
+
 let generateBigLet n =
     use f = new StringWriter()
     fprintfn f "(let ("

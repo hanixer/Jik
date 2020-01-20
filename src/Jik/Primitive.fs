@@ -89,6 +89,6 @@ let stringPrimop = [
     "make-symbol", MakeSymbol
     "symbol-string", SymbolString
     "symbol?", IsSymbol
-    "error", Error
+    // "error", Error
 ]
 

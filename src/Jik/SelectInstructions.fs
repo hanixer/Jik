@@ -397,7 +397,7 @@ let selectInstructions (prog : Intermediate.Program) : Program =
 
     let errorHandler =
         [Label(errorHandlerLabel), []
-         Call("error"), []]
+         Call("asmError"), []]
 
     let handleDef proc =
         let instrs =

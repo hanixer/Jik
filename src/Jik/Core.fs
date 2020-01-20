@@ -86,6 +86,9 @@ let rec sexprToExpr sexpr =
         Begin(sexprToExpr e :: es)
     | List [S.Symbol "set!"; S.Symbol name; rhs] -> Assign(name, sexprToExpr rhs)
     | List(S.Symbol "lambda" :: args :: body) ->
+        if List.isEmpty body then
+            failwith "lambda: body should not be empty"
+
         let args, dotted = parseArgs args
         let strings = symbolsToStrings args
         Lambda(strings, dotted, convertList body)
@@ -294,9 +297,11 @@ let collectComplexConstants (prog : Program) =
 
     let convertHelper propagate transform expr =
         match expr with
-        | Quote((PrimApp(Cons(_), _)) as subExpr) -> add subExpr
-        | Quote(_) -> failwith "In Core quote can contain only PrimApp(Cons...)"
+        | Quote(Symbol _ as symb) -> add symb
         | Symbol _ | String _ -> add expr
+        | Quote((PrimApp(Cons(_), _)) as subExpr) -> add subExpr
+        | Quote(_) ->
+            failwith "In Core quote can contain only PrimApp(Cons...)"
         | _ -> propagate expr
 
     let convertExpr expr = transform convertHelper expr
