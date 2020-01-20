@@ -73,6 +73,7 @@ type InstrName =
     | Lea of string
     // intermediate
     | RestoreStack
+    | SpliceSlot of slot : int * argsCount : int
 
 and Instr = InstrName * Operand list
 
@@ -209,6 +210,10 @@ let programToString (prog : Program) =
     showInstrs out prog.ErrorHandler
     out.ToString()
 
+
+let getCar reg dest = Mov, [Deref(-pairTag, reg); dest]
+let getCdr reg dest = Mov, [Deref(-pairTag + wordSize, reg); dest]
+
 /// Applies transformations to instructions.
 let transformInstructions handleInstrs (prog : Program) =
     let handleDef def =
@@ -265,6 +270,31 @@ let computePreds instrs =
     Seq.fold handleInstr (initial, 0) instrs
     |> fst
 
+/// Splice the last slot to support apply function.
+let spliceSlot slots slot argsCount =
+    // r8 - counts number of elements in list
+    // r9 - points to stack position to put an element
+    let stackOffset = (slots - slot) * wordSize
+    let loopBegin = freshLabel "loopBegin"
+    let loopEnd = freshLabel "loopEnd"
+    [Mov, [Reg Rsp; Reg R9]
+     Add, [Int stackOffset; Reg R9]
+     Mov, [Deref(0, R9); Reg Rdx]
+     Mov, [Int 0; Reg R8]
+     Label loopBegin, []
+     Mov, [Int nilLiteral; Reg Rax]
+     Cmp, [Reg Rdx; Reg Rax]
+     JmpIf(E, loopEnd), []
+     getCar Rdx (Reg Rax)
+     Add, [Int 1; Reg R8] // Change argument counter
+     Mov, [Reg Rax; Deref(0, R9)]
+     Add, [Int wordSize; Reg R9]
+     getCdr Rdx (Reg Rdx)
+     Jmp(loopBegin), []
+     Label(loopEnd), []
+     Mov, [Int (argsCount - 1); Reg Rcx]
+     Add, [Reg R8; Reg Rcx]]
+
 let convertSlots (prog : Program) =
     let handleArg slots arg =
         match arg with
@@ -275,10 +305,18 @@ let convertSlots (prog : Program) =
     let handleInstr slots (op, args) =
         op, List.map (handleArg slots) args
 
-    let handleInstrs instrs = List.map handleInstr instrs
+    let splice slots instr =
+        match instr with
+        | SpliceSlot(slot, argsCount), _ ->
+            spliceSlot slots slot argsCount
+        | _ -> [instr]
+
+    let handleInstrs slots instrs =
+        let instrs' = List.collect (splice slots) instrs
+        List.map (handleInstr slots) instrs'
 
     let handleDef def =
-        {def with Instrs = List.map (handleInstr def.SlotsOccupied) def.Instrs}
+        {def with Instrs = handleInstrs def.SlotsOccupied def.Instrs}
 
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }

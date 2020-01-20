@@ -131,7 +131,8 @@ let main argv =
 
     // runTestGroupWithLib "symbols" symbols
     // runTestGroup c "letLoop" letLoop
-    runTestGroupWithLib "apply nontail" applyNonTail
+    // runTestGroupWithLib "apply nontail" applyNonTail
+    runTestGroupWithLib "apply tail" applyTail
     // runTestGroup c "complexConstants" complexConstants
     // runTestGroup c "variable arity without rest arguments" variableArity
     // runTestGroup c "variable arity using rest arguments" variableArityUsingRest

@@ -12,9 +12,6 @@ let foreignFuncPrefix = "s_"
 
 let stackArgsCount args = List.length args - List.length registersForArgs
 
-let getCar reg dest = Mov, [Deref(-pairTag, reg); dest]
-let getCdr reg dest = Mov, [Deref(-pairTag + wordSize, reg); dest]
-
 let moveClosureArgs args =
     List.mapi (fun i arg ->
         Mov, [Var arg; Deref((i + 1) * wordSize, R11)]) args
@@ -78,8 +75,32 @@ let compileCall label blocks func args =
     [Mov, [Reg Rax; Var resultVar]
      Jmp label, []]
 
+let prepareArgumentsForApply args =
+    let total = List.length args
+    let simpleArgs = List.take (total - 1) args
+    let lastArg = List.skip (total - 1) args |> List.head
+    let loopBegin = freshLabel "loopBegin"
+    let loopEnd = freshLabel "loopEnd"
+    moveArgsForCall simpleArgs @ // move all but last arguments like in a regular call
+    [Mov, [Var lastArg; Reg Rdx]
+     Mov, [Int 0; Reg R8] // r8 contains negated number of arguments in list
+     Label loopBegin, []
+     Mov, [Int nilLiteral; Reg Rax]
+     Cmp, [Reg Rdx; Reg Rax]
+     JmpIf(E, loopEnd), []
+     getCar Rdx (Reg Rax)
+     Sub, [Int 1; Reg R8] // Change argument counter
+     Mov, [Reg Rax; Deref4(-wordSize * total, Rsp, R8, wordSize)] // Save argument to its pos in stack
+     getCdr Rdx (Reg Rdx)
+     Jmp(loopBegin), []
+     Label(loopEnd), []
+     Neg, [Reg R8]
+     Add, [Int (total - 1); Reg R8]
+     Mov, [Reg R8; Reg Rcx]]
+
 /// TODO: rework this so that apply could receive more than 2 arguments
-let compileApply func argsList dest =
+let compileApply label blocks func argsList =
+    let resultVar = getCallResultVar label blocks
     let total = List.length argsList
     let simpleArgs = List.take (total - 1) argsList
     let lastArg = List.skip (total - 1) argsList |> List.head
@@ -103,7 +124,40 @@ let compileApply func argsList dest =
      Add, [Int (total - 1); Reg R8]
      Mov, [Reg R8; Reg Rcx]] @
     makeIndirectCall func @
-    [Mov, [Reg Rax; Var dest]]
+    [Mov, [Reg Rax; Var resultVar]
+     Jmp(label), []]
+
+let prepareArgsForTailCall moveArgsInstrs =
+    // rcx should have arguments count
+    let loopBegin = freshLabel "loopBegin"
+    let loopEnd = freshLabel "loopEnd"
+    [Label(loopBegin), []
+     Cmp, [Int 0; Reg Rax]
+     JmpIf(E, loopEnd), []
+
+     ]
+    moveArgsInstrs
+    |> List.mapi (fun i x ->
+        match x with
+        | Mov, [_; arg2] -> Mov, [arg2; Slot(i)]
+        | _ -> failwith "wrong")
+
+let compileTailApply func args =
+    let moveToArgPositions = moveArgsForCall args
+    let moveStackArgs =
+        moveToArgPositions
+        |> List.mapi (fun i x ->
+            match x with
+            | Mov, [_; arg2] -> Mov, [arg2; Slot(i)]
+            | _ -> failwith "wrong")
+
+    moveToArgPositions @
+    [Mov, [Var func; Reg Rsi]] @
+    moveStackArgs @
+    [SpliceSlot(List.length args - 1, List.length args), []
+     RestoreStack, []] @
+    checkForClosureTag @
+    [JmpIndirect, [Deref(-closureTag, Rsi)]]
 
 /// Main function for tail call.
 let compileTailCall func args =
@@ -357,8 +411,6 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.IsSymbol, [var1]) ->
         compileIsOfType dest var1 symbolMask symbolTag
 
-    | Simple.Prim(Prim.Apply, (func :: argsList)) ->
-        compileApply func argsList dest
     | Simple.Prim(Prim.Error, [describe]) ->
         [Mov, [Var describe; Reg Rcx]
          Jmp(errorHandlerLabel), []]
@@ -385,6 +437,10 @@ let transferToInstrs blocks = function
         compileCall label blocks func args
     | Transfer.Call(Tail, func, args) ->
         compileTailCall func args
+    | Transfer.Apply(NonTail label, func, args) ->
+        compileApply label blocks func args
+    | Transfer.Apply(Tail, func, args) ->
+        compileTailApply func args
     | ForeignCall(label, foreignName, args) ->
         compileForeignCall label blocks foreignName args
 
