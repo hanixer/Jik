@@ -271,10 +271,9 @@ let computePreds instrs =
     |> fst
 
 /// Splice the last slot to support apply function.
-let spliceSlot slots slot argsCount =
+let spliceSlot stackOffset argsCount =
     // r8 - counts number of elements in list
     // r9 - points to stack position to put an element
-    let stackOffset = (slots - slot) * wordSize
     let loopBegin = freshLabel "loopBegin"
     let loopEnd = freshLabel "loopEnd"
     [Mov, [Reg Rsp; Reg R9]
@@ -308,7 +307,8 @@ let convertSlots (prog : Program) =
     let splice slots instr =
         match instr with
         | SpliceSlot(slot, argsCount), _ ->
-            spliceSlot slots slot argsCount
+            let stackOffset = (slots - slot) * wordSize
+            spliceSlot stackOffset argsCount
         | _ -> [instr]
 
     let handleInstrs slots instrs =

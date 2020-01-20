@@ -70,6 +70,7 @@ let rec quotedFormToExpr form =
         let xx = quotedFormToExpr x
         let yy = quotedFormToExpr y
         PrimApp(Cons, [xx; yy])
+    | _ -> failwith ""
 
 let rec sexprToExpr sexpr =
     let convertList = List.map sexprToExpr
