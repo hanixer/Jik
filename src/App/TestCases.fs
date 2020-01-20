@@ -506,8 +506,18 @@ let variableArityUsingRest =
       (f 10 20 30 40 50 60 70 80 90 100))", "(10 20 30 40 50 60 70 80 90 100)\n"  ]
 
 let complexConstants =
-    [ //"\"Hello World\"", "\"Hello World\"\n"
-      "'(1 2 3)", "5\n"]
+    [ "\"Hello World\"", "\"Hello World\"\n"
+      "'(\"Hello\" \"World\")", "(\"Hello\" \"World\")\n"
+      "'(1 . 3)", "(1 . 3)\n"
+      "'(1 2 3)", "(1 2 3)\n"
+      "(let ([x '(1 2 3)]) x)", "(1 2 3)\n"
+      "(let ([f (lambda () '(1 2 3))])
+        (f))", "(1 2 3)\n"
+      "(let ([f (lambda () '(1 2 3))])
+        (eq? (f) (f)))", "#t\n"
+      "(let ([f (lambda () (lambda ()'(1 2 3)))])
+        ((f)))", "(1 2 3)\n"
+      ]
 
 let tak =
     [ "(define (tak x y z)

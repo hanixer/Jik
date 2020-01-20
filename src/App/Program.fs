@@ -150,7 +150,7 @@ let main argv =
     // runTestGroup c "list" listTests
     // runTestGroup c "num -> char" numcharTests
     // runTestGroup c "char?" isCharTests
-    // runTestGroup c "string" stringTests
+    runTestGroup c "string" stringTests
     // runTestGroup c "foreign-call" foreignCallTests
 
 

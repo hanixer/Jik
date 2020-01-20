@@ -175,6 +175,9 @@ let convertGlobalRefs (prog : Program) : Program =
             let newName = Map.find var env
             let newRhs = transform rhs
             PrimApp(GlobalSet, [Ref newName; newRhs])
+        | PrimApp(GlobalSet, [Ref var; rhs]) ->
+            let newRhs = propagate rhs
+            PrimApp(GlobalSet, [Ref var; newRhs])
         | _ -> propagate expr
 
     let convertExpr expr = transform convertHelper expr
@@ -236,40 +239,9 @@ let rec replaceVars mapping expr =
     | ForeignCall(foreignName, args) -> ForeignCall(foreignName, List.map transf args)
     | e -> e
 
-let convertStrings (prog : Program) =
-    let stringsAndNames = System.Collections.Generic.List<string * string>()
-
-    let handleExpr propagate transform expr =
-        match expr with
-        | String(literal) ->
-            let name = freshLabel "str_lit"
-            stringsAndNames.Add(literal, name)
-            Ref name
-        | _ -> propagate expr
-
-    let exprs = List.map (transform handleExpr) prog.Main
-
-    let assignments =
-        stringsAndNames
-        |> Seq.collect (fun (literal, name) ->
-            literal
-            |> Seq.mapi (fun i ch ->
-                PrimApp(StringSet, [Ref name; Int i; Char ch])))
-
-    let combined = Seq.append assignments exprs |> Seq.toList
-
-    let argsForInit =
-        stringsAndNames
-        |> Seq.map (fun (literal, name) ->
-            PrimApp(MakeString, [Int (Seq.length literal)]))
-
-    let names = Seq.map snd stringsAndNames |> Seq.toList
-    let lambda = Lambda(names, false, combined)
-    let app = App(lambda, argsForInit |> Seq.toList)
-
-    {prog with Main = [app]}
-
-let makeStringExprs literal =
+/// Returns expressions needed for making and initializing
+/// a string from literal parameter.
+let makeAndInitStringExprs literal =
     let tmp = freshLabel "tmp"
 
     let assignments =
@@ -277,12 +249,12 @@ let makeStringExprs literal =
         |> Seq.mapi (fun i ch ->
             PrimApp(StringSet, [Ref tmp; Int i; Char ch]))
         |> Seq.toList
-    let lambda = Lambda([tmp], false, assignments)
+    let lambdaBody = assignments @ [Ref tmp]
+    let lambda = Lambda([tmp], false, lambdaBody)
     let make = PrimApp(MakeString, [Int (Seq.length literal)])
     App(lambda, [make])
 
 let collectComplexConstants (prog : Program) =
-    // expr, name
     let exprToName = System.Collections.Generic.Dictionary<Expr, string>()
     let assignments = System.Collections.Generic.List<string * Expr>()
 
@@ -292,11 +264,11 @@ let collectComplexConstants (prog : Program) =
             if exprToName.ContainsKey(expr) then
                 Ref exprToName.[expr]
             else
-                let xname = add x
-                let yname = add y
+                let xx = add x
+                let yy = add y
                 let thisName = freshLabel "cconst"
                 exprToName.Add(expr, thisName)
-                assignments.Add(thisName, PrimApp(Cons, [xname; yname]))
+                assignments.Add(thisName, PrimApp(Cons, [xx; yy]))
                 Ref thisName
         | Symbol s ->
             if exprToName.ContainsKey(expr) then
@@ -314,7 +286,7 @@ let collectComplexConstants (prog : Program) =
             else
                 let thisName = freshLabel "cconst"
                 exprToName.Add(expr, thisName)
-                let makeString = makeStringExprs s
+                let makeString = makeAndInitStringExprs s
                 assignments.Add(thisName, makeString)
                 Ref thisName
         | _ -> expr
@@ -328,6 +300,9 @@ let collectComplexConstants (prog : Program) =
 
     let convertExpr expr = transform convertHelper expr
 
+    // Replace all constants with references and collect assignments
+    let main = List.map convertExpr prog.Main
+
     let assignExprs =
         assignments
         |> Seq.map (fun (name, expr) ->
@@ -336,7 +311,7 @@ let collectComplexConstants (prog : Program) =
 
     let names = assignments |> Seq.map fst |> Seq.toList
 
-    { prog with Main = assignExprs @ List.map convertExpr prog.Main
+    { prog with Main = assignExprs @ main
                 Globals = prog.Globals @ names }
 
 let rec fixArithmeticPrims (prog : Program) : Program =
@@ -433,7 +408,10 @@ let stringToExpr = stringToSExpr >> sexprToExpr
 
 let allCoreTransformations =
     collectComplexConstants
+    // >> (fun x -> printfn "%A\n------------------------------------\n" x; x)
     >> fixArithmeticPrims
     >> convertGlobalRefs
+    // >> (fun x -> printfn "%A\n------------------------------------\n" x; x)
     >> alphaRename
     >> assignmentConvert
+    // >> (fun x -> printfn "%A" x; x)
