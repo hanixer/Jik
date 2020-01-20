@@ -288,7 +288,7 @@ let spliceSlot slots slot argsCount =
      getCar Rdx (Reg Rax)
      Add, [Int 1; Reg R8] // Change argument counter
      Mov, [Reg Rax; Deref(0, R9)]
-     Add, [Int wordSize; Reg R9]
+     Sub, [Int wordSize; Reg R9] // Go to next stack slot
      getCdr Rdx (Reg Rdx)
      Jmp(loopBegin), []
      Label(loopEnd), []
