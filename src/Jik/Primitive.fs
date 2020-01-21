@@ -101,4 +101,7 @@ let libraryFunctions = [
     "length"
     "string=?"
     "vector"
+    "open-output-file"
+    "flush-output-port"
+    "write-char"
 ]

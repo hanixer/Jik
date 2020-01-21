@@ -18,6 +18,8 @@ let miscPath = Util.getPathRelativeToRoot "misc/"
 
 let saveToFile filename str = System.IO.File.WriteAllText(filename, str)
 
+let defaultOutFile = Util.getPathRelativeToRoot ("misc/a.exe")
+
 let printIr s =
     (fun prog ->
     prog

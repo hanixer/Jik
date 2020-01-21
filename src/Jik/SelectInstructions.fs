@@ -8,8 +8,6 @@ open Primitive
 open Codegen
 open Common
 
-let foreignFuncPrefix = "s_"
-
 let stackArgsCount args = List.length args - List.length registersForArgs
 
 let moveClosureArgs args =
@@ -114,8 +112,8 @@ let compileTailCall shouldSplice func args =
 let compileForeignCall label blocks foreignName args =
     let moveToArgPositions = moveArgsForCallFF args
     let resultVar = getCallResultVar label blocks
-    let name = foreignFuncPrefix + foreignName
-    let stackArgsCount = args.Length - registersForArgs.Length
+    let name = foreignName
+    let stackArgsCount = System.Math.Max(args.Length - registersForArgs.Length, 0)
     let spChange = (stackArgsCount + 4) * wordSize // 4 is 'shadow space' which caller must allocate
     moveToArgPositions @
     [Sub, [Int spChange; Reg Rsp]

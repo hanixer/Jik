@@ -1,6 +1,10 @@
 #include <stdio.h>
-#include <windows.h>
 #include <stdint.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <windows.h>
+#include <string.h>
 
 #define wordSize 8
 #define fixnumShift 0x02
@@ -25,7 +29,6 @@
 void* freePointer;
 
 extern int schemeEntry();
-extern int write(int, const char*, int);
 
 typedef uint64_t ptr;
 typedef ptr* ptrptr;
@@ -51,7 +54,7 @@ static void printPair(ptr p);
 static void printVector(ptr p);
 static void printString(ptr p);
 
-static void printPtr(ptr p) {
+void printPtr(ptr p) {
     if (isFixnum(p)) {
         int n = (int) p;
         printf("%d", n >> fixnumShift);
@@ -74,6 +77,7 @@ static void printPtr(ptr p) {
     } else {
         printf("<unknown 0x%08x>", p);
     }
+    fflush(stdout);
 }
 
 static void printPair(ptr p) {
@@ -163,6 +167,27 @@ void s_error(ptr x) {
 
 void s_exit(ptr p) {
     exit(fixnumToInt(p));
+}
+
+char* copyString(ptr p) {
+    int size = stringSize(p);
+    char* str = stringData(p);
+    char* newStr = malloc(size) + 1;
+    for (int i = 0; i < size; ++i) {
+        newStr[i] = str[i];
+    }
+    newStr[size] = 0;
+    return newStr;
+}
+
+ptr s_openFile(ptr filename) {
+    char* str = copyString(filename);
+    FILE* f = fopen(".gitignore", "w");
+    // int fd = (int)(void*)CreateFileA(".gitignore", GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    int fd = 0;
+    // int fd = open(str, 0);
+    free(str);
+    return intToFixnum(fd);
 }
 
 int main() {

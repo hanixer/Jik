@@ -21,5 +21,5 @@ open Compile
 [<EntryPoint>]
 let main argv =
     let toRoot = Util.getPathRelativeToRoot
-    compileMany [toRoot "library/library.scm"; toRoot "examples/one.scm"]
+    compileMany [toRoot "library/library.scm"; toRoot "examples/one.scm"] defaultOutFile
     0 // return an integer exit code

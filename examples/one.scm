@@ -1,1 +1,3 @@
-(list? (list 1 2 3 4 5))
+(let ([f (open-output-file "misc/output.txt")])
+    (write-char #\a f)
+    (flush-output-port f))
