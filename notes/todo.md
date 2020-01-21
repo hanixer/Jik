@@ -125,3 +125,28 @@ We have a problem:
 String symbol uses string->symbol function for its creation, but function
 is not yet initialized.
 How to initialize library before anything else?
+
+# Separate compilation
+So the most problematic issues with separate compilation are:
+- During compilation of user code, how to provide external symbols defined outside user code?
+	- We can define a list of defined symbols and update it each time we add a primitive.
+	- This scheme does not work when we will compile more than one user file.
+- How to get an entry point of an compilation unit?
+	- An entry point can have the same name as file.
+
+Each file corrsponds to compilation unit.
+This CU should have names, that it define.
+
+compile lib file 1 -> libf1.s
+compile lib file 2 -> libf2.s
+...
+compile main file -> main.s
+
+build: gcc runtime.c libf1.s libf2.s ... main.s -> a.exe
+
+another approach:
+build all modules the same way.
+but then generate a file, that will initialize all modules and will contain schemeEntry.
+
+
+compile : source name isMain -> file

@@ -17,26 +17,10 @@ let runCompiled () =
 
 let mutable testCases : List<string * (List<string * string>)> = []
 
-let private runTestImpl compile input =
-    let prevCD = Environment.CurrentDirectory
-    Environment.CurrentDirectory <- miscPath
-    let prevPath = System.Environment.GetEnvironmentVariable("PATH")
-    System.Environment.SetEnvironmentVariable("PATH", prevPath + ";" + cygwin)
-
-    let compiled = compile input
-    let filename = getTempFile()
-
-    File.WriteAllText(filename, compiled)
-    File.WriteAllText("test.s", compiled)
-    try
-        let outFile = Util.getPathRelativeToRoot ("misc/" + "a.exe")
-        gccCompile filename outFile
-        runCompiled()
-    finally
-        File.Delete filename
-
-        Environment.CurrentDirectory <- prevCD
-        System.Environment.SetEnvironmentVariable("PATH", prevPath)
+let private runTestImpl useLib input =
+    let outFile = root + "/misc/a.exe"
+    compileSchemeStringToBinary useLib input outFile
+    Util.executeProcess(outFile, "").stdout
 
 let addTests str tests =
     testCases <- (str, tests) :: testCases
@@ -52,6 +36,7 @@ let singleTestWrapper action input expected =
             printfn "input:\n%s" input
             printfn "-----------------------------------"
             printfn ""
+            Environment.Exit(111)
         with
         | e ->
             printfn "-----------------------------------"
@@ -62,14 +47,14 @@ let singleTestWrapper action input expected =
             printfn "-----------------------------------"
             printfn ""
 
-let runTest input expected =
-    let action input = runTestImpl Compile.stringToAsmForm input
+let runTest useLib input expected =
+    let action input = runTestImpl useLib input
     singleTestWrapper action input expected
 
-let runTestGroup compile testName tests =
+let runTestGroup useLib testName tests =
     let fold (passed, i) (input, expected) =
         try
-            let output = runTestImpl compile input
+            let output = runTestImpl useLib input
             if output <> expected then
                 printfn "-----------------------------------"
                 printfn "FAIL! '%s' #%d" testName i
@@ -96,7 +81,7 @@ let runTestGroup compile testName tests =
     printfn "Test \"%s\": completed %d / %d" testName n tests.Length
 
 let runTestGroupWithLib =
-    runTestGroup (Compile.compileSchemeStringToString true)
+    runTestGroup true
 
 let runTestWithLib source expected =
     let action input =

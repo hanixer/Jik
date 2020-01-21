@@ -20,11 +20,6 @@ open Compile
 
 [<EntryPoint>]
 let main argv =
-    let paths =
-        if argv.Length > 0 then List.ofArray argv
-        else [getPathRelativeToRoot "library/library.mscm"; getPathRelativeToRoot "examples/one.scm"]
-    let source = SourceFileReader.readFilesExpandingModules paths
-    let compiled = stringToAsmForm source
-    let outFile = Util.getPathRelativeToRoot ("misc/" + "a.exe")
-    compileToBinary compiled outFile
+    let toRoot = Util.getPathRelativeToRoot
+    compileMany [toRoot "library/library.scm"; toRoot "examples/one.scm"]
     0 // return an integer exit code

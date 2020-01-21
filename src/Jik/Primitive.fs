@@ -92,3 +92,13 @@ let stringPrimop = [
     // "error", Error
 ]
 
+let libraryFunctions = [
+    "string->symbol"
+    "list"
+    "empty?"
+    "memq"
+    "list?"
+    "length"
+    "string=?"
+    "vector"
+]

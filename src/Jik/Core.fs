@@ -167,12 +167,15 @@ let convertSchemeIdentifToAsm name =
     |> System.String.Concat
 
 let convertGlobalRefs (prog : Program) : Program =
+    let isGlobalRef var =
+        List.contains var prog.Globals || List.contains var libraryFunctions
+    let newLibraryNames = List.map convertSchemeIdentifToAsm libraryFunctions
     let newNames = List.map convertSchemeIdentifToAsm prog.Globals
-    let env = List.zip prog.Globals newNames |> Map.ofSeq
+    let env = List.zip libraryFunctions newLibraryNames @ List.zip prog.Globals newNames |> Map.ofSeq
 
     let convertHelper propagate transform expr =
         match expr with
-        | Ref var when List.contains var prog.Globals ->
+        | Ref var when isGlobalRef var ->
             let newName = Map.find var env
             PrimApp(GlobalRef, [Ref newName])
         | Assign(var, rhs) when List.contains var prog.Globals ->

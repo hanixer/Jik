@@ -393,11 +393,13 @@ let selectInstructions (prog : Intermediate.Program) : Program =
         | Transfer tran -> transferToInstrs blocks tran
 
     let handleBlock blocks (name, _, stmts) =
-        (InstrName.Label name, []) :: List.collect (handleStmt blocks) stmts
+        (Label name, []) :: List.collect (handleStmt blocks) stmts
 
     let errorHandler =
         [Label(errorHandlerLabel), []
          Call("asmError"), []]
+
+    let entryPointLabel = freshLabel "entryPoint"
 
     let handleDef proc =
         let instrs =
@@ -414,23 +416,18 @@ let selectInstructions (prog : Intermediate.Program) : Program =
           LiveAfter = Map.empty
           SlotsOccupied = slots }
 
-    let impl = freshLabel "schemeEntryImpl"
-    let entryImplFunc =
+    let entryPointDef =
         match prog.Main.Blocks with
         | (_, args, stmts) :: restBlocks ->
             { prog.Main with
-                Name = impl
-                Blocks = (impl, args, stmts) :: restBlocks }
+                Name = entryPointLabel
+                Blocks = (entryPointLabel, args, stmts) :: restBlocks }
         | _ -> failwith "selectInstructions: wrong main function"
-    let procs = entryImplFunc :: prog.Procedures
-    let main = handleDef { emptyFunction with Name = schemeEntryLabel }
-    let instrs =
-        [Label schemeEntryLabel, [];
-         Mov, [Int 0; Reg Rcx]
-         Call impl, []]
-    let main = { main with Instrs = instrs }
+    let procs = entryPointDef :: prog.Procedures
+
     { Procedures = List.map handleDef procs
-      Main = main
+      Main = emptyFuncDef
       Globals = prog.Globals
-      ErrorHandler = errorHandler }
+      ErrorHandler = errorHandler
+      Entry = entryPointLabel }
 

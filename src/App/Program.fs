@@ -127,34 +127,34 @@ let runTestString source expected =
 let main argv =
     let c = Compile.stringToAsmForm
     // runSingleTest c "(string=? \"one\" \"one\" \"one\")" "#t\n"
-    runTestWithLib "'erer" "ere\n"
+    // runTestWithLib "'erer" "ere\n"
 
-    // runTestGroup c "exit" exitTest
-    // runTestGroupWithLib "symbols" symbols
-    // runTestGroup c "letLoop" letLoop
-    // runTestGroupWithLib "apply nontail" applyNonTail
-    // runTestGroupWithLib "apply tail" applyTail
-    // runTestGroup c "complexConstants" complexConstants
-    // runTestGroup c "variable arity without rest arguments" variableArity
-    // runTestGroup c "variable arity using rest arguments" variableArityUsingRest
-    // runTestGroup c "calls" callFailure
-    // runTestGroup c "deep procs" deeplyProcedureTests
-    // runTestGroup c "lambda" lambdaTests
-    // runTestGroup c "basic" basicTests
-    // runTestGroup c "boolean" booleanTests
-    // runTestGroup c "vector" vectorTests
-    // runTestGroup c "assignment" assignmentTests
-    // runTestGroup c "andOr" andOrTests
-    // runTestGroup c "pair" pairTests
-    // runTestGroup c "setCarCdr" setCarCdrTests
-    // runTestGroup c "whenUnless" whenUnlessTests
-    // runTestGroup c "cond" condTests
-    // runTestGroup c "letrec" letrecTests
-    // runTestGroup c "list" listTests
-    // runTestGroup c "num -> char" numcharTests
-    // runTestGroup c "char?" isCharTests
-    // runTestGroup c "string" stringTests
-    // runTestGroup c "foreign-call" foreignCallTests
+    runTestGroup false "exit" exitTest
+    runTestGroupWithLib "symbols" symbols
+    runTestGroup false "letLoop" letLoop
+    runTestGroupWithLib "apply nontail" applyNonTail
+    runTestGroupWithLib "apply tail" applyTail
+    runTestGroup false "complexConstants" complexConstants
+    runTestGroup false "variable arity without rest arguments" variableArity
+    runTestGroup false "variable arity using rest arguments" variableArityUsingRest
+    runTestGroup false "calls" callFailure
+    runTestGroup false "deep procs" deeplyProcedureTests
+    runTestGroup false "lambda" lambdaTests
+    runTestGroup false "basic" basicTests
+    runTestGroup false "boolean" booleanTests
+    runTestGroup false "vector" vectorTests
+    runTestGroup false "assignment" assignmentTests
+    runTestGroup false "andOr" andOrTests
+    runTestGroup false "pair" pairTests
+    runTestGroup false "setCarCdr" setCarCdrTests
+    runTestGroup false "whenUnless" whenUnlessTests
+    runTestGroup false "cond" condTests
+    runTestGroup false "letrec" letrecTests
+    runTestGroup false "list" listTests
+    runTestGroup false "num -> char" numcharTests
+    runTestGroup false "char?" isCharTests
+    runTestGroup false "string" stringTests
+    runTestGroup false "foreign-call" foreignCallTests
 
 
     0

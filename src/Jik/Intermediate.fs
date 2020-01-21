@@ -402,7 +402,8 @@ let convertProgram (prog : Core.Program) : Program =
       Globals = prog.Globals }
 
 let analyzeFreeVars (prog : Program) : Program =
-    let globals = Set.ofList prog.Globals
+    let newLibraryNames = List.map convertSchemeIdentifToAsm libraryFunctions
+    let globals = Set.ofList (newLibraryNames @ prog.Globals)
 
     let rec transformStmt stmt =
         match stmt with

@@ -92,7 +92,19 @@ type Program =
     { Procedures : FunctionDef list
       Main : FunctionDef
       Globals : string list
-      ErrorHandler : Instr list }
+      ErrorHandler : Instr list
+      Entry : string }
+
+let emptyFuncDef =
+    { Name = ""
+      Free = []
+      Args = []
+      IsDotted = false
+      InterfGraph = makeGraph []
+      Instrs = []
+      LiveBefore = Map.empty
+      LiveAfter = Map.empty
+      SlotsOccupied = 0 }
 
 let freePointer = "freePointer"
 
@@ -206,7 +218,8 @@ let programToString (prog : Program) =
 
     List.iter printGlobal prog.Globals
     List.iter handleDef prog.Procedures
-    handleDef { prog.Main with Name = schemeEntryLabel }
+    if prog.Main.Name.Length > 0 then
+        handleDef prog.Main
     showInstrs out prog.ErrorHandler
     out.ToString()
 
@@ -390,37 +403,7 @@ let addFuncPrologAndEpilog (prog : Program) =
         let instrs = argumentCheckAndStackAlloc def.Args def.IsDotted n
         { def with Instrs = firstInstr :: instrs @ rest }
 
-    let wrapMainFunction instr rest =
-        [instr
-         Push, [Reg R15]
-         Mov, [Reg Rsp; Reg R15]
-         Mov, [Reg Rcx; Reg Rsp]
-         Push, [Reg Rbp]
-         Push, [Reg R15]
-         Push, [Reg R14]
-         Push, [Reg R13]
-         Push, [Reg R12]
-         Push, [Reg Rbx]] @
-        rest @
-        [Pop, [Reg Rbx]
-         Pop, [Reg R12]
-         Pop, [Reg R13]
-         Pop, [Reg R14]
-         Pop, [Reg R15]
-         Pop, [Reg Rbp]
-         Mov, [Reg R15; Reg Rsp]
-         Pop, [Reg R15]
-         Ret, []]
-
-    let handleMain def =
-        match def.Instrs with
-        | (Label _, []) as instr :: rest ->
-            let instrs = wrapMainFunction instr rest
-            {def with Instrs = instrs}
-        | _ -> failwith "addFunction...: expected label"
-
-    { prog with Procedures = List.map handleDef prog.Procedures
-                Main = handleMain prog.Main }
+    { prog with Procedures = List.map handleDef prog.Procedures }
 
 let rec patchInstr (prog : Program) =
     let filterMoves =
@@ -486,3 +469,42 @@ let convertVarsToSlots (prog : Program) =
 
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
+
+let createMainModule entryPoints =
+    let callEntryPoint entryPoint =
+        [Mov, [Int 0; Reg Rcx]
+         Call entryPoint, []]
+
+    let calls = List.collect callEntryPoint entryPoints
+    let instrs =
+        [Label(schemeEntryLabel), []
+         Push, [Reg R15]
+         Mov, [Reg Rsp; Reg R15]
+         Mov, [Reg Rcx; Reg Rsp]
+         Push, [Reg Rbp]
+         Push, [Reg R15]
+         Push, [Reg R14]
+         Push, [Reg R13]
+         Push, [Reg R12]
+         Push, [Reg Rbx]] @
+        calls @
+        [Pop, [Reg Rbx]
+         Pop, [Reg R12]
+         Pop, [Reg R13]
+         Pop, [Reg R14]
+         Pop, [Reg R15]
+         Pop, [Reg Rbp]
+         Mov, [Reg R15; Reg Rsp]
+         Pop, [Reg R15]
+         Ret, []]
+
+    let funcDef =
+        { emptyFuncDef with
+            Name = schemeEntryLabel
+            Instrs = instrs }
+
+    { Procedures = []
+      Main = funcDef
+      Globals = []
+      ErrorHandler = []
+      Entry = schemeEntryLabel }
