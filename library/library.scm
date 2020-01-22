@@ -115,7 +115,6 @@
             (vector-set! v 3 buf)
             (vector-set! v 4 0) ; index to next position in the buffer
             (vector-set! v 5 %output-buf-size) ; size of the buffer
-            (foreign-call "printPtr" v)
             v))))
 
 (define flush-output-port
@@ -123,6 +122,7 @@
         (let ([fd (vector-ref output-port 2)]
               [index (vector-ref output-port 4)]
               [buf (vector-ref output-port 3)])
+         (foreign-call "printPtr" "flush is called!")
          (foreign-call "s_write" fd buf index )
          (vector-set! output-port 4 0))))
 
@@ -133,7 +133,5 @@
                 (flush-output-port output-port))
             (let ([index (vector-ref output-port 4)] ; index can be updated after flush
                   [buf (vector-ref output-port 3)])
-                (foreign-call "printPtr" (string-length buf))
-
                 (string-set! buf index char)
                 (vector-set! output-port 4 (+ index 1))))))

@@ -29,6 +29,7 @@ type Prim =
     | StringLength
     | StringRef
     | StringSet
+    | StringInit
     | MakeClosure
     | ClosureRef
     | IsProcedure

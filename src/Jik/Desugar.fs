@@ -113,10 +113,16 @@ and expand env sexpr =
         |> wrapInLet t a
         |> expand env
     | List (S.Symbol "when" :: condition :: body) ->
+        if List.isEmpty body then
+            failwith "unless body should not be empty"
+
         let condition = desugar condition
         let body = exprsToList (S.Symbol "begin" :: List.map desugar body)
         exprsToList [S.Symbol "if"; condition; body; undefinedExpr]
     | List (S.Symbol "unless" :: condition :: body) ->
+        if List.isEmpty body then
+            failwith "unless body should not be empty"
+
         let condition = desugar condition
         let body = exprsToList (S.Symbol "begin" :: List.map desugar body)
         exprsToList [S.Symbol "if"; condition; undefinedExpr; body]

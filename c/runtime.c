@@ -182,9 +182,8 @@ char* copyString(ptr p) {
 
 ptr s_openFile(ptr filename) {
     char* str = copyString(filename);
-    FILE* f = fopen(".gitignore", "w");
     // int fd = (int)(void*)CreateFileA(".gitignore", GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-    int fd = 0;
+    int fd = open(stringData(filename), O_CREAT | O_WRONLY);
     // int fd = open(str, 0);
     free(str);
     return intToFixnum(fd);

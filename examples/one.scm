@@ -1,3 +1,5 @@
 (let ([f (open-output-file "misc/output.txt")])
-    (write-char #\a f)
-    (flush-output-port f))
+    (let loop ([i 0])
+        (unless (>= i 5000)
+            (write-char #\a f)
+            (loop (+ i 1)))))

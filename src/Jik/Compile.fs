@@ -134,3 +134,9 @@ let compileSchemeStringToBinary useLibrary source outFile =
     let additional = if useLibrary then libraryFiles else []
     File.WriteAllText(sourceFileName, source)
     compileMany (additional @ [sourceFileName]) outFile
+
+
+do
+    if not(Directory.Exists(miscPath)) then
+        Directory.CreateDirectory(miscPath)
+        |> ignore
