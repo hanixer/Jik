@@ -107,6 +107,8 @@
 (define open-output-file
     (lambda (filename)
     (let ([fd (foreign-call "s_openFile" filename)])
+        (when (eq? fd -1)
+            (error "failed to open file"))
         (let ([buf (make-string %output-buf-size)]
               [v (make-vector %output-port-length)])
             (vector-set! v 0 %output-port-id)

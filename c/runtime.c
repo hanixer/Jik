@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <windows.h>
 #include <string.h>
+#include <errno.h>
 
 #define wordSize 8
 #define fixnumShift 0x02
@@ -139,8 +140,10 @@ void deallocateProtectedSpace(char* ptr, int size) {
 }
 
 ptr s_write(ptr fd, ptr str, ptr len) {
-
-    int bytes = write(fixnumToInt(fd), stringData(str), fixnumToInt(len));
+    int cfd = fixnumToInt(fd);
+    char* cstr = stringData(str);
+    int clen = fixnumToInt(len);
+    int bytes = write(cfd, cstr, clen);
     return intToFixnum(bytes);
 }
 
@@ -174,7 +177,7 @@ void s_exit(ptr p) {
 char* copyString(ptr p) {
     int size = stringSize(p);
     char* str = stringData(p);
-    char* newStr = malloc(size) + 1;
+    char* newStr = malloc(size + 1);
     for (int i = 0; i < size; ++i) {
         newStr[i] = str[i];
     }
@@ -185,7 +188,9 @@ char* copyString(ptr p) {
 ptr s_openFile(ptr filename) {
     char* str = copyString(filename);
     // int fd = (int)(void*)CreateFileA(".gitignore", GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
-    int fd = open(stringData(filename), O_CREAT | O_WRONLY);
+    int fd = open(str, O_CREAT | O_WRONLY);
+    int err = errno;
+    char* estr = strerror(err);
     // int fd = open(str, 0);
     free(str);
     return intToFixnum(fd);
