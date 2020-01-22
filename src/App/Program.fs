@@ -134,7 +134,7 @@ let main argv =
     // runTestGroup false "letLoop" letLoop
     // runTestGroupWithLib "apply nontail" applyNonTail
     // runTestGroupWithLib "apply tail" applyTail
-    runTestGroup false "complexConstants" complexConstants
+    // runTestGroup false "complexConstants" complexConstants
     // runTestGroup false "variable arity without rest arguments" variableArity
     // runTestGroup false "variable arity using rest arguments" variableArityUsingRest
     // runTestGroup false "calls" callFailure
@@ -154,7 +154,7 @@ let main argv =
     // runTestGroup false "num -> char" numcharTests
     // runTestGroup false "char?" isCharTests
     // runTestGroup false "string" stringTests
-    // runTestGroup false "foreign-call" foreignCallTests
+    runTestGroup false "foreign-call" foreignCallTests
 
 
     0

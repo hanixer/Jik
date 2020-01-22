@@ -312,6 +312,9 @@ let rec declToInstrs (dest, x) =
          Movzb, [Deref4(-stringTag, R11, R12, 1); Var dest]
          Sal, [Int charShift; Var dest]
          Or, [Int charTag; Var dest]]
+    | Simple.Prim(Prim.StringInit, [stringData]) ->
+        [Lea stringData, [Var dest]
+         Or, [Int stringTag; Var dest]]
     // Closures.
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
         let offset = (List.length args + 1) * wordSize

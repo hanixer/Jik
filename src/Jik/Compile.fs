@@ -91,6 +91,7 @@ let compileMany files outFile =
         |> stringToProgram
         |> allCoreTransformations
         |> allIntermediateTransformations
+        |> printIr ("interm.ir")
         |> allCodegenTransformations
 
     let handleFile file =

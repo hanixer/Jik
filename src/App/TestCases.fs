@@ -105,12 +105,12 @@ let e18 = "
 (let ((s (make-string 2)))
    (string-set! s 0 #\\A)
    (string-set! s 1 #\\B)
-   (foreign-call \"write\" 1 s 2)
-   (foreign-call \"write\" 1 s 2)
+   (foreign-call \"s_write\" 1 s 2)
+   (foreign-call \"s_write\" 1 s 2)
    1)"
 let e19 = "
-(foreign-call \"print6args\" 1 2 3 4 5 6)
-(foreign-call \"print6args\" 1 2 3 4 5 6)
+(foreign-call \"s_print6args\" 1 2 3 4 5 6)
+(foreign-call \"s_print6args\" 1 2 3 4 5 6)
 #t"
 let e20 = "
 (define (sum x y) (+ x y))
@@ -525,16 +525,16 @@ let variableArityUsingRest =
 
 let complexConstants =
     [ "\"Hello World\"", "\"Hello World\"\n"
-      // "'(\"Hello\" \"World\")", "(\"Hello\" \"World\")\n"
-      // "'(1 . 3)", "(1 . 3)\n"
-      // "'(1 2 3)", "(1 2 3)\n"
-      // "(let ([x '(1 2 3)]) x)", "(1 2 3)\n"
-      // "(let ([f (lambda () '(1 2 3))])
-        // (f))", "(1 2 3)\n"
-      // "(let ([f (lambda () '(1 2 3))])
-        // (eq? (f) (f)))", "#t\n"
-      // "(let ([f (lambda () (lambda ()'(1 2 3)))])
-        // ((f)))", "(1 2 3)\n"
+      "'(\"Hello\" \"World\")", "(\"Hello\" \"World\")\n"
+      "'(1 . 3)", "(1 . 3)\n"
+      "'(1 2 3)", "(1 2 3)\n"
+      "(let ([x '(1 2 3)]) x)", "(1 2 3)\n"
+      "(let ([f (lambda () '(1 2 3))])
+        (f))", "(1 2 3)\n"
+      "(let ([f (lambda () '(1 2 3))])
+        (eq? (f) (f)))", "#t\n"
+      "(let ([f (lambda () (lambda ()'(1 2 3)))])
+        ((f)))", "(1 2 3)\n"
       ]
 
 let tak =

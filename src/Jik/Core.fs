@@ -169,12 +169,10 @@ let convertSchemeIdentifToAsm name =
     |> System.String.Concat
 
 let convertGlobalRefs (prog : Program) : Program =
-    let stringNames = List.map fst prog.Strings
     let newLibraryNames = List.map convertSchemeIdentifToAsm libraryFunctions
     let newGlobalNames = List.map convertSchemeIdentifToAsm prog.Globals
 
     let env =
-        List.zip stringNames stringNames @
         List.zip libraryFunctions newLibraryNames @
         List.zip prog.Globals newGlobalNames
         |> Map.ofSeq
@@ -301,9 +299,11 @@ let collectComplexConstants (prog : Program) =
             if exprToName.ContainsKey(expr) then
                 Ref exprToName.[expr]
             else
-                let thisName = freshLabel ".string"
+                let stringName = freshLabel ".string" // This label will hold actual string data.
+                let thisName = freshLabel ".cconst" // This label will hold an address of above label.
                 exprToName.Add(expr, thisName)
-                strings.Add(thisName, s)
+                strings.Add(stringName, s)
+                assignments.Add(thisName, PrimApp(StringInit, [Ref stringName]))
                 Ref thisName
         | _ -> expr
 
@@ -323,8 +323,7 @@ let collectComplexConstants (prog : Program) =
 
     let assignExprs =
         assignments
-        |> Seq.map (fun (name, expr) ->
-            PrimApp(GlobalSet, [Ref name; expr]))
+        |> Seq.map Assign
         |> Seq.toList
 
     let names = assignments |> Seq.map fst |> Seq.toList

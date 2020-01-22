@@ -140,8 +140,6 @@ void deallocateProtectedSpace(char* ptr, int size) {
 
 ptr s_write(ptr fd, ptr str, ptr len) {
 
-    printf("s_write  %s", copyString(str));
-    fflush(stdout);
     int bytes = write(fixnumToInt(fd), stringData(str), fixnumToInt(len));
     return intToFixnum(bytes);
 }

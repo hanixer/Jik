@@ -212,7 +212,7 @@ let programToString (prog : Program) =
         fprintfn out "    .space %d" wordSize
 
     let printStringConst (name, literal : string) =
-        let firstField = literal.Length ||| stringTag
+        let firstField = literal.Length <<< fixnumShift
         fprintfn out "    .section .rdata,\"dr\""
         fprintfn out "    .align %d" wordSize
         fprintfn out "%s:" name
