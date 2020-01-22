@@ -196,6 +196,12 @@ ptr s_openFile(ptr filename) {
     return intToFixnum(fd);
 }
 
+ptr s_closeFile(ptr fd) {
+    int cfd = fixnumToInt(fd);
+    int ret = close(fd);
+    return intToFixnum(ret);
+}
+
 int main() {
     int stackSize = 16 * 4096;
     char* stack = allocateProtectedSpace(stackSize);
