@@ -464,8 +464,10 @@ let convertVarsToSlots (prog : Program) =
     let handleDef def =
         let vars = collectVars def.Instrs
         let env = makeEnv def.Args vars
+        let used = def.SlotsOccupied + env.Count
+        let slots = if used % 2 <> 0 then used + 1 else used // To preserve alignment.
         {def with Instrs = List.map (handleInstr env) def.Instrs
-                  SlotsOccupied = def.SlotsOccupied + env.Count }
+                  SlotsOccupied = slots }
 
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }

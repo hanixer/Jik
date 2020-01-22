@@ -150,3 +150,6 @@ but then generate a file, that will initialize all modules and will contain sche
 
 
 compile : source name isMain -> file
+
+# Stack alignment and C function()
+Before call Stack must be aligned on 16 byte boundary.

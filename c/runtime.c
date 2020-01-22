@@ -196,7 +196,7 @@ ptr s_openFile(ptr filename) {
 int main() {
     int stackSize = 16 * 4096;
     char* stack = allocateProtectedSpace(stackSize);
-    char* stackHigherAddr = stack + stackSize - wordSize;
+    char* stackHigherAddr = stack + stackSize - 2 * wordSize;
     int heapSize = 32 * 4096;
     char* heap = allocateProtectedSpace(heapSize);
     freePointer = heap;
