@@ -429,5 +429,6 @@ let selectInstructions (prog : Intermediate.Program) : Program =
       Main = emptyFuncDef
       Globals = prog.Globals
       ErrorHandler = errorHandler
-      Entry = entryPointLabel }
+      Entry = entryPointLabel
+      Strings = prog.Strings }
 

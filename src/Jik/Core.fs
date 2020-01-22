@@ -29,7 +29,8 @@ and LambdaData = string list * bool * Expr list
 
 type Program =
     { Main : Expr list
-      Globals : string list }
+      Globals : string list
+      Strings : (string * string) list }
 
 type S = SExpr
 
@@ -126,7 +127,8 @@ let stringToProgram str : Program =
         let globals, sexprs = List.fold parseSExpr ([], []) sexprs
         let exprList = List.map sexprToExpr sexprs
         { Main = exprList |> List.rev
-          Globals = List.rev globals }
+          Globals = List.rev globals
+          Strings = [] }
     | _ -> failwith "stringToProgram: parsing failed"
 
 let rec transform f expr =
@@ -159,7 +161,6 @@ let convertSchemeIdentifToAsm name =
         | '+' -> "Plus"
         | '*' -> "Times"
         | '/' -> "Divide"
-        | '.' -> "Dot"
         | '$' -> "Dollar"
         | '%' -> "Percent"
         | c -> sprintf "%c" c
@@ -168,11 +169,18 @@ let convertSchemeIdentifToAsm name =
     |> System.String.Concat
 
 let convertGlobalRefs (prog : Program) : Program =
-    let isGlobalRef var =
-        List.contains var prog.Globals || List.contains var libraryFunctions
+    let stringNames = List.map fst prog.Strings
     let newLibraryNames = List.map convertSchemeIdentifToAsm libraryFunctions
-    let newNames = List.map convertSchemeIdentifToAsm prog.Globals
-    let env = List.zip libraryFunctions newLibraryNames @ List.zip prog.Globals newNames |> Map.ofSeq
+    let newGlobalNames = List.map convertSchemeIdentifToAsm prog.Globals
+
+    let env =
+        List.zip stringNames stringNames @
+        List.zip libraryFunctions newLibraryNames @
+        List.zip prog.Globals newGlobalNames
+        |> Map.ofSeq
+
+    let isGlobalRef var =
+        Map.containsKey var env
 
     let convertHelper propagate transform expr =
         match expr with
@@ -191,7 +199,7 @@ let convertGlobalRefs (prog : Program) : Program =
     let convertExpr expr = transform convertHelper expr
 
     { prog with Main = List.map convertExpr prog.Main
-                Globals = newNames }
+                Globals = newGlobalNames }
 
 let trySubstitute v mapping =
     match Map.tryFind v mapping with
@@ -265,6 +273,7 @@ let makeAndInitStringExprs literal =
 let collectComplexConstants (prog : Program) =
     let exprToName = System.Collections.Generic.Dictionary<Expr, string>()
     let assignments = System.Collections.Generic.List<string * Expr>()
+    let strings = System.Collections.Generic.List<string * string>()
 
     let rec add expr =
         match expr with
@@ -274,7 +283,7 @@ let collectComplexConstants (prog : Program) =
             else
                 let xx = add x
                 let yy = add y
-                let thisName = freshLabel "cconst"
+                let thisName = freshLabel ".cconst"
                 exprToName.Add(expr, thisName)
                 assignments.Add(thisName, PrimApp(Cons, [xx; yy]))
                 Ref thisName
@@ -283,7 +292,7 @@ let collectComplexConstants (prog : Program) =
                 Ref exprToName.[expr]
             else
                 let sname = add (String s)
-                let thisName = freshLabel "cconst"
+                let thisName = freshLabel ".cconst"
                 exprToName.Add(expr, thisName)
                 let app = App(Ref "string->symbol", [sname])
                 assignments.Add(thisName, app)
@@ -292,10 +301,9 @@ let collectComplexConstants (prog : Program) =
             if exprToName.ContainsKey(expr) then
                 Ref exprToName.[expr]
             else
-                let thisName = freshLabel "cconst"
+                let thisName = freshLabel ".string"
                 exprToName.Add(expr, thisName)
-                let makeString = makeAndInitStringExprs s
-                assignments.Add(thisName, makeString)
+                strings.Add(thisName, s)
                 Ref thisName
         | _ -> expr
 
@@ -322,7 +330,8 @@ let collectComplexConstants (prog : Program) =
     let names = assignments |> Seq.map fst |> Seq.toList
 
     { prog with Main = assignExprs @ main
-                Globals = prog.Globals @ names }
+                Globals = prog.Globals @ names
+                Strings = strings |> Seq.toList }
 
 let rec fixArithmeticPrims (prog : Program) : Program =
     let ops = [Add; Mul;]

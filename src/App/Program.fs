@@ -134,7 +134,7 @@ let main argv =
     // runTestGroup false "letLoop" letLoop
     // runTestGroupWithLib "apply nontail" applyNonTail
     // runTestGroupWithLib "apply tail" applyTail
-    // runTestGroup false "complexConstants" complexConstants
+    runTestGroup false "complexConstants" complexConstants
     // runTestGroup false "variable arity without rest arguments" variableArity
     // runTestGroup false "variable arity using rest arguments" variableArityUsingRest
     // runTestGroup false "calls" callFailure
@@ -147,7 +147,7 @@ let main argv =
     // runTestGroup false "andOr" andOrTests
     // runTestGroup false "pair" pairTests
     // runTestGroup false "setCarCdr" setCarCdrTests
-    runTestGroup false "whenUnless" whenUnlessTests
+    // runTestGroup false "whenUnless" whenUnlessTests
     // runTestGroup false "cond" condTests
     // runTestGroup false "letrec" letrecTests
     // runTestGroup false "list" listTests

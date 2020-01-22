@@ -2,6 +2,7 @@
 - [ ] Output ports.
 - [ ] Safe primitives.
 - [x] Symbols.
+- [ ] Change initialization of strings.
 
 After variable arity functions, we can implement library functions like (vector 1 2 3) => #(1 2 3).
 So we return to separate compilation.
@@ -153,3 +154,16 @@ compile : source name isMain -> file
 
 # Stack alignment and C function()
 Before call Stack must be aligned on 16 byte boundary.
+
+# Initialization of strings
+First, strings should be collected and substited by their names.
+Add a field for string constants to intermediate and Codegen for.
+During code generation make labels for each string:
+```
+	.section .rdata,"dr"
+	.align 8
+.LC0:
+	.quad (length or stringTag)
+	.ascii "When are you planing to start?\0"
+
+```

@@ -93,7 +93,8 @@ type Program =
       Main : FunctionDef
       Globals : string list
       ErrorHandler : Instr list
-      Entry : string }
+      Entry : string
+      Strings : (string * string) list }
 
 let emptyFuncDef =
     { Name = ""
@@ -210,14 +211,24 @@ let programToString (prog : Program) =
         fprintfn out "%s:" globl
         fprintfn out "    .space %d" wordSize
 
+    let printStringConst (name, literal : string) =
+        let firstField = literal.Length ||| stringTag
+        fprintfn out "    .section .rdata,\"dr\""
+        fprintfn out "    .align %d" wordSize
+        fprintfn out "%s:" name
+        fprintfn out "    .quad %d" firstField
+        fprintfn out "    .ascii \"%s\"" literal
+
     let handleDef def =
         fprintfn out "    .text"
         fprintfn out "    .globl %s" def.Name
         showInstrs out def.Instrs
         fprintfn out "\n\n"
 
+    List.iter printStringConst prog.Strings
     List.iter printGlobal prog.Globals
     List.iter handleDef prog.Procedures
+
     if prog.Main.Name.Length > 0 then
         handleDef prog.Main
     showInstrs out prog.ErrorHandler
@@ -509,4 +520,5 @@ let createMainModule entryPoints =
       Main = funcDef
       Globals = []
       ErrorHandler = []
-      Entry = schemeEntryLabel }
+      Entry = schemeEntryLabel
+      Strings = [] }
