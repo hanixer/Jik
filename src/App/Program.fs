@@ -127,7 +127,7 @@ let runTestString source expected =
 let main argv =
     let c = Compile.stringToAsmForm
     // runSingleTest c "(string=? \"one\" \"one\" \"one\")" "#t\n"
-    runTestWithLib "(open-output-file \".gitignore\")" "ere\n"
+    // runTestWithLib "(open-output-file \".gitignore\")" "ere\n"
 
     // runTestGroup false "exit" exitTest
     // runTestGroupWithLib "symbols" symbols
@@ -147,7 +147,7 @@ let main argv =
     // runTestGroup false "andOr" andOrTests
     // runTestGroup false "pair" pairTests
     // runTestGroup false "setCarCdr" setCarCdrTests
-    // runTestGroup false "whenUnless" whenUnlessTests
+    runTestGroup false "whenUnless" whenUnlessTests
     // runTestGroup false "cond" condTests
     // runTestGroup false "letrec" letrecTests
     // runTestGroup false "list" listTests

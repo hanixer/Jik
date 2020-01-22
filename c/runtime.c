@@ -53,6 +53,7 @@ char stringRef(ptr p, int i) { return (*(toPtrptr(p - stringTag + wordSize + i))
 static void printPair(ptr p);
 static void printVector(ptr p);
 static void printString(ptr p);
+char* copyString(ptr p);
 
 void printPtr(ptr p) {
     if (isFixnum(p)) {
@@ -138,6 +139,9 @@ void deallocateProtectedSpace(char* ptr, int size) {
 }
 
 ptr s_write(ptr fd, ptr str, ptr len) {
+
+    printf("s_write  %s", copyString(str));
+    fflush(stdout);
     int bytes = write(fixnumToInt(fd), stringData(str), fixnumToInt(len));
     return intToFixnum(bytes);
 }

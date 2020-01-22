@@ -105,4 +105,5 @@ let libraryFunctions = [
     "open-output-file"
     "flush-output-port"
     "write-char"
+    "newline"
 ]

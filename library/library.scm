@@ -126,9 +126,16 @@
          (foreign-call "s_write" fd buf index )
          (vector-set! output-port 4 0))))
 
+(define newline
+    (lambda ()
+        (foreign-call "s_write" 1 "\n" 1)))
+
 (define write-char
     (lambda (char output-port)
         (let ([index (vector-ref output-port 4)])
+            ; (foreign-call "printPtr" index)
+            (newline)
+
             (unless (< index (vector-ref output-port 5))
                 (flush-output-port output-port))
             (let ([index (vector-ref output-port 4)] ; index can be updated after flush

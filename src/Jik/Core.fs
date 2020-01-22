@@ -105,7 +105,7 @@ let rec sexprToExpr sexpr =
     | e -> failwith <| sexprToString e
 
 let stringToProgram str : Program =
-    let sexpr = stringToSExpr ("(" + str + ")")
+    let sexpr = stringToSExpr ("(\n" + str + "\n)")
 
     let parseSExpr (globals, sexprs) sexpr =
         match sexpr with
@@ -138,6 +138,7 @@ let rec transform f expr =
         | Begin(exprs) -> Begin(List.map transform exprs)
         | App(func, args) -> App(transform func, List.map transform args)
         | PrimApp(op, args) -> PrimApp(op, List.map transform args)
+        | ForeignCall(name, args) -> ForeignCall(name, List.map transform args)
         | e -> e
 
     and transform expr =

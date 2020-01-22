@@ -213,6 +213,8 @@ let rec declToInstrs (dest, x) =
         comparisonInstrs var1 var2 Cc.L (Some(Var dest))
     | Simple.Prim(Prim.Ge, [var1; var2]) ->
         comparisonInstrs var1 var2 Cc.Ge (Some(Var dest))
+    | Simple.Prim(Prim.Gt, [var1; var2]) ->
+        comparisonInstrs var1 var2 Cc.G (Some(Var dest))
     | Simple.Prim(Prim.Not, [var1]) ->
         [Cmp, [Operand.Int falseLiteral; Var var1]] @
         compileSetOnEqual dest
