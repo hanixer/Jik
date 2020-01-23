@@ -128,4 +128,6 @@ let libraryFunctions = [
     "read-int"
     "write-string"
     "write-int"
+    "append"
+    "filter"
 ]

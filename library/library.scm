@@ -51,6 +51,27 @@
     (lambda (ls)
         (if (empty? ls) 0 (+ 1 (length (cdr ls))))))
 
+(define append
+  (lambda (l1 l2)
+    (if (null? l1)
+        l2
+        (if (null? l2)
+            l1
+            (cons (car l1) (append (cdr l1) l2))))))
+
+(define fold-right
+  (lambda (f z l)
+    (if (null? l)
+        z
+        (f (car l) (fold-right f z (cdr l))))))
+
+(define filter
+  (lambda (p l)
+    (fold-right (lambda (e r)
+                  (if (p e) (cons e r) r))
+                nil
+                l)))
+
 ;;; Strings
 
 (define %strings2=?
@@ -174,7 +195,8 @@
             (let loop ([i 0])
                 (when (< i len)
                     (write-char (string-ref s i) (current-output-port))
-                    (loop (+ i 1)))))))
+                    (loop (+ i 1))))
+            (flush-output-port (current-output-port)))))
 
 ;;; Input ports
 (define %input-port-id 11644978)
