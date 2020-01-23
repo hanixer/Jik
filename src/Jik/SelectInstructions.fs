@@ -211,6 +211,11 @@ let rec declToInstrs (dest, x) =
          IDiv, [Var var2]
          Sal, [Int fixnumShift; Reg Rax]
          Mov, [Reg Rax; Var dest]]
+    | Simple.Prim(Prim.Remainder, [var1; var2]) ->
+        [Mov, [Var var1; Reg Rax]
+         Cqto, []
+         IDiv, [Var var2]
+         Mov, [Reg Rdx; Var dest]]
     | Simple.Prim(Prim.Sub, [var1]) ->
         [Mov, [Var var1; Reg Rax]
          Neg, [Reg Rax]

@@ -251,21 +251,27 @@
     (and (<= #\0 c) (<= c #\9))))
 
 ;;; Integers
-(define = (lambda (a b) (eq? a b)))
+; (define = (lambda (a b) (eq? a b)))
 
-; (define %write-positive-int
-;   (lambda (n)
-;     (if (> n 9)
-;         (write-int (/ n 10))
-;         0)
-;     (write-char (+ #\0 (% n 10)) (current-output-port))))
+(define abs
+    (lambda (x)
+        (if (> x 0)
+            x
+            (- 0 x))))
 
-; (define write-int
-;   (lambda (n)
-;     (if (< n 0)
-;         (write-char #\- (current-output-port))
-;         0)
-;     (%write-positive-int (abs n))))
+(define %write-positive-int
+  (lambda (n)
+    (when (> n 9)
+        (write-int (quotient n 10)))
+    (write-char (number->char (+ (char->number #\0)
+                                 (remainder n 10)))
+                (current-output-port))))
+
+(define write-int
+  (lambda (n)
+    (when (< n 0)
+        (write-char #\- (current-output-port)))
+    (%write-positive-int (abs n))))
 
 (define %read-int
   (lambda (acc)

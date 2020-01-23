@@ -580,9 +580,20 @@ let eofTests =
       "(eof-object? 'baz)", "#f\n"
      ]
 
-let quotientTests =
+let quotientRemainderTests =
     [ "(quotient 16 4)", "4\n"
       "(quotient 5 2)", "2\n"
       "(quotient -45 7)", "-6\n"
       "(quotient 10 -3)", "-3\n"
-      "(quotient -17 -9)", "1\n" ]
+      "(quotient -17 -9)", "1\n"
+
+      "(remainder 16 4)", "0\n"
+      "(remainder 5 2)", "1\n"
+      "(remainder -45 7)", "-3\n"
+      "(remainder 10 -3)", "1\n"
+      "(remainder -17 -9)", "-8\n" ]
+
+let writeInt =
+    [ "(write-int 1)(flush-output-port (current-output-port))(exit-scheme)", "1\n"
+      "(write-int 102030)(flush-output-port (current-output-port))(exit-scheme)", "102030\n"
+      "(write-int -102030)(flush-output-port (current-output-port))(exit-scheme)", "-102030\n" ]

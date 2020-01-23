@@ -229,6 +229,7 @@ int main() {
     int heapSize = 32 * 4096;
     char* heap = allocateProtectedSpace(heapSize);
     freePointer = heap;
-    printPtr(schemeEntry(stackHigherAddr, heap));
+    ptr result = schemeEntry(stackHigherAddr, heap);
+    printPtr(result);
     return 0;
 }
