@@ -4,6 +4,7 @@ type Prim =
     | Add
     | Sub
     | Mul
+    | Quotient
     | Eq
     | Lt
     | Le
@@ -54,6 +55,7 @@ let stringPrimop = [
     "fx-", Sub
     "*", Mul
     "fx*", Mul
+    "quotient", Quotient
     "eq?", Eq
     "<", Lt
     "<=", Le

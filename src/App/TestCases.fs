@@ -579,3 +579,10 @@ let eofTests =
       "(eof-object? (lambda (x) x))", "#f\n"
       "(eof-object? 'baz)", "#f\n"
      ]
+
+let quotientTests =
+    [ "(quotient 16 4)", "4\n"
+      "(quotient 5 2)", "2\n"
+      "(quotient -45 7)", "-6\n"
+      "(quotient 10 -3)", "-3\n"
+      "(quotient -17 -9)", "1\n" ]

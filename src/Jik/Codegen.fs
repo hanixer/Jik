@@ -52,6 +52,8 @@ type InstrName =
     | Neg
     | Mov
     | IMul
+    | IDiv
+    | Cqto
     | Sar
     | Sal
     | And
@@ -150,6 +152,10 @@ let showInstr out (op, args) =
             fprintf out "call %s" label
         | Movb ->
             fprintf out "movb "
+        | Cqto ->
+            fprintf out "cqto "
+        | IDiv ->
+            fprintf out "idivq "
         | _ ->
             let s = sprintf "%A" op
             fprintf out "%s" (s.ToLower() + "q ")
