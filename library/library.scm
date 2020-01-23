@@ -168,6 +168,14 @@
     (lambda ()
         %curr-out-port))
 
+(define write-string
+    (lambda (s)
+        (let ([len (string-length s)])
+            (let loop ([i 0])
+                (when (< i len)
+                    (write-char (string-ref s i) (current-output-port))
+                    (loop (+ i 1)))))))
+
 ;;; Input ports
 (define %input-port-id 11644978)
 (define %input-port-length 7)
@@ -195,7 +203,7 @@
             (vector-set! v 6 %input-buf-size) ; size of the buffer
             v))))
 
-(define read-char
+(define read-char*
     (lambda (input-port)
         (let ([index (vector-ref input-port 4)]
               [max (vector-ref input-port 5)]
@@ -213,6 +221,9 @@
                     (vector-set! input-port 4 (+ index 1))
                     char)
                 (eof-object))))))
+
+(define read-char
+    (lambda () (read-char* (current-input-port))))
 
 (define close-input-port
     (lambda (input-port)
@@ -233,3 +244,41 @@
 (define current-input-port
     (lambda ()
         %curr-in-port))
+
+;;; Characters
+(define digit?
+  (lambda (c)
+    (and (<= #\0 c) (<= c #\9))))
+
+;;; Integers
+(define = (lambda (a b) (eq? a b)))
+
+; (define %write-positive-int
+;   (lambda (n)
+;     (if (> n 9)
+;         (write-int (/ n 10))
+;         0)
+;     (write-char (+ #\0 (% n 10)) (current-output-port))))
+
+; (define write-int
+;   (lambda (n)
+;     (if (< n 0)
+;         (write-char #\- (current-output-port))
+;         0)
+;     (%write-positive-int (abs n))))
+
+(define %read-int
+  (lambda (acc)
+    (let ((c (read-char)))
+      (if (digit? c)
+          (%read-int (+ (* 10 acc) (- c #\0)))
+          acc))))
+
+(define read-int
+  (lambda ()
+    (let ((c (read-char)))
+      (if (= c #\-)
+          (- 0 (%read-int 0))
+          (if (digit? c)
+              (%read-int (- c #\0))
+              0)))))

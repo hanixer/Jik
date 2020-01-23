@@ -211,6 +211,8 @@ let rec declToInstrs (dest, x) =
          Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Lt, [var1; var2]) ->
         comparisonInstrs var1 var2 Cc.L (Some(Var dest))
+    | Simple.Prim(Prim.Le, [var1; var2]) ->
+        comparisonInstrs var1 var2 Cc.Le (Some(Var dest))
     | Simple.Prim(Prim.Ge, [var1; var2]) ->
         comparisonInstrs var1 var2 Cc.Ge (Some(Var dest))
     | Simple.Prim(Prim.Gt, [var1; var2]) ->

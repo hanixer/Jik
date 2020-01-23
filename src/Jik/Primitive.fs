@@ -117,6 +117,10 @@ let libraryFunctions = [
     "current-input-port"
     "write-char"
     "read-char"
+    "read-char*"
     "newline"
     "exit-scheme"
+    "read-int"
+    "write-string"
+    "write-int"
 ]
