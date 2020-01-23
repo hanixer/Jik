@@ -7,6 +7,7 @@ let fixnumTag = 0x00
 let falseLiteral = 0x2F
 let trueLiteral = 0x6F
 let eofTag = 0x5F
+let eofMask = 0xFF
 let voidTag = 0x6F
 let unboundTag = 0x7F
 let boolBit = 6

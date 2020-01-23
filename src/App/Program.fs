@@ -129,6 +129,7 @@ let main argv =
     // runSingleTest c "(string=? \"one\" \"one\" \"one\")" "#t\n"
     // runTestWithLib "(open-output-file \".gitignore\")" "ere\n"
 
+    runTestGroup true "eofTests" eofTests
     // runTestGroup false "exit" exitTest
     // runTestGroupWithLib "symbols" symbols
     // runTestGroup false "letLoop" letLoop
@@ -154,7 +155,7 @@ let main argv =
     // runTestGroup false "num -> char" numcharTests
     // runTestGroup false "char?" isCharTests
     // runTestGroup false "string" stringTests
-    runTestGroup false "foreign-call" foreignCallTests
+    // runTestGroup false "foreign-call" foreignCallTests
 
 
     0

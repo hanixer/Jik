@@ -44,6 +44,8 @@ type Prim =
     | SymbolString
     | IsSymbol
     | Error // this primitive receives a single argument - a string. Should be called from scheme library.
+    | EofObject
+    | IsEofObject
 
 let stringPrimop = [
     "+", Add
@@ -91,6 +93,8 @@ let stringPrimop = [
     "symbol-string", SymbolString
     "symbol?", IsSymbol
     // "error", Error
+    "eof-object", EofObject
+    "eof-object?", IsEofObject
 ]
 
 let libraryFunctions = [

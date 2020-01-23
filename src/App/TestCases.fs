@@ -559,11 +559,23 @@ let symbols =
 let exitTest =
     [ "(foreign-call \"exit\" 0)", "" ]
 
-let generateBigLet n =
-    use f = new StringWriter()
-    fprintfn f "(let ("
-    for i in 0..n do
-        fprintfn f "  (x%d %d)" i i
-    fprintfn f "  )"
-    fprintfn f "(+ x1 x3))"
-    f.ToString()
+let eofTests =
+    [ "(eof-object? (eof-object))", "#t\n"
+      "(null? (eof-object))", "#f\n"
+      "(boolean? (eof-object))", "#f\n"
+      "(string? (eof-object))", "#f\n"
+      "(char? (eof-object))", "#f\n"
+      "(pair? (eof-object))", "#f\n"
+      "(symbol? (eof-object))", "#f\n"
+      "(procedure? (eof-object))", "#f\n"
+      "(vector? (eof-object))", "#f\n"
+      "(not (eof-object))", "#f\n"
+
+      "(eof-object? #\\a)", "#f\n"
+      "(eof-object? #t)", "#f\n"
+      "(eof-object? 12)", "#f\n"
+      "(eof-object? '(1 2 3))", "#f\n"
+      "(eof-object? '())", "#f\n"
+      "(eof-object? (lambda (x) x))", "#f\n"
+      "(eof-object? 'baz)", "#f\n"
+     ]

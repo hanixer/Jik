@@ -348,6 +348,10 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.IsSymbol, [var1]) ->
         compileIsOfType dest var1 symbolMask symbolTag
 
+    | Simple.Prim(Prim.EofObject, []) -> moveInt eofTag dest
+    | Simple.Prim(Prim.IsEofObject, [var1]) ->
+        compileIsOfType dest var1 eofMask eofTag
+
     | Simple.Prim(Prim.Error, [describe]) ->
         [Mov, [Var describe; Reg Rcx]
          Jmp(errorHandlerLabel), []]
