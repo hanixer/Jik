@@ -24,6 +24,8 @@
 #define vectorMask 0x07
 #define stringTag 0x06
 #define stringMask 0x07
+#define eofTag 0x5F
+#define eofMask 0xFF
 #define carOffset 0
 #define cdrOffset wordSize
 
@@ -42,6 +44,7 @@ int isFixnum(ptr p) {return (p & fixnumMask) == fixnumTag; }
 int isPair(ptr p) { return (p & pairMask) == pairTag; }
 int isVector(ptr p) { return (p & vectorMask) == vectorTag; }
 int isString(ptr p) { return (p & stringMask) == stringTag; }
+int isEof(ptr p) { return (p & eofMask) == eofTag; }
 int isNil(ptr p) { return p == nilLiteral; }
 ptr car(ptr p) { return (ptr) *(toPtrptr(p - pairTag)); }
 ptr cdr(ptr p) { return *(toPtrptr(p - pairTag + wordSize)); }
@@ -76,6 +79,8 @@ void printPtr(ptr p) {
         printVector(p);
     } else if (isString(p)) {
         printString(p);
+    } else if (isEof(p)) {
+        printf("#!eof");
     } else {
         printf("<unknown 0x%08x>", p);
     }

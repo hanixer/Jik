@@ -208,11 +208,11 @@
 
         (let ([index (vector-ref input-port 4)]
               [max (vector-ref input-port 5)])
-              (unless (< index max)
-                (error "nothing to read"))
-              (let ([char (string-ref buf index)])
+              (if (< index max)
+                (let ([char (string-ref buf index)])
                     (vector-set! input-port 4 (+ index 1))
-                    char)))))
+                    char)
+                (eof-object))))))
 
 (define close-input-port
     (lambda (input-port)
@@ -223,10 +223,11 @@
            [v (make-vector %input-port-length)])
             (vector-set! v 0 %input-port-id)
             (vector-set! v 1 "")
-            (vector-set! v 2 1)
+            (vector-set! v 2 0)
             (vector-set! v 3 buf)
             (vector-set! v 4 0) ; index to next position in the buffer
-            (vector-set! v 5 %input-buf-size) ; size of the buffer
+            (vector-set! v 5 0) ; number of bytes that was read
+            (vector-set! v 6 %input-buf-size) ; size of the buffer
             v))
 
 (define current-input-port
