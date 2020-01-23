@@ -16,7 +16,7 @@
 ;;; Error
 (define error
     (lambda args
-        (foreign-call "error" args)))
+        (foreign-call "s_error" args)))
 
 ;;; Lists
 
@@ -94,6 +94,17 @@
                   (loop (+ i 1) (cdr args)))))))))
 
 ;;; Foreign calls
+
+(define exit-scheme
+    (lambda ()
+        (foreign-call "s_exit" 0)))
+
+(define newline
+    (lambda ()
+        (foreign-call "s_write" 1 "\n" 1)))
+
+;;; Output ports
+
 (define %output-port-id 1999817)
 (define %output-port-length 6)
 (define %output-buf-size 4096)
@@ -106,7 +117,7 @@
 
 (define open-output-file
     (lambda (filename)
-    (let ([fd (foreign-call "s_openFile" filename)])
+    (let ([fd (foreign-call "s_openFileW" filename)])
         (when (eq? fd -1)
             (error "failed to open file"))
         (let ([buf (make-string %output-buf-size)]
@@ -126,10 +137,6 @@
               [buf (vector-ref output-port 3)])
          (foreign-call "s_write" fd buf index )
          (vector-set! output-port 4 0))))
-
-(define newline
-    (lambda ()
-        (foreign-call "s_write" 1 "\n" 1)))
 
 (define write-char
     (lambda (char output-port)
@@ -160,3 +167,68 @@
 (define current-output-port
     (lambda ()
         %curr-out-port))
+
+;;; Input ports
+(define %input-port-id 11644978)
+(define %input-port-length 7)
+(define %input-buf-size 4096)
+
+(define input-port?
+    (lambda (port)
+        (and (vector? port)
+             (eq? (vector-length port) %input-port-length)
+             (eq? (vector-ref port 0) %input-port-id))))
+
+(define open-input-file
+    (lambda (filename)
+    (let ([fd (foreign-call "s_openFileR" filename)])
+        (when (eq? fd -1)
+            (error "failed to open file"))
+        (let ([buf (make-string %input-buf-size)]
+              [v (make-vector %input-port-length)])
+            (vector-set! v 0 %input-port-id)
+            (vector-set! v 1 filename)
+            (vector-set! v 2 fd)
+            (vector-set! v 3 buf)
+            (vector-set! v 4 0) ; index to next position in the buffer
+            (vector-set! v 5 0) ; number of bytes that was read
+            (vector-set! v 6 %input-buf-size) ; size of the buffer
+            v))))
+
+(define read-char
+    (lambda (input-port)
+        (let ([index (vector-ref input-port 4)]
+              [max (vector-ref input-port 5)]
+              [buf (vector-ref input-port 3)]
+              [fd (vector-ref input-port 2)])
+            (unless (< index max)
+                (let ([count (foreign-call "s_read" fd buf (string-length buf))])
+                    (vector-set! input-port 5 count)
+                    (vector-set! input-port 4 0)))
+
+        (let ([index (vector-ref input-port 4)]
+              [max (vector-ref input-port 5)])
+              (unless (< index max)
+                (error "nothing to read"))
+              (let ([char (string-ref buf index)])
+                    (vector-set! input-port 4 (+ index 1))
+                    char)))))
+
+(define close-input-port
+    (lambda (input-port)
+        (foreign-call "s_closeFile" (vector-ref input-port 2))))
+
+(define %curr-in-port
+    (let ([buf (make-string %input-buf-size)]
+           [v (make-vector %input-port-length)])
+            (vector-set! v 0 %input-port-id)
+            (vector-set! v 1 "")
+            (vector-set! v 2 1)
+            (vector-set! v 3 buf)
+            (vector-set! v 4 0) ; index to next position in the buffer
+            (vector-set! v 5 %input-buf-size) ; size of the buffer
+            v))
+
+(define current-input-port
+    (lambda ()
+        %curr-in-port))

@@ -147,6 +147,14 @@ ptr s_write(ptr fd, ptr str, ptr len) {
     return intToFixnum(bytes);
 }
 
+ptr s_read(ptr fd, ptr str, ptr len) {
+    int cfd = fixnumToInt(fd);
+    char* cstr = stringData(str);
+    int clen = fixnumToInt(len);
+    int bytes = read(cfd, cstr, clen);
+    return intToFixnum(bytes);
+}
+
 ptr s_print6args(ptr a1, ptr a2, ptr a3, ptr a4, ptr a5, ptr a6) {
     printPtr(a1);
     printPtr(a2);
@@ -170,10 +178,6 @@ void s_error(ptr x) {
     exit(1);
 }
 
-void s_exit(ptr p) {
-    exit(fixnumToInt(p));
-}
-
 char* copyString(ptr p) {
     int size = stringSize(p);
     char* str = stringData(p);
@@ -185,13 +189,20 @@ char* copyString(ptr p) {
     return newStr;
 }
 
-ptr s_openFile(ptr filename) {
+ptr s_openFileW(ptr filename) {
     char* str = copyString(filename);
-    // int fd = (int)(void*)CreateFileA(".gitignore", GENERIC_WRITE, FILE_SHARE_WRITE, 0, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
     int fd = open(str, O_CREAT | O_WRONLY);
     int err = errno;
     char* estr = strerror(err);
-    // int fd = open(str, 0);
+    free(str);
+    return intToFixnum(fd);
+}
+
+ptr s_openFileR(ptr filename) {
+    char* str = copyString(filename);
+    int fd = open(str, O_RDONLY);
+    int err = errno;
+    char* estr = strerror(err);
     free(str);
     return intToFixnum(fd);
 }
@@ -202,6 +213,10 @@ ptr s_closeFile(ptr fd) {
     return intToFixnum(ret);
 }
 
+void s_exit(ptr p) {
+    ExitProcess((UINT)fixnumToInt(p));
+}
+
 int main() {
     int stackSize = 16 * 4096;
     char* stack = allocateProtectedSpace(stackSize);
@@ -210,6 +225,5 @@ int main() {
     char* heap = allocateProtectedSpace(heapSize);
     freePointer = heap;
     printPtr(schemeEntry(stackHigherAddr, heap));
-    deallocateProtectedSpace(stackHigherAddr, stackSize);
     return 0;
 }
