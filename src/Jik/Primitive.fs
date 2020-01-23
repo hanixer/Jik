@@ -130,4 +130,6 @@ let libraryFunctions = [
     "write-int"
     "append"
     "filter"
+    "for-each"
+    "reverse"
 ]

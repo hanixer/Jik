@@ -226,7 +226,7 @@ int main() {
     int stackSize = 16 * 4096;
     char* stack = allocateProtectedSpace(stackSize);
     char* stackHigherAddr = stack + stackSize - 2 * wordSize;
-    int heapSize = 32 * 4096;
+    int heapSize = 100 * 1024 * 4096;
     char* heap = allocateProtectedSpace(heapSize);
     freePointer = heap;
     ptr result = schemeEntry(stackHigherAddr, heap);

@@ -72,6 +72,22 @@
                 nil
                 l)))
 
+(define for-each
+  (lambda (f l)
+    (unless (null? l)
+        (let ()
+          (f (car l))
+          (for-each f (cdr l))))))
+
+(define %reverse-acc
+  (lambda (l acc)
+    (if (null? l)
+        acc
+        (%reverse-acc (cdr l) (cons (car l) acc)))))
+
+(define reverse
+  (lambda (l) (%reverse-acc l nil)))
+
 ;;; Strings
 
 (define %strings2=?
@@ -298,6 +314,7 @@
 (define %read-int
   (lambda (acc)
     (let ((c (read-char)))
+        (foreign-call "printPtr" c)
       (if (digit? c)
           (%read-int (+ (* 10 acc) (- c #\0)))
           acc))))
