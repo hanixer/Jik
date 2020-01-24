@@ -9,6 +9,7 @@ open RuntimeConstants
 open Display
 open Intermediate
 open Codegen
+open Library
 open RegisterAllocation
 open SelectInstructions
 open System.IO
@@ -95,8 +96,13 @@ let compileMany files outFile =
         |> allCodegenTransformations
 
     let handleFile file =
-        File.ReadAllText file
-        |> schemeStringToModule
+        try
+            File.ReadAllText file
+            |> schemeStringToModule
+        with
+        | e ->
+            printfn "Error during compilation of file: %s" file
+            raise e
 
     let entryOfModule (prog : Codegen.Program) = prog.Entry
 
@@ -126,15 +132,17 @@ let compileMany files outFile =
 
     ()
 
-let libraryFiles = [
-    "library/library.scm"
-]
-
 let compileSchemeStringToBinary useLibrary source outFile =
     let sourceFileName = miscPath + "sourceFile.scm"
-    let additional = if useLibrary then libraryFiles else []
+    let libFiles = List.map (fun f -> getPathRelativeToRoot ("library/" + f)) libraryFiles
+    let additional = if useLibrary then libFiles else []
     File.WriteAllText(sourceFileName, source)
     compileMany (additional @ [sourceFileName]) outFile
+
+let compileFilesToBinary useLibrary files outFile =
+    let libFiles = List.map (fun f -> getPathRelativeToRoot ("library/" + f)) libraryFiles
+    let additional = if useLibrary then libFiles else []
+    compileMany (additional @ files) outFile
 
 
 do

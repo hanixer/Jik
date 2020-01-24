@@ -13,6 +13,7 @@
     <Compile Include="Graph.fs" />
     <Compile Include="Desugar.fs" />
     <Compile Include="Primitive.fs" />
+    <Compile Include="Library.fs" />
     <Compile Include="Core.fs" />
     <Compile Include="Intermediate.fs" />
     <Compile Include="Codegen.fs" />

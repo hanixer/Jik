@@ -5,6 +5,7 @@ open Graph
 open Display
 open Common
 open Primitive
+open Library
 
 type Var = string
 

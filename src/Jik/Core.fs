@@ -5,6 +5,7 @@ open System.Collections.Generic
 open Common
 open Desugar
 open Primitive
+open Library
 
 /// Core represents desugared form of input language.
 
@@ -77,6 +78,7 @@ let rec sexprToExpr sexpr =
     let convertList = List.map sexprToExpr
     match sexpr with
     | _ when isSimple sexpr -> convertSimple sexpr
+    | S.Symbol "nil" -> EmptyList
     | S.Symbol name -> Ref name
     | List [S.Symbol "if"; cond; conseq; altern] ->
         If(sexprToExpr cond, sexprToExpr conseq, sexprToExpr altern)

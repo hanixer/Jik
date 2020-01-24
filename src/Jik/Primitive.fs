@@ -101,35 +101,3 @@ let stringPrimop = [
     "eof-object", EofObject
     "eof-object?", IsEofObject
 ]
-
-let libraryFunctions = [
-    "string->symbol"
-    "list"
-    "empty?"
-    "memq"
-    "list?"
-    "length"
-    "string=?"
-    "vector"
-    "output-port?"
-    "open-output-file"
-    "close-output-port"
-    "flush-output-port"
-    "current-output-port"
-    "input-port?"
-    "open-input-file"
-    "close-input-port"
-    "current-input-port"
-    "write-char"
-    "read-char"
-    "read-char*"
-    "newline"
-    "exit-scheme"
-    "read-int"
-    "write-string"
-    "write-int"
-    "append"
-    "filter"
-    "for-each"
-    "reverse"
-]

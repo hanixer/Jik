@@ -18,11 +18,10 @@
 
 (define print-n-char
   (lambda (n c)
-    (if (> n 0)
-        (let ()
+    (when (> n 0)
+        (let ([c (if (number? c) (number->char c) c)])
           (print-char c)
-          (print-n-char (- n 1) c))
-        0)))
+          (print-n-char (- n 1) c)))))
 
 (define contains
   (lambda (l elem)
@@ -171,7 +170,6 @@
     (let ((space 32)
           (wall 35))
       (print-n-char (+ (* s 2) 1) wall)
-      (write-char #\3)
       (newline)
       (for 0 s
            (lambda (r)
