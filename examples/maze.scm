@@ -81,8 +81,8 @@
     (% w 65536)))
 
 (define isWallUp
-  (lambda (c1 c2 w)
-    (contains w (makeWall c1 c2))))
+  (lambda (c1 c2 maze)
+    (contains maze (makeWall c1 c2))))
 
 
 ; Create a maze that has walls everywhere
@@ -156,7 +156,7 @@
         0)))
 
 (define print-maze
-  (lambda (s w)
+  (lambda (s maze)
     (let ((space (number->char 32))
           (wall (number->char 35)))
       (print-n-char (+ (* s 2) 1) wall)
@@ -169,7 +169,7 @@
                         (print-char space)
                         (when (< c (- s 1))
                             (let ((rc (cell r c s)))
-                              (print-char (if (isWallUp rc (atE rc s) w) wall space))))))
+                              (print-char (if (isWallUp rc (atE rc s) maze) wall space))))))
                (print-char wall)
                (newline)
                (when (< r (- s 1))
@@ -177,10 +177,9 @@
                      (for 0 s
                           (lambda (c)
                             (let ((rc (cell r c s)))
-                              (print-char (if (isWallUp rc (atS rc s) w) wall space))
-                              (if (< c (- s 1))
-                                  (print-char wall)
-                                  0))))
+                              (print-char (if (isWallUp rc (atS rc s) maze) wall space))
+                              (when (< c (- s 1))
+                                  (print-char wall)))))
                      (print-char wall)
                      (newline))))
 
@@ -204,14 +203,31 @@
           (c (fullyDisconnectedSets s)))
       (random-maze-acc m c nil))))
 
+; This is for debugging
+(define convert-cell
+  (lambda (c s)
+    (let ([r (quotient c s)]
+          [c (remainder c s)])
+          (cons r c))))
+
+; This is also
+(define convert-list
+  (lambda (l s)
+    (map
+      (lambda (el)
+        (let ([c1 (quotient el 65536)]
+              [c2 (remainder el 65536)])
+         (list (convert-cell c1 s) (convert-cell c2 s)))) l)))
 
 (print-string "Size: ") ; T
-(let ((size 3))
+(let ((size 15))
 ; (let ((size (read-int)))
   (print-string "Seed: ") ; G
-  (let ((seed 1235))
+  (let ((seed 3))
   ; (let ((seed (read-int)))
-    ; (print-maze size (random-maze size seed))))
-    (print-maze size (completeMaze size )))
-    (completeMaze size))
+  (let ((rmaze (random-maze size seed)))
+    (newline)
+    (newline)
+    (print-maze size rmaze)
+    (exit-scheme))))
 

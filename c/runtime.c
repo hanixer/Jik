@@ -219,27 +219,32 @@ ptr s_closeFile(ptr fd) {
     return intToFixnum(ret);
 }
 
-void s_exit(ptr p) {
-    ExitProcess((UINT)fixnumToInt(p));
+static int allocations[5];
+
+void printAllocInfo() {
+    printf("vector: %d\n", allocations[0]);
+    printf("string: %d\n", allocations[1]);
+    printf("cons: %d\n", allocations[2]);
+    printf("closure: %d\n", allocations[3]);
+    printf("other: %d\n", allocations[5]);
 }
 
-static int allocations[5];
+void s_exit(ptr p) {
+    printAllocInfo();
+    ExitProcess((UINT)fixnumToInt(p));
+}
 
 void checkHeapSpaceAvailable(int which) {
     allocations[which]++;
     if (freePointer >= heapTopPointer) {
         fprintf(stderr, "No space for heap allocation");
-        printf("vector: %d\n", allocations[0]);
-        printf("string: %d\n", allocations[1]);
-        printf("cons: %d\n", allocations[2]);
-        printf("closure: %d\n", allocations[3]);
-        printf("other: %d\n", allocations[5]);
+        printAllocInfo();
         exit(1);
     }
 }
 
 int main() {
-    int stackSize = 16 * 4096;
+    int stackSize = 10 * 16 * 4096;
     char* stack = allocateProtectedSpace(stackSize);
     char* stackHigherAddr = stack + stackSize - 2 * wordSize;
     int heapSize = 100 * 1024 * 4096;

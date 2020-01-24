@@ -55,6 +55,9 @@ and expand env sexpr =
         let argsRevert = exprsToDottedList args
         SExpr.Cons(Symbol "lambda", SExpr.Cons(argsRevert, exprsToList body))
     | List(Symbol "let" :: List bindings :: body) ->
+        if List.isEmpty body then
+            failwithf "let: body should not be empty\n%s\n" (sexprToString sexpr)
+
         let folder sexpr (names, initExprs) =
             match sexpr with
             | List [Symbol name; initExpr] ->

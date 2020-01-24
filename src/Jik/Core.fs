@@ -90,7 +90,7 @@ let rec sexprToExpr sexpr =
     | List [S.Symbol "set!"; S.Symbol name; rhs] -> Assign(name, sexprToExpr rhs)
     | List(S.Symbol "lambda" :: args :: body) ->
         if List.isEmpty body then
-            failwith "lambda: body should not be empty"
+            failwithf "lambda: body should not be empty\n%s\n" (sexprToString sexpr)
 
         let args, dotted = parseArgs args
         let strings = symbolsToStrings args

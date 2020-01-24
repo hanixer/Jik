@@ -65,3 +65,10 @@
 
 (define reverse
   (lambda (l) (%reverse-acc l nil)))
+
+(define map
+  (lambda (f l)
+    (if (null? l)
+        l
+        (cons (f (car l))
+              (map f (cdr l))))))

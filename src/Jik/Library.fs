@@ -49,4 +49,5 @@ let libraryFunctions = [
     "for-each"
     "reverse"
     "rand-next"
+    "map"
 ]
