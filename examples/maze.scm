@@ -1,34 +1,28 @@
+;;; MAZEFUN -- Constructs a maze in a purely functional way,
+;;; written by Marc Feeley.
+;;;
+;;; edited by me
+
 (define % (lambda (a b) (remainder a b)))
 (define / (lambda (a b) (quotient a b)))
 (define print-char (lambda (c) (write-char c (current-output-port))))
 (define print-string write-string)
 (define nil '())
 
-(define abs
-  (lambda (x)
-    (if (< x 0)
-        (- 0 x)
-        x)))
-
-
-(define rand-next
-  (lambda (s)
-    (% (* s 19731979)
-       219072107)))
-
 (define print-n-char
   (lambda (n c)
     (when (> n 0)
         (let ([c (if (number? c) (number->char c) c)])
+          (unless (char? c) (error "again, c is not a char!!!!"))
           (print-char c)
           (print-n-char (- n 1) c)))))
 
 (define contains
   (lambda (l elem)
     (if (null? l)
-        0
+        #f
         (if (= (car l) elem)
-            1
+            #t
             (contains (cdr l) elem)))))
 
 (define nth
@@ -128,15 +122,11 @@
 
 (define connected
   (lambda (sets c1 c2)
-    (and (not (= sets nil))
+    (and (not (null? sets))
       (let ((set (car sets)))
         (or (and (contains set c1)
                  (contains set c2))
             (connected (cdr sets) c1 c2))))))
-
-(define not
-  (lambda (x)
-    (if x 0 1)))
 
 ; return the first element that satisfies p
 (define find
@@ -167,8 +157,8 @@
 
 (define print-maze
   (lambda (s w)
-    (let ((space 32)
-          (wall 35))
+    (let ((space (number->char 32))
+          (wall (number->char 35)))
       (print-n-char (+ (* s 2) 1) wall)
       (newline)
       (for 0 s
@@ -177,15 +167,13 @@
                (for 0 s
                     (lambda (c)
                         (print-char space)
-                        (if (< c (- s 1))
+                        (when (< c (- s 1))
                             (let ((rc (cell r c s)))
-                              (print-char (if (isWallUp rc (atE rc s) w) wall space)))
-                            0)))
+                              (print-char (if (isWallUp rc (atE rc s) w) wall space))))))
                (print-char wall)
                (newline)
-               (if (< r (- s 1))
-                   (let ()
-                     (print-char wall)
+               (when (< r (- s 1))
+                 (print-char wall)
                      (for 0 s
                           (lambda (c)
                             (let ((rc (cell r c s)))
@@ -194,8 +182,8 @@
                                   (print-char wall)
                                   0))))
                      (print-char wall)
-                     (newline))
-                   0)))
+                     (newline))))
+
       (print-n-char (+ (* s 2) 1) wall)
       (newline))))
 
@@ -218,9 +206,12 @@
 
 
 (print-string "Size: ") ; T
-(let ((size 5))
+(let ((size 3))
 ; (let ((size (read-int)))
   (print-string "Seed: ") ; G
-  (let ((seed 5))
+  (let ((seed 1235))
   ; (let ((seed (read-int)))
-    (print-maze size (random-maze size seed))))
+    ; (print-maze size (random-maze size seed))))
+    (print-maze size (completeMaze size )))
+    (completeMaze size))
+

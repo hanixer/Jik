@@ -1,5 +1,6 @@
 (define write-char
     (lambda (char output-port)
+        (unless (char? char) (error "write-char: char is not a char"))
         (let ([index (vector-ref output-port 4)])
             (unless (< index (vector-ref output-port 5))
                 (flush-output-port output-port))

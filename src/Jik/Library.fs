@@ -4,6 +4,7 @@ let libraryFiles = [
     "foreign.scm"
     "numbers.scm"
     "symbols.scm"
+    "random.scm"
     "vector.scm"
     "strings.scm"
     "lists.scm"
@@ -24,6 +25,8 @@ let libraryFunctions = [
     "length"
     "string=?"
     "vector"
+    "vector-swap!"
+    "vector-shuffle!"
     "output-port?"
     "open-output-file"
     "close-output-port"
@@ -45,4 +48,5 @@ let libraryFunctions = [
     "filter"
     "for-each"
     "reverse"
+    "rand-next"
 ]
