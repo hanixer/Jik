@@ -1,8 +1,9 @@
 - [x] Complex constants.
-- [ ] Output ports.
+- [x] Output ports.
 - [ ] Safe primitives.
 - [x] Symbols.
-- [ ] Change initialization of strings.
+- [x] Change initialization of strings.
+- [ ] Report error on heap overflow.
 
 After variable arity functions, we can implement library functions like (vector 1 2 3) => #(1 2 3).
 So we return to separate compilation.
@@ -167,3 +168,10 @@ During code generation make labels for each string:
 	.ascii "When are you planing to start?\0"
 
 ```
+
+# Report error on heap overflow
+Add heap top pointer, and compare it with current freePointer.
+If freePointer is >= than top - report error and exit.
+Which primitives use freePointer?
+cons, make-*(vector, string, closure)
+

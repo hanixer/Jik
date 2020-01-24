@@ -1,3 +1,2 @@
-(write-int 1234)
+(write-char #\a)
 (flush-output-port (current-output-port))
-(exit-scheme)

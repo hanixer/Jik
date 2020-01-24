@@ -314,7 +314,6 @@
 (define %read-int
   (lambda (acc)
     (let ((c (read-char)))
-        (foreign-call "printPtr" c)
       (if (digit? c)
           (%read-int (+ (* 10 acc) (- c #\0)))
           acc))))

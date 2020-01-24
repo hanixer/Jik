@@ -153,8 +153,25 @@ let compileIsOfType dest var1 mask tag =
      Cmp, [Int tag; Reg Rax]]
     @ compileSetOnEqual dest
 
+let callRuntime func =
+    [Sub, [Int (4 * wordSize); Reg Rsp]
+     Call(func), []
+     Add, [Int (4 * wordSize); Reg Rsp]]
+
+let checkForHeap p =
+    let arg =
+        match p with
+        | Prim.MakeVector -> 0
+        | Prim.MakeString -> 1
+        | Prim.Cons -> 2
+        | Prim.MakeClosure -> 3
+        | _ -> 4
+    [Mov, [Int arg; Reg Rcx]] @
+    callRuntime "checkHeapSpaceAvailable"
+
 let compileMakeVector size var =
     let shift = if wordSize = 8 then 3 else 2
+    checkForHeap Prim.MakeVector @
     [Mov, [GlobalValue(freePointer); Reg R11]
      Mov, [size; Deref(0, R11)]
      Or, [Int vectorTag; Reg R11]
@@ -166,6 +183,7 @@ let compileMakeVector size var =
      Add, [Reg R11; GlobalValue(freePointer)]]
 
 let compileMakeString size dest =
+    checkForHeap Prim.MakeString @
     [Mov, [GlobalValue(freePointer); Reg R11]
      Mov, [size; Deref(0, R11)]
      Or, [Int stringTag; Reg R11]
@@ -263,6 +281,7 @@ let rec declToInstrs (dest, x) =
          Or, [Int charTag; Reg Rax]
          Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Cons, [var1; var2]) ->
+        checkForHeap Prim.Cons @
         [Mov, [GlobalValue(freePointer); Reg R11]
          Mov, [Var var1; Deref(0, R11)]
          Mov, [Var var2; Deref(wordSize, R11)]
@@ -331,6 +350,7 @@ let rec declToInstrs (dest, x) =
     // Closures.
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
         let offset = (List.length args + 1) * wordSize
+        checkForHeap Prim.MakeClosure @
         [Mov, [GlobalValue(freePointer); Reg R11]
          Lea(label), [Deref(0, R11)]] @
         moveClosureArgs args @
@@ -417,7 +437,8 @@ let selectInstructions (prog : Intermediate.Program) : Program =
 
     let errorHandler =
         [Label(errorHandlerLabel), []
-         Call("asmError"), []]
+         Sub, [Int wordSize; Reg Rsp]] @
+        callRuntime "asmError"
 
     let entryPointLabel = freshLabel "entryPoint"
 

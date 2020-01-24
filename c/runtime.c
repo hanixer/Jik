@@ -30,6 +30,7 @@
 #define cdrOffset wordSize
 
 void* freePointer;
+void* heapTopPointer;
 
 extern int schemeEntry();
 
@@ -172,7 +173,7 @@ ptr s_print6args(ptr a1, ptr a2, ptr a3, ptr a4, ptr a5, ptr a6) {
 }
 
 void asmError() {
-    printf("error");
+    fprintf(stderr, "error, probably bad procedure call");
     exit(1);
 }
 
@@ -222,6 +223,21 @@ void s_exit(ptr p) {
     ExitProcess((UINT)fixnumToInt(p));
 }
 
+static int allocations[5];
+
+void checkHeapSpaceAvailable(int which) {
+    allocations[which]++;
+    if (freePointer >= heapTopPointer) {
+        fprintf(stderr, "No space for heap allocation");
+        printf("vector: %d\n", allocations[0]);
+        printf("string: %d\n", allocations[1]);
+        printf("cons: %d\n", allocations[2]);
+        printf("closure: %d\n", allocations[3]);
+        printf("other: %d\n", allocations[5]);
+        exit(1);
+    }
+}
+
 int main() {
     int stackSize = 16 * 4096;
     char* stack = allocateProtectedSpace(stackSize);
@@ -229,6 +245,7 @@ int main() {
     int heapSize = 100 * 1024 * 4096;
     char* heap = allocateProtectedSpace(heapSize);
     freePointer = heap;
+    heapTopPointer = heap + heapSize;
     ptr result = schemeEntry(stackHigherAddr, heap);
     printPtr(result);
     return 0;

@@ -1,6 +1,6 @@
 (define % (lambda (a b) (remainder a b)))
 (define / (lambda (a b) (quotient a b)))
-(define print-char write-char)
+(define print-char (lambda (c) (write-char c (current-output-port))))
 (define print-string write-string)
 (define nil '())
 
@@ -171,6 +171,7 @@
     (let ((space 32)
           (wall 35))
       (print-n-char (+ (* s 2) 1) wall)
+      (write-char #\3)
       (newline)
       (for 0 s
            (lambda (r)
@@ -219,7 +220,9 @@
 
 
 (print-string "Size: ") ; T
-(let ((size (read-int)))
+(let ((size 5))
+; (let ((size (read-int)))
   (print-string "Seed: ") ; G
-  (let ((seed (read-int)))
+  (let ((seed 5))
+  ; (let ((seed (read-int)))
     (print-maze size (random-maze size seed))))
