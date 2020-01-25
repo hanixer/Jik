@@ -21,6 +21,8 @@ let special = [
 
 let undefinedExpr = Bool false
 
+let symbLambda = Symbol "lambda"
+
 let isUnused s env = List.contains s env |> not
 
 let wrapInLet var value body =
@@ -68,6 +70,7 @@ and expand env sexpr =
         let a = desugar a
         let rest = exprsToList (Symbol "and" :: rest)
         exprsToList [Symbol "if"; a; desugar rest; Bool false]
+    | List(Symbol "or" :: args) -> desugarOr env args
     | List [Symbol "or"] -> Bool false
     | List [Symbol "or"; a] ->
         desugar a
@@ -122,6 +125,21 @@ and expand env sexpr =
     | _ ->
         printfn "Oh no! %A" sexpr
         sexpr
+
+let desugarOr env exprs =
+    let handle expr desugared =
+        let expr = desugar2 env expr
+        match desugared with
+        | Some(prev) ->
+            let t = Symbol (freshLabel "or")
+            let ifExpr = exprsToList [Symbol "if"; t; t; prev]
+            let lam = exprsToList [symbLambda; exprsToList [t]; ifExpr]
+            Some (exprsToList [lam; expr])
+        | None -> Some(expr)
+
+    List.foldBack handle exprs None
+    |> Option.defaultValue (Bool false)
+
 
 let desugarLet env sexpr bindings body =
     if List.isEmpty body then

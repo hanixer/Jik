@@ -147,11 +147,11 @@ let main argv =
     // runTestGroup false "boolean" booleanTests
     // runTestGroup false "vector" vectorTests
     // runTestGroup false "assignment" assignmentTests
-    // runTestGroup false "andOr" andOrTests
+    runTestGroup false "andOr" andOrTests
     // runTestGroup false "pair" pairTests
     // runTestGroup false "setCarCdr" setCarCdrTests
     // runTestGroup false "whenUnless" whenUnlessTests
-    runTestGroup false "cond" condTests
+    // runTestGroup false "cond" condTests
     // runTestGroup false "letrec" letrecTests
     // runTestGroup false "list" listTests
     // runTestGroup false "num -> char" numcharTests
