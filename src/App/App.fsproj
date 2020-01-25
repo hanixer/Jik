@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Jik\Jik.fsproj" />
+    <Reference Include="netstandard" />
   </ItemGroup>
 
 </Project>

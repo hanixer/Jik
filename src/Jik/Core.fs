@@ -133,30 +133,28 @@ let stringToProgram str : Program =
           Strings = [] }
     | _ -> failwith "stringToProgram: parsing failed"
 
-// let stringToProgram2 str : Program =
-//     let sexpr = stringToSExpr ("(\n" + str + "\n)")
+let stringToProgram2 str : Program =
+    let sexpr = stringToSExpr ("(\n" + str + "\n)")
 
-//     let convertTopLevel sexpr =
-//         match sexpr with
-//         | List (S.Symbol "define" :: S.Cons(S.Symbol name, args) :: body) ->
-//             let lambda = exprsToList (S.Symbol "lambda" :: args :: body)
-//             exprsToList [S.Symbol "set!"; S.Symbol name; lambda]
-//         | List [S.Symbol "define"; S.Symbol name; sexpr] ->
-//             let sexpr = exprsToList [S.Symbol "set!"; S.Symbol name; sexpr]
-//             name :: globals, sexpr :: sexprs
-//         | sexpr ->
-//             globals, sexpr :: sexprs
+    let convertTopLevel sexpr =
+        match sexpr with
+        | List (S.Symbol "define" :: S.Cons(S.Symbol name, args) :: body) ->
+            let lambda = exprsToList (S.Symbol "lambda" :: args :: body)
+            exprsToList [S.Symbol "set!"; S.Symbol name; lambda]
+        | List [S.Symbol "define"; S.Symbol name; sexpr] ->
+            exprsToList [S.Symbol "set!"; S.Symbol name; sexpr]
+        | sexpr -> sexpr
 
-//     let desugared = desugar2 [] sexpr
+    let desugared = desugar2 [] sexpr
 
-//     match desugared with
-//     | List sexprs when not (sexprs.IsEmpty) ->
-//         let globals, sexprs = List.fold convertTopLevel ([], []) sexprs
-//         let exprList = List.map sexprToExpr sexprs
-//         { Main = exprList |> List.rev
-//           Globals = List.rev globals
-//           Strings = [] }
-//     | _ -> failwith "stringToProgram: parsing failed"
+    match desugared with
+    | List sexprs when not (sexprs.IsEmpty) ->
+        let sexprs = List.map convertTopLevel sexprs
+        let exprList = List.map sexprToExpr sexprs
+        { Main = exprList |> List.rev
+          Globals = List.rev []
+          Strings = [] }
+    | _ -> failwith "stringToProgram: parsing failed"
 
 let rec transform f expr =
     let rec propagate expr =
