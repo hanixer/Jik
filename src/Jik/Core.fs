@@ -110,7 +110,7 @@ let rec sexprToExpr sexpr =
 let stringToProgram str : Program =
     let sexpr = stringToSExpr ("(\n" + str + "\n)")
 
-    let parseSExpr (globals, sexprs) sexpr =
+    let convertDefinitions (globals, sexprs) sexpr =
         match sexpr with
         | List (S.Symbol "define" :: List (S.Symbol name :: args) :: body) ->
             let lambda = exprsToList (S.Symbol "lambda" :: exprsToList args :: body)
@@ -126,12 +126,37 @@ let stringToProgram str : Program =
 
     match desugared with
     | List sexprs when not (sexprs.IsEmpty) ->
-        let globals, sexprs = List.fold parseSExpr ([], []) sexprs
+        let globals, sexprs = List.fold convertDefinitions ([], []) sexprs
         let exprList = List.map sexprToExpr sexprs
         { Main = exprList |> List.rev
           Globals = List.rev globals
           Strings = [] }
     | _ -> failwith "stringToProgram: parsing failed"
+
+// let stringToProgram2 str : Program =
+//     let sexpr = stringToSExpr ("(\n" + str + "\n)")
+
+//     let convertTopLevel sexpr =
+//         match sexpr with
+//         | List (S.Symbol "define" :: S.Cons(S.Symbol name, args) :: body) ->
+//             let lambda = exprsToList (S.Symbol "lambda" :: args :: body)
+//             exprsToList [S.Symbol "set!"; S.Symbol name; lambda]
+//         | List [S.Symbol "define"; S.Symbol name; sexpr] ->
+//             let sexpr = exprsToList [S.Symbol "set!"; S.Symbol name; sexpr]
+//             name :: globals, sexpr :: sexprs
+//         | sexpr ->
+//             globals, sexpr :: sexprs
+
+//     let desugared = desugar2 [] sexpr
+
+//     match desugared with
+//     | List sexprs when not (sexprs.IsEmpty) ->
+//         let globals, sexprs = List.fold convertTopLevel ([], []) sexprs
+//         let exprList = List.map sexprToExpr sexprs
+//         { Main = exprList |> List.rev
+//           Globals = List.rev globals
+//           Strings = [] }
+//     | _ -> failwith "stringToProgram: parsing failed"
 
 let rec transform f expr =
     let rec propagate expr =

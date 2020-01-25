@@ -21,5 +21,5 @@ open Compile
 [<EntryPoint>]
 let main argv =
     let toRoot = Util.getPathRelativeToRoot
-    compileFilesToBinary true [toRoot "examples/frequency.scm"] defaultOutFile
+    compileFilesToBinary true [toRoot "examples/one.scm"] defaultOutFile
     0 // return an integer exit code

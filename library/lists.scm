@@ -72,3 +72,11 @@
         l
         (cons (f (car l))
               (map f (cdr l))))))
+
+(define cadr
+  (lambda (x)
+    (car (cdr x))))
+
+(define cddr
+  (lambda (x)
+    (cdr (cdr x))))

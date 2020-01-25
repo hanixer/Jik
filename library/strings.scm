@@ -54,21 +54,7 @@
 (define string<? $string<?)
 
   (define list->string
-    (letrec ([race
-              (lambda (h t ls n)
-               (if (pair? h)
-                   (let ([h (cdr h)])
-                      (if (pair? h)
-                          (if (not (eq? h t))
-                              (race (cdr h) (cdr t) ls (+ n 2))
-                              (error "list->string: circular list" ls))
-                          (if (null? h)
-                              (+ n 1)
-                              (error "list->string: not a proper list" ls))))
-                   (if (null? h)
-                       n
-                       (error "list->string: not a proper list" ls))))]
-              [fill
+    (letrec ([fill
                (lambda (s i ls)
                  (cond
                    [(null? ls) s]
@@ -79,6 +65,6 @@
                       (string-set! s i c)
                       (fill s (+ i 1) (cdr ls)))]))])
        (lambda (ls)
-         (let ([n (race ls ls ls 0)])
+         (let ([n (length ls)])
            (let ([s (make-string n)])
              (fill s 0 ls))))))

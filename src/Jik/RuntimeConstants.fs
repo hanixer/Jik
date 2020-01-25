@@ -17,6 +17,8 @@ let charTag = 0x0F
 let charMask = 0xFF
 let nilLiteral = 0x8F
 let nilMask = 0xFF
+let undefinedLiteral = 0x7F
+let undefinedMask = 0xFF
 
 let pairTag = 0x01
 let pairMask = 0x07

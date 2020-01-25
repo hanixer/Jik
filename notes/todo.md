@@ -3,7 +3,8 @@
 - [ ] Safe primitives.
 - [x] Symbols.
 - [x] Change initialization of strings.
-- [ ] Report error on heap overflow.
+- [x] Report error on heap overflow.
+- [ ] Add internal definitions
 
 After variable arity functions, we can implement library functions like (vector 1 2 3) => #(1 2 3).
 So we return to separate compilation.
@@ -150,7 +151,6 @@ another approach:
 build all modules the same way.
 but then generate a file, that will initialize all modules and will contain schemeEntry.
 
-
 compile : source name isMain -> file
 
 # Stack alignment and C function()
@@ -175,3 +175,22 @@ If freePointer is >= than top - report error and exit.
 Which primitives use freePointer?
 cons, make-*(vector, string, closure)
 
+# Internal definitions
+Change behaviour of global symbols.
+Across all modules, there should be only one global variable.
+So each module references global variables. These variables are collected
+during compilation.
+Then main module will define all of the global variables, and set all of them to undefined
+value.
+Only after that entry points of modules will be called.
+Define forms should be transformed in top level:
+```
+(define a 1) => (set! a 1)
+(define a (lambda (x) x)) => (set! a (lambda ...))
+(define (a x) x) => (set! a (lambda ...))
+(define (a . x) x) => (set! a (lambda x x))
+```
+In local scope:
+Collect all definitions and bind them to name.
+Data defines are collected on top level.
+Func defines are combined into letrec.
