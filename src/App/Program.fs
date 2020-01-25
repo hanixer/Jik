@@ -129,8 +129,8 @@ let main argv =
     // runSingleTest c "(string=? \"one\" \"one\" \"one\")" "#t\n"
     // runTestWithLib "(remainder 5 2)" "1\n"
 
-    runTestGroup true "writeInt" writeInt
-    runTestGroup false "quotientTests" quotientRemainderTests
+    // runTestGroup true "writeInt" writeInt
+    // runTestGroup false "quotientTests" quotientRemainderTests
     // runTestGroup true "eofTests" eofTests
     // runTestGroup false "exit" exitTest
     // runTestGroupWithLib "symbols" symbols
@@ -151,7 +151,7 @@ let main argv =
     // runTestGroup false "pair" pairTests
     // runTestGroup false "setCarCdr" setCarCdrTests
     // runTestGroup false "whenUnless" whenUnlessTests
-    // runTestGroup false "cond" condTests
+    runTestGroup false "cond" condTests
     // runTestGroup false "letrec" letrecTests
     // runTestGroup false "list" listTests
     // runTestGroup false "num -> char" numcharTests

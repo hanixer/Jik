@@ -222,6 +222,7 @@ ptr s_closeFile(ptr fd) {
 static int allocations[5];
 
 void printAllocInfo() {
+    printf("Allocations info:\n");
     printf("vector: %d\n", allocations[0]);
     printf("string: %d\n", allocations[1]);
     printf("cons: %d\n", allocations[2]);

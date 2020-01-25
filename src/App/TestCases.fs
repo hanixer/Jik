@@ -222,6 +222,7 @@ let andOrTests =
       @"(or #t)", "#t\n"
       @"(or 5)", "5\n"
       @"(or 1 2 3)", "1\n"
+      @"(not (or #f #t))", "#f\n"
       @"(or (cons 1 2) ((lambda (x) (x x)) (lambda (x) (x x))))", "(1 . 2)\n"
       @"(let ((if 12)) (or if 17))", "12\n"
       @"(let ((if 12)) (and if 17))", "17\n"

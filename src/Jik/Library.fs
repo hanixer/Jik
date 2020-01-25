@@ -12,6 +12,7 @@ let libraryFiles = [
     "input-port.scm"
     "output.scm"
     "input.scm"
+    "chars.scm"
 ]
 
 let libraryFunctions = [
@@ -24,6 +25,8 @@ let libraryFunctions = [
     "list?"
     "length"
     "string=?"
+    "string<?"
+    "list->string"
     "vector"
     "vector-swap!"
     "vector-shuffle!"
@@ -50,4 +53,6 @@ let libraryFunctions = [
     "reverse"
     "rand-next"
     "map"
+    "char-numeric?"
+    "char-alphabetic?"
 ]
