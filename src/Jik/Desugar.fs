@@ -59,7 +59,8 @@ let desugarSingle expr =
         desugarWhen condition body
     | List (Symbol "unless" :: condition :: body) ->
         desugarUnless condition body
-    | Cons(Symbol "cond", _) -> failwith "cond is not done yet"
+    | List (Symbol "cond" :: clauses) ->
+        desugarCond clauses
     // primitive or function application
     | Cons(head, tail) ->
         let head = desugarSingle head
@@ -72,6 +73,35 @@ let desugarSingle expr =
 let desugarLambda args body =
     let body = desugarBody body
     exprsToList (Symbol "lambda" :: args :: body)
+
+// else e1 e2 ... => (begin e1 e2 ...)
+// (test) => or test
+// (test => exp) => (let ((t test)) (if t (exp t) rest))
+// (test e1 e2 ...) => (if t (begin e1 e2 ...) rest)
+
+let desugarCond clauses =
+    let handleClause clause handled =
+        match clause with
+        | List (Symbol "else" :: rest) when Option.isNone handled ->
+            Some(desugarBegin rest)
+        | List [test] ->
+            Some(desugarOr (test :: Option.toList handled))
+        | List [test; Symbol "=>"; expr] ->
+            let t = Symbol (freshLabel "t")
+            let app = exprsToList [expr; t]
+            let bindings = [exprsToList [t; test]]
+            let altern = Option.defaultValue undefinedExpr handled
+            let ifExpr = makeIf t app altern
+            Some(desugarLet bindings [ifExpr])
+        | List (test :: conseq) ->
+            let conseq = desugarBegin conseq
+            let altern = Option.defaultValue undefinedExpr handled
+            Some(makeIf test conseq altern)
+        | _ ->
+            failwithf "desugarCond: wrong cond clause: %s" (sexprToString clause)
+
+    List.foldBack handleClause clauses None
+    |> Option.defaultValue undefinedExpr
 
 let desugarWhen condition body =
     if List.isEmpty body then

@@ -207,6 +207,7 @@ let convertGlobalRefs (prog : Program) : Program =
             let conseq = convert env conseq
             let altern = convert env altern
             If(cond, conseq, altern)
+        | PrimApp(StringInit, _) -> expr
         | PrimApp(p, args) ->
             let args = List.map (convert env) args
             PrimApp(p, args)
@@ -353,6 +354,7 @@ let collectComplexConstants (prog : Program) =
         |> Seq.map Assign
         |> Seq.toList
 
+    let stringNames = strings |> Seq.map fst |> Seq.toList
     let names = assignments |> Seq.map fst |> Seq.toList
 
     { prog with Main = assignExprs @ main
