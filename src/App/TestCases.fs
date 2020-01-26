@@ -594,3 +594,18 @@ let writeInt =
     [ "(write-int 1)(flush-output-port (current-output-port))(exit-scheme)", "1\n"
       "(write-int 102030)(flush-output-port (current-output-port))(exit-scheme)", "102030\n"
       "(write-int -102030)(flush-output-port (current-output-port))(exit-scheme)", "-102030\n" ]
+
+let localDefine =
+    [ "
+(define f #f)
+(let ()
+    (define (g x) (+ x 1))
+    (set! f (lambda (y) (g (g y)))))
+(f 1)", "3\n"
+      "
+(define a 1)
+(cons
+  (let ()
+    (define a 2)
+    a)
+  a)", "(2 . 1)\n" ]

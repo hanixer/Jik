@@ -45,16 +45,6 @@ let runTestString source expected =
 let main argv =
     // runTestWithLib "(remainder 5 2)" "1\n"
 
-    let s = "(lambda x
-    (define a 1)
-    (define b 2)
-    a
-    (define c 1)
-    (define e 2)
-    e)"
-    let s = "(quote (and 1 2 3))"
-
-
     // let expr = stringToSExpr s
     // let desug = Desugar.desugar2 [] expr
     // printf "result: %s" (sexprToString desug)
@@ -63,8 +53,10 @@ let main argv =
     // runTestGroupWithLib "apply nontail" applyNonTail
     // runTestGroupWithLib "apply tail" applyTail
     // runTestGroup true "eofTests" eofTests
-    runTestGroup true "writeInt" writeInt
-    // runTestGroup false "defineTests" defineTests
+    // runTestGroup true "writeInt" writeInt
+    runTestGroup false "defineTests" defineTests
+    runTestGroup false "localDefine" localDefine
+
     // runTestGroup false "quotientTests" quotientRemainderTests
     // runTestGroup false "complexConstants" complexConstants
     // runTestGroup false "cond" condTests
@@ -88,6 +80,7 @@ let main argv =
     // runTestGroup false "letrec" letrecTests
     // runTestGroup false "basic" basicTests
 
-    // runTest false "\"one way\"" "1\n"
+    // runTest false "(define a 1) ((lambda (a) a) 2)" "2\n"
+
 
     0

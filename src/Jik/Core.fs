@@ -232,35 +232,61 @@ let trySubstitute v mapping =
     | _ -> v
 
 let extendMapping vars mapping =
-    let newVars = List.map freshLabel vars
-    let folder mapping (oldVar, newVar) = Map.add oldVar newVar mapping
-    newVars, List.fold folder mapping (List.zip vars newVars)
+    let rec loop mapping var =
+        if Map.containsKey var mapping then
+            loop mapping (freshLabel var)
+        else
+            var
+
+    let newVars = System.Collections.Generic.List<string>()
+
+    let add mapping var =
+        let newVar = loop mapping var
+        newVars.Add(newVar)
+        Map.add var newVar mapping
+
+    let newMapping = List.fold add mapping vars
+    let newVars = Seq.toList newVars
+
+    newVars, newMapping
 
 // TODO: change this to use transform instead
 let rec alphaRenameImpl mapping =
     function
     | Ref v -> trySubstitute v mapping |> Ref
     | If(cond, thenExpr, elseExpr) ->
-        If(alphaRenameImpl mapping cond, alphaRenameImpl mapping thenExpr,
-             alphaRenameImpl mapping elseExpr)
+        let cond = alphaRenameImpl mapping cond
+        let thenExpr = alphaRenameImpl mapping thenExpr
+        let elseExpr = alphaRenameImpl mapping elseExpr
+        If(cond, thenExpr, elseExpr)
     | Assign(var, rhs) ->
-        Assign(trySubstitute var mapping, alphaRenameImpl mapping rhs)
+        let var = trySubstitute var mapping
+        let rhs = alphaRenameImpl mapping rhs
+        Assign(var, rhs)
     | Lambda(args, dotted, body) ->
         let newVars, mapping = extendMapping args mapping
-        Lambda(newVars, dotted, List.map (alphaRenameImpl mapping) body)
-    | Begin exprs -> Begin(List.map (alphaRenameImpl mapping) exprs)
-    | App(func, argsExprs) ->
-        App(alphaRenameImpl mapping func, List.map (alphaRenameImpl mapping) argsExprs)
+        let body = List.map (alphaRenameImpl mapping) body
+        Lambda(newVars, dotted, body)
+    | Begin exprs ->
+        let exprs = List.map (alphaRenameImpl mapping) exprs
+        Begin(exprs)
+    | App(func, args) ->
+        let func = alphaRenameImpl mapping func
+        let args = List.map (alphaRenameImpl mapping) args
+        App(func, args)
     | PrimApp(op, args) ->
-        PrimApp(op, List.map (alphaRenameImpl mapping) args)
+        let args = List.map (alphaRenameImpl mapping) args
+        PrimApp(op, args)
     | ForeignCall(foreignName, args) ->
-        ForeignCall(foreignName, List.map (alphaRenameImpl mapping) args)
+        let args = List.map (alphaRenameImpl mapping) args
+        ForeignCall(foreignName, args)
     | e -> e
 
 let alphaRename (prog : Program) : Program =
     // let newGlobals, mapping = extendMapping prog.Globals Map.empty
-    let mapping = Map.empty
-    let rename = alphaRenameImpl mapping
+    let initial = prog.Globals @ prog.ConstantsNames
+    let initial = List.zip initial initial |> Map.ofList
+    let rename = alphaRenameImpl initial
     { prog with Main = List.map rename prog.Main }
                 // Globals = newGlobals }
 
