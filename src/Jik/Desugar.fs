@@ -136,7 +136,7 @@ let desugarLetLoop name bindings body =
     let args =  exprsToList names
     let lam = desugarLambda args body
     let binding = [exprsToList [Symbol name; lam]]
-    let app = (Symbol name :: initExprs)
+    let app = [exprsToList (Symbol name :: initExprs)]
     desugarLetrec binding app
 
 let desugarLetrec bindings body =
@@ -172,7 +172,6 @@ let collectDefinitions defs es =
         let def = name, rhs
         collectDefinitions (def :: defs) rest
     | _ -> (List.rev defs), es
-// (name, (lambda args body)) => ()
 
 /// Desugar expression and handle internal (define ...) expressions.
 let desugarBody exprs =

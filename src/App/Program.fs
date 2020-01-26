@@ -137,16 +137,15 @@ let main argv =
     let s = "(quote (and 1 2 3))"
 
 
-    let expr = stringToSExpr s
-    let desug = Desugar.desugar2 [] expr
-    printf "result: %s" (sexprToString desug)
+    // let expr = stringToSExpr s
+    // let desug = Desugar.desugar2 [] expr
+    // printf "result: %s" (sexprToString desug)
 
     // runTestGroup true "writeInt" writeInt
     // runTestGroup false "quotientTests" quotientRemainderTests
     // runTestGroup true "eofTests" eofTests
     // runTestGroup false "exit" exitTest
     // runTestGroupWithLib "symbols" symbols
-    // runTestGroup false "letLoop" letLoop
     // runTestGroupWithLib "apply nontail" applyNonTail
     // runTestGroupWithLib "apply tail" applyTail
     // runTestGroup false "complexConstants" complexConstants
@@ -155,21 +154,24 @@ let main argv =
     // runTestGroup false "calls" callFailure
     // runTestGroup false "deep procs" deeplyProcedureTests
     // runTestGroup false "lambda" lambdaTests
-    // runTestGroup false "basic" basicTests
     // runTestGroup false "boolean" booleanTests
     // runTestGroup false "vector" vectorTests
     // runTestGroup false "assignment" assignmentTests
-    // runTestGroup false "andOr" andOrTests
     // runTestGroup false "pair" pairTests
     // runTestGroup false "setCarCdr" setCarCdrTests
-    // runTestGroup false "whenUnless" whenUnlessTests
     // runTestGroup false "cond" condTests
-    // runTestGroup false "letrec" letrecTests
     // runTestGroup false "list" listTests
     // runTestGroup false "num -> char" numcharTests
     // runTestGroup false "char?" isCharTests
     // runTestGroup false "string" stringTests
     // runTestGroup false "foreign-call" foreignCallTests
+    runTestGroup false "letLoop" letLoop
+    // runTestGroup false "whenUnless" whenUnlessTests
+    // runTestGroup false "andOr" andOrTests
+    runTestGroup false "letrec" letrecTests
+    // runTestGroup false "basic" basicTests
 
+    // runTest false "(let f () 12)" "12\n"
+    // runTest false "(letrec ([f (lambda () 12)]) (f))" "12\n"
 
     0

@@ -359,7 +359,8 @@ let letLoop =
       "(let sum ([n 10000] [ac 0])
           (if (zero? n)
                       ac
-                      (sum (- n 1) (+ n ac))))", "50005000\n" ]
+                      (sum (- n 1) (+ n ac))))", "50005000\n"
+     ]
 
 let deeplyProcedureTests =
     [ @"(letrec ((sum (lambda (n ac)
