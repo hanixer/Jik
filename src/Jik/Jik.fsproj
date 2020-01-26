@@ -19,6 +19,7 @@
     <Compile Include="Codegen.fs" />
     <Compile Include="SelectInstructions.fs" />
     <Compile Include="RegisterAllocation.fs" />
+    <Compile Include="CodePrinter.fs" />
     <Compile Include="SourceFileReader.fs" />
     <Compile Include="Compile.fs" />
     <Compile Include="TestDriver.fs" />

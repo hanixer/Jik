@@ -1,19 +1,14 @@
 module Compile
 
 open System
-open SExpr
 open Util
 open Core
-open Graph
-open RuntimeConstants
-open Display
 open Intermediate
 open Codegen
 open Library
-open RegisterAllocation
 open SelectInstructions
 open System.IO
-open System.Text
+open CodePrinter
 
 let miscPath = Util.getPathRelativeToRoot "misc/"
 
@@ -44,6 +39,16 @@ let getTempFile () =
 
 let schemeMainName = "schemeMain.s"
 
+/// Returns list of globals and list of their original scheme names
+let collectGlobals modules =
+    let collect pairs modul =
+        let curr = List.zip modul.Globals modul.GlobalsOriginal
+        Set.union (Set.ofList curr) pairs
+
+    let pairs = List.fold collect Set.empty modules |> List.ofSeq
+
+    List.unzip pairs
+
 /// Compile all files (which may contain library files) to a binary.
 let compileMany files outFile =
     Common.resetFreshLabels()
@@ -57,30 +62,31 @@ let compileMany files outFile =
         |> allCodegenTransformations
 
     let handleFile file =
-        try
+        // try
             File.ReadAllText file
             |> schemeStringToModule
-        with
-        | e ->
-            printfn "Error during compilation of file: %s" file
-            raise e
+        // with
+        // | e ->
+        //     printfn "Error during compilation of file: %s" file
+        //     printfn "Error: %A" e
+        //     raise e
 
     let entryOfModule (prog : Codegen.Program) = prog.Entry
 
     let modules = List.map handleFile files
-    let globals = List.fold (fun acc modul -> Set.union (Set.ofSeq modul.Globals) acc) Set.empty modules
+    let globals, globOriginal = collectGlobals modules
     let entryPoints = List.map entryOfModule modules
-    let mainModule = createMainModule globals entryPoints
+    let mainModule = createMainModule globals globOriginal entryPoints
     let asmFiles = List.map (fun (file : string) ->
         let file = Path.GetFileName(file)
         miscPath + file + ".s") files
 
     List.zip asmFiles modules
     |> List.iter (fun (asmFile, m) ->
-        let text = Codegen.programToString false m
+        let text = programToString false m
         File.WriteAllText(asmFile, text))
 
-    let mainText = Codegen.programToString true mainModule
+    let mainText = programToString true mainModule
     let mainFile = miscPath + schemeMainName
     File.WriteAllText(mainFile, mainText)
 

@@ -1,1 +1,2 @@
-(list->string (list #\a #\b #\b))
+(let ([a 1]) a)
+a

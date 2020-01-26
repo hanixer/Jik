@@ -80,7 +80,7 @@ let main argv =
     // runTestGroup false "letrec" letrecTests
     // runTestGroup false "basic" basicTests
 
-    // runTest false "(define a 1) ((lambda (a) a) 2)" "2\n"
+    // runTest false "2" "2"
 
 
     0

@@ -31,6 +31,8 @@ and LambdaData = string list * bool * Expr list
 type Program =
     { Main : Expr list
       Globals : string list
+      GlobalsOriginal : string list // Contains original scheme names, for error reporting.
+                                    // Must correspond by index to Globals list.
       ConstantsNames : string list
       Strings : (string * string) list }
 
@@ -131,6 +133,7 @@ let stringToProgram str : Program =
         let exprList = List.map sexprToExpr sexprs
         { Main = exprList |> List.rev
           Globals = List.rev globals
+          GlobalsOriginal = []
           Strings = []
           ConstantsNames = [] }
     | _ -> failwith "stringToProgram: parsing failed"
@@ -174,10 +177,13 @@ let convertSchemeIdentifToAsm name =
 
 let convertGlobalRefs (prog : Program) : Program =
     let globals = System.Collections.Generic.HashSet<string>()
+    let newVarToOriginal = System.Collections.Generic.Dictionary<string, string>()
 
     let addGlobal var =
         let newVar = convertSchemeIdentifToAsm var
         globals.Add(newVar) |> ignore
+        if not(newVarToOriginal.ContainsKey(newVar)) then
+            newVarToOriginal.Add(newVar, var)
         newVar
 
     let rec convert env expr =
@@ -223,8 +229,14 @@ let convertGlobalRefs (prog : Program) : Program =
     // Remove constant references from globals list.
     globals.RemoveWhere(fun g -> Seq.contains g prog.ConstantsNames) |> ignore
 
+    let original = Seq.map (fun g ->
+        if not(newVarToOriginal.ContainsKey(g)) then
+            printfn "not contains, stop"
+        newVarToOriginal.[g]) globals |> Seq.toList
+
     { prog with Main = main
-                Globals = Seq.toList globals }
+                Globals = Seq.toList globals
+                GlobalsOriginal = original }
 
 let trySubstitute v mapping =
     match Map.tryFind v mapping with

@@ -368,7 +368,12 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.GlobalSet, [glob; value]) ->
         [Mov, [Var value; GlobalValue(glob)]]
     | Simple.Prim(Prim.GlobalRef, [glob]) ->
-        [Mov, [GlobalValue(glob); Var dest]]
+        // Save address of global var in rcx for C error handler.
+        [Mov, [GlobalValue(glob); Reg Rax]
+         Cmp, [Int undefinedLiteral; Reg Rax]
+         Lea(glob), [Reg Rcx]
+         JmpIf(E, globVarErrorHandler), []
+         Mov, [GlobalValue(glob); Var dest]]
     // Symbols.
     | Simple.Prim(Prim.MakeSymbol, [var1]) ->
         [Mov, [Var var1; Var dest]
@@ -438,7 +443,9 @@ let selectInstructions (prog : Intermediate.Program) : Program =
     let errorHandler =
         [Label(errorHandlerLabel), []
          Sub, [Int wordSize; Reg Rsp]] @
-        callRuntime "asmError"
+        callRuntime "asmError" @
+        [Label(globVarErrorHandler), []] @
+        callRuntime "globVarError"
 
     let entryPointLabel = freshLabel "entryPoint"
 
@@ -469,6 +476,7 @@ let selectInstructions (prog : Intermediate.Program) : Program =
     { Procedures = List.map handleDef procs
       Main = emptyFuncDef
       Globals = prog.Globals
+      GlobalsOriginal = prog.GlobalsOriginal
       ConstantsNames = prog.ConstantsNames
       ErrorHandler = errorHandler
       Entry = entryPointLabel

@@ -33,6 +33,7 @@ void* freePointer;
 void* heapTopPointer;
 
 extern int schemeEntry();
+extern char* globVarNameTable[];
 
 typedef uint64_t ptr;
 typedef ptr* ptrptr;
@@ -174,6 +175,22 @@ ptr s_print6args(ptr a1, ptr a2, ptr a3, ptr a4, ptr a5, ptr a6) {
 
 void asmError() {
     fprintf(stderr, "error, probably bad procedure call");
+    exit(1);
+}
+
+void globVarError(char* varAddress) {
+    // see printGlobalOriginals in CodePrinter.fs
+    for (int i = 0; globVarNameTable[i] != 0; i += 2) {
+        // the first entry is an address
+        if (globVarNameTable[i] == varAddress) {
+            // the second entry is a string
+            char* str = globVarNameTable[i + 1];
+            fprintf(stderr, "global variable '%s' is not initialized\n", str);
+            exit(1);
+        }
+    }
+
+    fprintf(stderr, "global variable with address '%p' was not found\n", varAddress);
     exit(1);
 }
 

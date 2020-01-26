@@ -36,3 +36,8 @@ let closureMask = 0x07
 
 let symbolTag = 0x03
 let symbolMask = 0x07
+
+let freePointer = "freePointer"
+let errorHandlerLabel = ".L_errorHandler"
+let globVarErrorHandler = ".L_globVarErrorHandler"
+let globVarNameTable = "globVarNameTable"

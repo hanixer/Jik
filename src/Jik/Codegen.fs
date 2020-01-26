@@ -94,6 +94,7 @@ type Program =
     { Procedures : FunctionDef list
       Main : FunctionDef
       Globals : string list
+      GlobalsOriginal : string list // Contains original scheme names, for error reporting.
       ConstantsNames : string list
       ErrorHandler : Instr list
       Entry : string
@@ -109,10 +110,6 @@ let emptyFuncDef =
       LiveBefore = Map.empty
       LiveAfter = Map.empty
       SlotsOccupied = 0 }
-
-let freePointer = "freePointer"
-
-let errorHandlerLabel = ".L_errorHandler"
 
 let allRegisters =
     [Rsp; Rbp; Rax; Rbx; Rcx; Rdx; Rsi; Rdi;
@@ -133,123 +130,6 @@ let isArithm = function
     | _ -> false
 
 let isRegister = function | Reg _ -> true | _ -> false
-
-let showInstr out (op, args) =
-    let showOp op =
-        match op with
-        | Set cc ->
-            fprintf out "set%s " ((sprintf "%A" cc).ToLower())
-        | Label label ->
-            fprintf out "%s:" label
-        | JmpIf (E, label) ->
-            fprintf out "je %s" label
-        | JmpIf (Ne, label) ->
-            fprintf out "jne %s" label
-        | JmpIf (S, label) ->
-            fprintf out "js %s" label
-        | Jmp label ->
-            fprintf out "jmp %s" label
-        | Call label ->
-            fprintf out "call %s" label
-        | Movb ->
-            fprintf out "movb "
-        | Cqto ->
-            fprintf out "cqto "
-        | IDiv ->
-            fprintf out "idivq "
-        | _ ->
-            let s = sprintf "%A" op
-            fprintf out "%s" (s.ToLower() + "q ")
-
-    let reg r =
-        let s = sprintf "%%%A" r
-        s.ToLower()
-
-    let showArg = function
-        | Int n -> fprintf out "$%d" n
-        | Reg(r) -> fprintf out "%s" (reg r)
-        | Deref(n, r) -> fprintf out "%d(%s)" n (reg r)
-        | Deref4(n, r1, r2, m) -> fprintf out "%d(%s, %s, %d)" n (reg r1) (reg r2) m
-        | Var(v) -> fprintf out "[var %s]" v
-        | ByteReg(r) -> fprintf out "%s" (reg r)
-        | Slot(n) -> fprintfn out "{slot %d}" n
-        | GlobalValue(v) -> fprintf out "%s(%%rip)" v
-
-    let showArgs args =
-        List.iteri (fun i arg ->
-            showArg arg
-            if i <> List.length args - 1 then
-                fprintf out ", ") args
-
-    match op, args with
-    | CallIndirect, [arg] ->
-        fprintf out "call *"
-        showArg arg
-    | JmpIndirect, [arg] ->
-        fprintf out "jmp *"
-        showArg arg
-    | Lea label, [arg] ->
-        fprintf out "leaq %s(%%rip), " label
-        showArg arg
-    | _ ->
-        showOp op
-        showArgs args
-
-let showInstrs out instrs =
-    List.iter (fun instr ->
-        fprintf out "    "
-        showInstr out instr
-        fprintfn out "") instrs
-
-let instrsToString instrs =
-    let out = new StringWriter()
-    fprintfn out "    .globl %s" schemeEntryLabel
-    fprintfn out "%s:" schemeEntryLabel
-    showInstrs out instrs
-    out.ToString()
-
-let programToString writeGlobals (prog : Program) =
-    let out = new StringWriter()
-
-    let printGlobal globl =
-        fprintfn out "    .globl %s" globl
-        fprintfn out "    .bss"
-        fprintfn out "    .align %d" wordSize
-        fprintfn out "%s:" globl
-        fprintfn out "    .space %d" wordSize
-
-    let printConstant globl =
-        fprintfn out "    .bss"
-        fprintfn out "    .align %d" wordSize
-        fprintfn out "%s:" globl
-        fprintfn out "    .space %d" wordSize
-
-    let printStringConst (name, literal : string) =
-        let firstField = literal.Length <<< fixnumShift
-        fprintfn out "    .section .rdata,\"dr\""
-        fprintfn out "    .align %d" wordSize
-        fprintfn out "%s:" name
-        fprintfn out "    .quad %d" firstField
-        fprintfn out "    .ascii \"%s\"" literal
-
-    let handleDef def =
-        fprintfn out "    .text"
-        fprintfn out "    .globl %s" def.Name
-        showInstrs out def.Instrs
-        fprintfn out "\n\n"
-
-    List.iter printStringConst prog.Strings
-    List.iter printConstant prog.ConstantsNames
-
-    if writeGlobals then
-        List.iter printGlobal prog.Globals
-
-    List.iter handleDef prog.Procedures
-
-    if prog.Main.Name.Length > 0 then
-        handleDef prog.Main
-    showInstrs out prog.ErrorHandler
-    out.ToString()
 
 
 let getCar reg dest = Mov, [Deref(-pairTag, reg); dest]
@@ -275,9 +155,6 @@ let revealGlobals (prog : Program) =
     let handleInstrs instrs = List.map convertInstr instrs
 
     transformInstructions handleInstrs prog
-
-let dbg func =
-    (fun x -> let y = func x in printfn "%s" (instrsToString y); y)
 
 let computePreds instrs =
     let labelToIndex =
@@ -500,7 +377,7 @@ let convertVarsToSlots (prog : Program) =
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
 
-let createMainModule globals entryPoints =
+let createMainModule globals globOriginal entryPoints =
     let initGlobal name =
         [Mov, [Int undefinedLiteral; GlobalValue name]]
 
@@ -542,6 +419,7 @@ let createMainModule globals entryPoints =
     { Procedures = []
       Main = funcDef
       Globals = List.ofSeq globals
+      GlobalsOriginal = List.ofSeq globOriginal
       ConstantsNames = []
       ErrorHandler = []
       Entry = schemeEntryLabel

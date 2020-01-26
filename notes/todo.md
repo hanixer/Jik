@@ -5,7 +5,8 @@
 - [x] Change initialization of strings.
 - [x] Report error on heap overflow.
 - [ ] Rework desugar process.
-- [ ] Add internal definitions.
+- [x] Add internal definitions.
+- [ ] Throw an error if a global variable is not initialized.
 
 After variable arity functions, we can implement library functions like (vector 1 2 3) => #(1 2 3).
 So we return to separate compilation.
@@ -200,3 +201,24 @@ This pass will need environment to track.
 ```
 (lambda (x) (lambda (y) x))
 ```
+
+# Reporting an error if a global var is not initialized
+Pass address of a global var to some reginer (e.g. rcx).
+Jump to an error handler.
+Error handler call C function.
+C function get an address or index of global variable.
+Then it get string.
+And print the string.
+String must be original symbol name.
+
+Problem: each module refers to a global variable.
+But index of that variable will be available only after all modules are processed.
+So how that can be handled?
+Create yet another table, which will map from global to index.
+We can first collect global variables, create a list of it and pass that mapping to code generation.
+Or we can pass to rcx the address of the variable.
+And then find an address of the variable in a table.
+What will be store in the table?
+Pairs:
+	First element is an address of global
+	Second element is a string.
