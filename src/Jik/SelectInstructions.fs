@@ -469,6 +469,7 @@ let selectInstructions (prog : Intermediate.Program) : Program =
     { Procedures = List.map handleDef procs
       Main = emptyFuncDef
       Globals = prog.Globals
+      ConstantsNames = prog.ConstantsNames
       ErrorHandler = errorHandler
       Entry = entryPointLabel
       Strings = prog.Strings }

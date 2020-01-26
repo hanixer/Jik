@@ -94,6 +94,7 @@ type Program =
     { Procedures : FunctionDef list
       Main : FunctionDef
       Globals : string list
+      ConstantsNames : string list
       ErrorHandler : Instr list
       Entry : string
       Strings : (string * string) list }
@@ -207,11 +208,17 @@ let instrsToString instrs =
     showInstrs out instrs
     out.ToString()
 
-let programToString (prog : Program) =
+let programToString writeGlobals (prog : Program) =
     let out = new StringWriter()
 
     let printGlobal globl =
         fprintfn out "    .globl %s" globl
+        fprintfn out "    .bss"
+        fprintfn out "    .align %d" wordSize
+        fprintfn out "%s:" globl
+        fprintfn out "    .space %d" wordSize
+
+    let printConstant globl =
         fprintfn out "    .bss"
         fprintfn out "    .align %d" wordSize
         fprintfn out "%s:" globl
@@ -232,7 +239,11 @@ let programToString (prog : Program) =
         fprintfn out "\n\n"
 
     List.iter printStringConst prog.Strings
-    List.iter printGlobal prog.Globals
+    List.iter printConstant prog.ConstantsNames
+
+    if writeGlobals then
+        List.iter printGlobal prog.Globals
+
     List.iter handleDef prog.Procedures
 
     if prog.Main.Name.Length > 0 then
@@ -489,12 +500,17 @@ let convertVarsToSlots (prog : Program) =
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
 
-let createMainModule entryPoints =
+let createMainModule globals entryPoints =
+    let initGlobal name =
+        [Mov, [Int undefinedLiteral; GlobalValue name]]
+
     let callEntryPoint entryPoint =
         [Mov, [Int 0; Reg Rcx]
          Call entryPoint, []]
 
     let calls = List.collect callEntryPoint entryPoints
+    let initGlobals = Seq.collect initGlobal globals |> Seq.toList
+
     let instrs =
         [Label(schemeEntryLabel), []
          Push, [Reg R15]
@@ -506,6 +522,7 @@ let createMainModule entryPoints =
          Push, [Reg R13]
          Push, [Reg R12]
          Push, [Reg Rbx]] @
+        initGlobals @
         calls @
         [Pop, [Reg Rbx]
          Pop, [Reg R12]
@@ -524,7 +541,8 @@ let createMainModule entryPoints =
 
     { Procedures = []
       Main = funcDef
-      Globals = []
+      Globals = List.ofSeq globals
+      ConstantsNames = []
       ErrorHandler = []
       Entry = schemeEntryLabel
       Strings = [] }

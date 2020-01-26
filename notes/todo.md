@@ -179,10 +179,8 @@ cons, make-*(vector, string, closure)
 # Internal definitions
 Change behaviour of global symbols.
 Across all modules, there should be only one global variable.
-So each module references global variables. These variables are collected
-during compilation.
-Then main module will define all of the global variables, and set all of them to undefined
-value.
+So each module references global variables. These variables are collected during compilation.
+Then main module will define all of the global variables, and set all of them to undefined value.
 Only after that entry points of modules will be called.
 Define forms should be transformed in top level:
 ```
@@ -195,3 +193,10 @@ In local scope:
 Collect all definitions and bind them to name.
 Data defines are collected on top level.
 Func defines are combined into letrec.
+
+Make a new pass on Core form, that will change globals references.
+This pass will need environment to track.
+
+```
+(lambda (x) (lambda (y) x))
+```

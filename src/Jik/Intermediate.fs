@@ -52,6 +52,7 @@ type Program =
     { Procedures : Function list
       Main : Function
       Globals : string list
+      ConstantsNames : string list
       Strings : (string * string) list }
 
 let schemeEntryLabel = "schemeEntry"
@@ -402,12 +403,14 @@ let convertProgram (prog : Core.Program) : Program =
     { Procedures = []
       Main = convertMainExprs (Begin prog.Main)
       Globals = prog.Globals
+      ConstantsNames = prog.ConstantsNames
       Strings = prog.Strings }
 
 let analyzeFreeVars (prog : Program) : Program =
-    let newLibraryNames = List.map convertSchemeIdentifToAsm libraryFunctions
+    let newLibraryNames = []
+    // let newLibraryNames = List.map convertSchemeIdentifToAsm libraryFunctions
     let stringNames = List.map fst prog.Strings
-    let globals = Set.ofList (newLibraryNames @ prog.Globals @ stringNames)
+    let globals = Set.ofList (newLibraryNames @ prog.Globals @ prog.ConstantsNames @ stringNames)
 
     let rec transformStmt stmt =
         match stmt with

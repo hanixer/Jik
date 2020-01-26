@@ -83,7 +83,7 @@ let testAllStages s =
     |> convertSlots
     |> addFuncPrologAndEpilog
     |> patchInstr
-    |> Codegen.programToString
+    |> Codegen.programToString false
 
 let testCodegen s =
     s
@@ -103,7 +103,7 @@ let testCodegen s =
     |> convertSlots
     |> addFuncPrologAndEpilog
     |> patchInstr
-    |> Codegen.programToString
+    |> Codegen.programToString false
 
 let testLambda str =
     let r = stringToProgram str
@@ -141,11 +141,12 @@ let main argv =
     // let desug = Desugar.desugar2 [] expr
     // printf "result: %s" (sexprToString desug)
 
+    // runTestGroup false "defineTests" defineTests
     // runTestGroup true "writeInt" writeInt
     // runTestGroup false "quotientTests" quotientRemainderTests
     // runTestGroup true "eofTests" eofTests
     // runTestGroup false "exit" exitTest
-    // runTestGroupWithLib "symbols" symbols
+    runTestGroupWithLib "symbols" symbols
     // runTestGroupWithLib "apply nontail" applyNonTail
     // runTestGroupWithLib "apply tail" applyTail
     // runTestGroup false "complexConstants" complexConstants
@@ -165,10 +166,10 @@ let main argv =
     // runTestGroup false "char?" isCharTests
     // runTestGroup false "string" stringTests
     // runTestGroup false "foreign-call" foreignCallTests
-    runTestGroup false "letLoop" letLoop
+    // runTestGroup false "letLoop" letLoop
     // runTestGroup false "whenUnless" whenUnlessTests
     // runTestGroup false "andOr" andOrTests
-    runTestGroup false "letrec" letrecTests
+    // runTestGroup false "letrec" letrecTests
     // runTestGroup false "basic" basicTests
 
     // runTest false "(let f () 12)" "12\n"

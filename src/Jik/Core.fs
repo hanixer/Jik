@@ -31,6 +31,7 @@ and LambdaData = string list * bool * Expr list
 type Program =
     { Main : Expr list
       Globals : string list
+      ConstantsNames : string list
       Strings : (string * string) list }
 
 type S = SExpr
@@ -130,7 +131,8 @@ let stringToProgram str : Program =
         let exprList = List.map sexprToExpr sexprs
         { Main = exprList |> List.rev
           Globals = List.rev globals
-          Strings = [] }
+          Strings = []
+          ConstantsNames = [] }
     | _ -> failwith "stringToProgram: parsing failed"
 
 let rec transform f expr =
@@ -171,35 +173,58 @@ let convertSchemeIdentifToAsm name =
     |> System.String.Concat
 
 let convertGlobalRefs (prog : Program) : Program =
-    let newLibraryNames = List.map convertSchemeIdentifToAsm libraryFunctions
-    let newGlobalNames = List.map convertSchemeIdentifToAsm prog.Globals
+    let globals = System.Collections.Generic.HashSet<string>()
 
-    let env =
-        List.zip libraryFunctions newLibraryNames @
-        List.zip prog.Globals newGlobalNames
-        |> Map.ofSeq
+    let addGlobal var =
+        let newVar = convertSchemeIdentifToAsm var
+        globals.Add(newVar) |> ignore
+        newVar
 
-    let isGlobalRef var =
-        Map.containsKey var env
-
-    let convertHelper propagate transform expr =
+    let rec convert env expr =
         match expr with
-        | Ref var when isGlobalRef var ->
-            let newName = Map.find var env
-            PrimApp(GlobalRef, [Ref newName])
-        | Assign(var, rhs) when List.contains var prog.Globals ->
-            let newName = Map.find var env
-            let newRhs = transform rhs
-            PrimApp(GlobalSet, [Ref newName; newRhs])
-        | PrimApp(GlobalSet, [Ref var; rhs]) ->
-            let newRhs = propagate rhs
-            PrimApp(GlobalSet, [Ref var; newRhs])
-        | _ -> propagate expr
+        | Ref(var) when List.contains var env -> Ref(var)
+        | Ref(var) ->
+            globals.Add(var) |> ignore
+            let newVar = addGlobal var
+            PrimApp(GlobalRef, [Ref newVar])
+        | Assign(var, rhs) ->
+            let rhs = convert env rhs
+            if List.contains var env then
+                Assign(var, rhs)
+            else
+                let newVar = addGlobal var
+                PrimApp(GlobalSet, [Ref newVar; rhs])
+        | Lambda(args, dotted, body) ->
+            let env = args @ env
+            let body = List.map (convert env) body
+            Lambda(args, dotted, body)
+        | App(func, args) ->
+            let func = convert env func
+            let args = List.map (convert env) args
+            App(func, args)
+        | If(cond, conseq, altern) ->
+            let cond = convert env cond
+            let conseq = convert env conseq
+            let altern = convert env altern
+            If(cond, conseq, altern)
+        | PrimApp(p, args) ->
+            let args = List.map (convert env) args
+            PrimApp(p, args)
+        | Begin(exprs) ->
+            let exprs = List.map (convert env) exprs
+            Begin(exprs)
+        | ForeignCall(foreignName, args) ->
+            let args = List.map (convert env) args
+            ForeignCall(foreignName, args)
+        | _ -> expr
 
-    let convertExpr expr = transform convertHelper expr
+    let main = List.map (convert []) prog.Main
 
-    { prog with Main = List.map convertExpr prog.Main
-                Globals = newGlobalNames }
+    // Remove constant references from globals list.
+    globals.RemoveWhere(fun g -> Seq.contains g prog.ConstantsNames) |> ignore
+
+    { prog with Main = main
+                Globals = Seq.toList globals }
 
 let trySubstitute v mapping =
     match Map.tryFind v mapping with
@@ -277,7 +302,7 @@ let collectComplexConstants (prog : Program) =
 
     let rec add expr =
         match expr with
-        | (PrimApp(Cons, [x; y])) ->
+        | PrimApp(Cons, [x; y]) ->
             if exprToName.ContainsKey(expr) then
                 Ref exprToName.[expr]
             else
@@ -331,7 +356,7 @@ let collectComplexConstants (prog : Program) =
     let names = assignments |> Seq.map fst |> Seq.toList
 
     { prog with Main = assignExprs @ main
-                Globals = prog.Globals @ names
+                ConstantsNames = names
                 Strings = strings |> Seq.toList }
 
 let rec fixArithmeticPrims (prog : Program) : Program =
