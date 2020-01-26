@@ -28,10 +28,19 @@ let tokenize source =
         | c when Char.IsWhiteSpace(c) -> false
         | _ -> true
 
-    let rec string (acc:string) = function
-        | '\\' :: '"' :: cs -> string (acc + "\"") cs
-        | '"' :: cs -> acc, cs
-        | c :: cs -> string (acc + c.ToString()) cs
+    let isEscapedChar c =
+        match c with
+        | '\\' | '"' -> true
+        | _ -> false
+
+    let rec eatString (acc:StringBuilder) = function
+        | '\\' :: c :: cs when isEscapedChar c ->
+            acc.Append(c) |> ignore
+            eatString acc cs
+        | '"' :: cs -> acc.ToString(), cs
+        | c :: cs ->
+            acc.Append(c) |> ignore
+            eatString acc cs
         | [] -> failwith "EOF not espected"
 
     let character cs =
@@ -73,7 +82,7 @@ let tokenize source =
         | '[' :: cs -> loop (OpenBr :: acc) cs
         | ']' :: cs -> loop (CloseBr :: acc) cs
         | '"' :: cs ->
-            let s, cs' = string "" cs
+            let s, cs' = eatString (StringBuilder()) cs
             loop (String s :: acc) cs'
         | '-' :: d ::cs when Char.IsDigit(d) ->
             let n, cs' = number "-" (d::cs)
@@ -279,6 +288,8 @@ let rec sexprToString expr =
         |> sexprToString
         |> add
     loop expr
+
+
     s.ToString()
 
 let define s env value =

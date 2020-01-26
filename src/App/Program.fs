@@ -54,8 +54,8 @@ let main argv =
     // runTestGroupWithLib "apply tail" applyTail
     // runTestGroup true "eofTests" eofTests
     // runTestGroup true "writeInt" writeInt
-    runTestGroup false "defineTests" defineTests
-    runTestGroup false "localDefine" localDefine
+    // runTestGroup false "defineTests" defineTests
+    // runTestGroup false "localDefine" localDefine
 
     // runTestGroup false "quotientTests" quotientRemainderTests
     // runTestGroup false "complexConstants" complexConstants
@@ -80,7 +80,7 @@ let main argv =
     // runTestGroup false "letrec" letrecTests
     // runTestGroup false "basic" basicTests
 
-    // runTest false "2" "2"
+    runTest false "(list #\\space #\\space #\\space #\\space)" "#\\space"
 
 
     0

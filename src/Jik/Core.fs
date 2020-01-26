@@ -158,6 +158,20 @@ let rec transform f expr =
     transform expr
 
 let convertSchemeIdentifToAsm name =
+    let boundCNames = [
+        "write"
+        "read"
+        "open"
+        "close"
+        "exit"
+    ]
+
+    let name =
+        if List.contains name boundCNames then
+            "___" + name + "___"
+        else
+            name
+
     let convertChar = function
         | '?' -> "Qmark"
         | '!' -> "Bang"

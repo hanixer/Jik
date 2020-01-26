@@ -43,3 +43,8 @@
 (define current-input-port
     (lambda ()
         %curr-in-port))
+
+(define port?
+    (lambda (p)
+        (or (output-port? p)
+            (input-port? p))))

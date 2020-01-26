@@ -103,6 +103,16 @@ let printGlobalOriginals out originals globals =
     fprintfn out "    .quad 0" // Put zeros to know where table ends.
     fprintfn out "    .quad 0"
 
+let escapeString chars =
+    let rec loop (acc : char list) chars =
+        match chars with
+        | [] ->
+            let list = List.rev acc
+            System.String.Concat(list)
+        | '\\' :: cs -> loop ('\\' :: '\\' :: acc) cs
+        | c :: cs -> loop (c :: acc) cs
+
+    loop [] (Seq.toList chars)
 
 let programToString writeGlobals (prog : Program) =
     let out = new StringWriter()
@@ -126,7 +136,7 @@ let programToString writeGlobals (prog : Program) =
         fprintfn out "    .align %d" wordSize
         fprintfn out "%s:" name
         fprintfn out "    .quad %d" firstField
-        fprintfn out "    .ascii \"%s\"" literal
+        fprintfn out "    .ascii \"%s\"" (escapeString literal)
 
     let handleDef def =
         fprintfn out "    .text"
