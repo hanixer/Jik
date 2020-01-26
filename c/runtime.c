@@ -231,7 +231,7 @@ void printAllocInfo() {
 }
 
 void s_exit(ptr p) {
-    printAllocInfo();
+    // printAllocInfo();
     ExitProcess((UINT)fixnumToInt(p));
 }
 

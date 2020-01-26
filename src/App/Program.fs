@@ -59,10 +59,10 @@ let main argv =
     // let desug = Desugar.desugar2 [] expr
     // printf "result: %s" (sexprToString desug)
 
-    runTestGroupWithLib "symbols" symbols
-    runTestGroupWithLib "apply nontail" applyNonTail
-    runTestGroupWithLib "apply tail" applyTail
-    runTestGroup true "eofTests" eofTests
+    // runTestGroupWithLib "symbols" symbols
+    // runTestGroupWithLib "apply nontail" applyNonTail
+    // runTestGroupWithLib "apply tail" applyTail
+    // runTestGroup true "eofTests" eofTests
     runTestGroup true "writeInt" writeInt
     // runTestGroup false "defineTests" defineTests
     // runTestGroup false "quotientTests" quotientRemainderTests

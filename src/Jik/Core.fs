@@ -184,7 +184,6 @@ let convertGlobalRefs (prog : Program) : Program =
         match expr with
         | Ref(var) when List.contains var env -> Ref(var)
         | Ref(var) ->
-            globals.Add(var) |> ignore
             let newVar = addGlobal var
             PrimApp(GlobalRef, [Ref newVar])
         | Assign(var, rhs) ->
@@ -259,10 +258,11 @@ let rec alphaRenameImpl mapping =
     | e -> e
 
 let alphaRename (prog : Program) : Program =
-    let newGlobals, mapping = extendMapping prog.Globals Map.empty
+    // let newGlobals, mapping = extendMapping prog.Globals Map.empty
+    let mapping = Map.empty
     let rename = alphaRenameImpl mapping
-    { prog with Main = List.map rename prog.Main
-                Globals = newGlobals }
+    { prog with Main = List.map rename prog.Main }
+                // Globals = newGlobals }
 
 let rec replaceVars mapping expr =
     let transf = replaceVars mapping
