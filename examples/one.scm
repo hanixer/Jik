@@ -1,2 +1,1 @@
-(let ([a 1]) a)
-a
+(string->symbol "oneoneone")

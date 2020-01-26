@@ -98,7 +98,7 @@
         (let loop ([i 0])
           (when (< i n)
             (let ((c (string-ref x i)))
-              (when (or (char=? c #\") (char=? c #\\))
+              (when (or (= c #\") (= c #\\))
                 (write-char #\\ p))
               (write-char c p))
             (loop (+ i 1)))))

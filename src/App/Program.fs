@@ -43,6 +43,26 @@ let runTestString source expected =
 
 [<EntryPoint>]
 let main argv =
+    let text = "
+ (define uni
+   (lambda (u v s ks kf)
+     (cond
+       [(symbol? u) (try-subst u v s ks kf)]
+       [(symbol? v) (try-subst v u s ks kf)]
+       [(and (eq? (car u) (car v))
+             (= (length u) (length v)))
+        (let f ([u (cdr u)] [v (cdr v)] [s s])
+          (if (null? u)
+              (ks s)
+              (uni (car u)
+                   (car v)
+                   s
+                   (lambda (s) (f (cdr u) (cdr v) s))
+                   kf)))]
+       [else (kf \"clash\")])))"
+
+    let e = SExpr.stringToSExpr text
+    printfn "%s !!!!" (sexprToString (exprsToList(Desugar.desugar e)))
     // runTestWithLib "(remainder 5 2)" "1\n"
 
     // let expr = stringToSExpr s
@@ -56,7 +76,6 @@ let main argv =
     // runTestGroup true "writeInt" writeInt
     // runTestGroup false "defineTests" defineTests
     // runTestGroup false "localDefine" localDefine
-
     // runTestGroup false "quotientTests" quotientRemainderTests
     // runTestGroup false "complexConstants" complexConstants
     // runTestGroup false "cond" condTests
@@ -80,7 +99,7 @@ let main argv =
     // runTestGroup false "letrec" letrecTests
     // runTestGroup false "basic" basicTests
 
-    runTest false "(list #\\space #\\space #\\space #\\space)" "#\\space"
+    // runTest false "(list #\\space #\\space #\\space #\\space)" "#\\space"
 
 
     0

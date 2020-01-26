@@ -10,3 +10,9 @@
                 (if (string=? (symbol-string (car ls)) str)
                     (car ls)
                     (loop (cdr ls)))))))
+
+(define symbol->string
+    (lambda (s)
+        (unless (symbol? s)
+            (error "symbol->string: not a symbol"))
+        (symbol-string s)))

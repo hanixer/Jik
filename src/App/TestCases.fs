@@ -284,6 +284,7 @@ let condTests =
       @"(cond (else 17))", "17\n"
       @"(cond (#f) (#f 12) (12 13))", "13\n"
       @"(cond ((cons 1 2) => (lambda (x) (cdr x))))", "2\n"
+      @"(cond [(and #f 2)] [(or #f 123)])", "123\n"
       ]
 
 let lambdaTests =

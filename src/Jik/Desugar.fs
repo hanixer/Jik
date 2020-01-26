@@ -94,6 +94,7 @@ let desugarCond clauses =
             let ifExpr = makeIf t app altern
             Some(desugarLet bindings [ifExpr])
         | List (test :: conseq) ->
+            let test = desugarSingle test
             let conseq = desugarBegin conseq
             let altern = Option.defaultValue undefinedExpr handled
             Some(makeIf test conseq altern)
