@@ -449,3 +449,5 @@
     (setup)
     (map name
          (graph-nodes (make-lattice (make-graph a b c d any-node none-node) #f))))
+
+(test)

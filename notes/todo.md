@@ -4,9 +4,15 @@
 - [x] Symbols.
 - [x] Change initialization of strings.
 - [x] Report error on heap overflow.
-- [ ] Rework desugar process.
+- [x] Rework desugar process.
 - [x] Add internal definitions.
-- [ ] Throw an error if a global variable is not initialized.
+- [x] Throw an error if a global variable is not initialized.
+- [ ] 'do' form
+- [ ] cadr caddr
+- [ ] let*
+- [ ] Find a few benchmarks, that could be used for comparison of safe primitives.
+- [ ] floating point number, then we can do ray tracer.
+- [ ] garbage collection - far far away...
 
 After variable arity functions, we can implement library functions like (vector 1 2 3) => #(1 2 3).
 So we return to separate compilation.
