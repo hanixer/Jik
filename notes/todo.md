@@ -4,7 +4,8 @@
 - [x] Symbols.
 - [x] Change initialization of strings.
 - [x] Report error on heap overflow.
-- [ ] Add internal definitions
+- [ ] Rework desugar process.
+- [ ] Add internal definitions.
 
 After variable arity functions, we can implement library functions like (vector 1 2 3) => #(1 2 3).
 So we return to separate compilation.
