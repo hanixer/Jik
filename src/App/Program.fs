@@ -125,9 +125,21 @@ let runTestString source expected =
 
 [<EntryPoint>]
 let main argv =
-    let c = Compile.stringToAsmForm
-    // runSingleTest c "(string=? \"one\" \"one\" \"one\")" "#t\n"
     // runTestWithLib "(remainder 5 2)" "1\n"
+
+    let s = "(lambda x
+    (define a 1)
+    (define b 2)
+    a
+    (define c 1)
+    (define e 2)
+    e)"
+    let s = "(quote (and 1 2 3))"
+
+
+    let expr = stringToSExpr s
+    let desug = Desugar.desugar2 [] expr
+    printf "result: %s" (sexprToString desug)
 
     // runTestGroup true "writeInt" writeInt
     // runTestGroup false "quotientTests" quotientRemainderTests
@@ -147,7 +159,7 @@ let main argv =
     // runTestGroup false "boolean" booleanTests
     // runTestGroup false "vector" vectorTests
     // runTestGroup false "assignment" assignmentTests
-    runTestGroup false "andOr" andOrTests
+    // runTestGroup false "andOr" andOrTests
     // runTestGroup false "pair" pairTests
     // runTestGroup false "setCarCdr" setCarCdrTests
     // runTestGroup false "whenUnless" whenUnlessTests

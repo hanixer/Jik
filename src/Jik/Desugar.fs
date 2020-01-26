@@ -30,6 +30,9 @@ let wrapInLet var value body =
                  exprsToList [exprsToList [var; value]]
                  body]
 
+let desugar expr =
+    ()
+
 let rec desugar2 env sexpr =
     match sexpr with
     | List (Symbol s :: rest) when (List.contains s special) && (List.contains s env |> not) ->
@@ -38,9 +41,10 @@ let rec desugar2 env sexpr =
         exprsToList (List.map (desugar2 env) sexprs)
     | _ -> sexpr
 
-and expand env sexpr =
+and expand env expr =
     let desugar = desugar2 env
-    match sexpr with
+    match expr with
+    | Cons(Symbol "quote", rest) -> expr
     | List(Symbol "lambda" :: Symbol arg :: body) ->
         let env = arg :: env
         let body = List.map (desugar2 env) body
@@ -56,33 +60,16 @@ and expand env sexpr =
         let body = List.map (desugar2 env) body
         let argsRevert = exprsToDottedList args
         SExpr.Cons(Symbol "lambda", SExpr.Cons(argsRevert, exprsToList body))
+    | List(Symbol "lambda" :: args :: body) ->
+        desugarLambda env args body
     | List(Symbol "let" :: List bindings :: body) ->
-        desugarLet env sexpr bindings body
+        desugarLet env expr bindings body
     | List(Symbol "let" :: Symbol name :: List bindings :: body) ->
         desugarLetLoop env name bindings body
     | List(Symbol "letrec" :: List bindings :: body) ->
         desugarLetrec env bindings body
-    | List [Symbol "and"] -> Bool true
-    | List [Symbol "and"; a] ->
-        let a = desugar2 env a
-        exprsToList [Symbol "if"; a; a; Bool false]
-    | List (Symbol "and" :: a :: rest) ->
-        let a = desugar a
-        let rest = exprsToList (Symbol "and" :: rest)
-        exprsToList [Symbol "if"; a; desugar rest; Bool false]
+    | List(Symbol "and" :: args) -> desugarAnd env args
     | List(Symbol "or" :: args) -> desugarOr env args
-    | List [Symbol "or"] -> Bool false
-    | List [Symbol "or"; a] ->
-        desugar a
-    | List (Symbol "or" :: a :: rest) ->
-        let a = desugar a
-        let t = Symbol (freshLabel "t")
-        let rest =
-            exprsToList (Symbol "or" :: rest)
-            |> desugar
-        exprsToList [Symbol "if"; t; t; rest]
-        |> wrapInLet t a
-        |> expand env
     | List (Symbol "when" :: condition :: body) ->
         if List.isEmpty body then
             failwith "unless body should not be empty"
@@ -123,8 +110,31 @@ and expand env sexpr =
         let rest = desugar (exprsToList (Symbol "cond" :: rest))
         exprsToList [Symbol "if"; condition; conseq; rest]
     | _ ->
-        printfn "Oh no! %A" sexpr
-        sexpr
+        printfn "Oh no! %A" expr
+        expr
+
+let getArgsList args =
+    match args with
+    | Symbol arg -> [arg]
+    | List args -> symbolsToStrings args
+    | ListImproper args -> symbolsToStrings args
+    | _ -> failwithf "wrong args list: %s" (sexprToString args)
+
+let desugarLambda env args body =
+    let env' = getArgsList args @ env
+    let body' = desugarMany env' body
+    exprsToList (symbLambda :: args :: body')
+
+let desugarAnd env exprs =
+    let handle expr desugared =
+        let expr = desugar2 env expr
+        match desugared with
+        | Some(prev) ->
+            Some(exprsToList [Symbol "if"; expr; prev; Bool(false)])
+        | None -> Some(expr)
+
+    List.foldBack handle exprs None
+    |> Option.defaultValue (Bool true)
 
 let desugarOr env exprs =
     let handle expr desugared =
@@ -139,7 +149,6 @@ let desugarOr env exprs =
 
     List.foldBack handle exprs None
     |> Option.defaultValue (Bool false)
-
 
 let desugarLet env sexpr bindings body =
     if List.isEmpty body then
@@ -185,8 +194,7 @@ let desugarLetrec env bindings body =
     let letExpr = exprsToList (Symbol "let" :: letBindings :: body)
     desugar2 env letExpr
 
-
-let rec collectDefinitions defs es =
+let collectDefinitions defs es =
     match es with
     | List (Symbol "define" :: Cons(Symbol name, args) :: body) :: rest ->
         let lambda = exprsToList (Symbol "lambda" :: args :: body)
@@ -196,20 +204,21 @@ let rec collectDefinitions defs es =
         let def = name, rhs
         collectDefinitions (def :: defs) rest
     | _ -> (List.rev defs), es
-
-
 // (name, (lambda args body)) => ()
 
-let rec convert es =
-    let defs, rest = collectDefinitions [] es
+let desugarMany env exprs =
+    let defs, exprs = collectDefinitions [] exprs
+    match defs, exprs with
+    | [], expr :: exprs ->
+        desugar2 env expr :: desugarMany env exprs
+    | [], [] -> []
+    | _, [] -> failwith "there must be some expressions after definitions"
+    | _, expr :: exprs ->
+        let defs = List.map (fun (name, expr) -> name, desugar2 env expr) defs
+        let defs = List.map (function | name, expr -> exprsToList [Symbol name; expr] ) defs
+        let exprs = desugar2 env expr :: desugarMany env exprs
+        [desugarLetrec env defs exprs]
 
-    let defs = List.map (fun (name, e) -> name, convert [e]) defs
-
-    let rest' = convert rest
-
-    let defs = List.map (function | name, expr -> exprsToList [Symbol name; expr] ) defs
-
-    exprsToList [Symbol "letrec"; exprsToList defs; rest']
 
 // let convertInnerDefinitions sexpr =
 //     match sexpr with
