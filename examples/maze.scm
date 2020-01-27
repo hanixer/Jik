@@ -6,7 +6,6 @@
 (define % (lambda (a b) (remainder a b)))
 (define / (lambda (a b) (quotient a b)))
 (define print-char (lambda (c) (write-char c (current-output-port))))
-(define print-string write-string)
 (define nil '())
 
 (define print-n-char
@@ -219,10 +218,10 @@
               [c2 (remainder el 65536)])
          (list (convert-cell c1 s) (convert-cell c2 s)))) l)))
 
-(print-string "Size: ") ; T
-(let ((size 15))
+(write "Size: ") ; T
+(let ((size 20))
 ; (let ((size (read-int)))
-  (print-string "Seed: ") ; G
+  (write "Seed: ") ; G
   (let ((seed 3))
   ; (let ((seed (read-int)))
   (let ((rmaze (random-maze size seed)))
