@@ -80,3 +80,12 @@
 (define cddr
   (lambda (x)
     (cdr (cdr x))))
+
+(define list-zip
+     (lambda (l1 l2)
+          (let loop ((l1 l1) (l2 l2))
+               (if (or (empty? l1) (empty? l2))
+                   '()
+                   (cons
+                    (cons (car l1) (car l2))
+                    (loop (cdr l1) (cdr l2)))))))

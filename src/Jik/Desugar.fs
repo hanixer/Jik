@@ -28,6 +28,10 @@ let desugarSingle expr =
     match expr with
     // core forms
     | Cons(Symbol "quote", _) -> expr
+    | List [Symbol "if"; cond; conseq] ->
+        let cond = desugarSingle cond
+        let conseq = desugarSingle conseq
+        makeIf cond conseq undefinedExpr
     | List [Symbol "if"; cond; conseq; altern] ->
         let cond = desugarSingle cond
         let conseq = desugarSingle conseq
