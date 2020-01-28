@@ -4,6 +4,7 @@ type Prim =
     | Add
     | Sub
     | Mul
+    | Sar
     | Quotient
     | Remainder
     | Eq
@@ -36,6 +37,7 @@ type Prim =
     | ClosureRef
     | IsProcedure
     | GlobalRef
+    | GlobalRefUncheck // Do not check before read.
     | GlobalSet
     | IsZero
     | NumberToChar
@@ -48,6 +50,7 @@ type Prim =
     | Error // this primitive receives a single argument - a string. Should be called from scheme library.
     | EofObject
     | IsEofObject
+    | Collect
 
 let stringPrimop = [
     "+", Add

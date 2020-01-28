@@ -1,6 +1,8 @@
 {
     "files.associations": {
-        "windows.h": "c"
+        "*.ss": "scheme",
+        "windows.h": "c",
+        "memory.h": "c"
     },
     "search.useIgnoreFiles": true
 }

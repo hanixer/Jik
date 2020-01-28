@@ -93,7 +93,7 @@ let compileMany files outFile =
     File.WriteAllText(mainFile, mainText)
 
     let runtime = Util.getPathRelativeToRoot "c/runtime.c"
-    let gc = Util.getPathRelativeToRoot "c/gc.c"
+    let gc = Util.getPathRelativeToRoot "c/memory.c"
     let filesForGcc = runtime :: gc :: asmFiles @ [mainFile] |> String.concat " "
     let res = Util.executeProcess("gcc", " -g -std=c99 " + filesForGcc + " -o " + outFile)
     if res.stderr.Trim().Length > 0 then

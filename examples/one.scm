@@ -1,6 +1,5 @@
-(if 1 (make-vector 3)
-        (make-vector 2))
-3
+(make-vector 2)
+(make-vector 2)
 
 ; (let ([v (make-vector 3)]
 ;       [u (make-vector 1)])

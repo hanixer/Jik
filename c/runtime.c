@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <string.h>
 #include <errno.h>
+#include "memory.h"
 
 #define wordSize 8
 #define fixnumShift 0x02
@@ -28,9 +29,6 @@
 #define eofMask 0xFF
 #define carOffset 0
 #define cdrOffset wordSize
-
-void* freePointer;
-void* heapTopPointer;
 
 extern int schemeEntry();
 extern char* globVarNameTable[];
@@ -124,26 +122,6 @@ static void printString(ptr p) {
         printf("%c", stringRef(p, i));
     }
     printf("\"");
-}
-
-char* allocateProtectedSpace(int size) {
-	SYSTEM_INFO si;
-	GetSystemInfo(&si);
-	int pageSize = si.dwPageSize;
-	int aligned = (size + pageSize - 1) / pageSize * pageSize;
-	int total = aligned + pageSize * 2;
-	char* pBase = (char*) VirtualAlloc(0, total, MEM_RESERVE, PAGE_NOACCESS);
-	char* pSpace = (char*) VirtualAlloc(pBase + pageSize, aligned, MEM_COMMIT, PAGE_READWRITE);
-	return pSpace;
-}
-
-void deallocateProtectedSpace(char* ptr, int size) {
-	SYSTEM_INFO si;
-	GetSystemInfo(&si);
-	int pageSize = si.dwPageSize;
-	int aligned = (size + pageSize - 1) / pageSize * pageSize;
-	int total = aligned + pageSize * 2;
-	VirtualFree(ptr - aligned, total, MEM_RELEASE);
 }
 
 ptr s_write(ptr fd, ptr str, ptr len) {
@@ -254,22 +232,16 @@ void s_exit(ptr p) {
 
 void checkHeapSpaceAvailable(int which) {
     allocations[which]++;
-    if (freePointer + 10 >= heapTopPointer) {
-        fprintf(stderr, "No space for heap allocation");
-        printAllocInfo();
-        exit(1);
-    }
 }
 
 int main() {
     int stackSize = 10 * 16 * 4096;
     char* stack = allocateProtectedSpace(stackSize);
     char* stackHigherAddr = stack + stackSize - 2 * wordSize;
-    int heapSize = 100 * 1024 * 4096;
-    char* heap = allocateProtectedSpace(heapSize);
-    freePointer = heap;
-    heapTopPointer = heap + heapSize;
-    ptr result = schemeEntry(stackHigherAddr, heap);
+    int heapSize = 32;
+    // int heapSize = 100 * 1024 * 4096;
+    gcInitialize(heapSize);
+    ptr result = schemeEntry(stackHigherAddr);
     printPtr(result);
     return 0;
 }

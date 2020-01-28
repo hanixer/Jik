@@ -171,7 +171,6 @@ let checkForHeap p =
 
 let compileMakeVector size var =
     let shift = if wordSize = 8 then 3 else 2
-    checkForHeap Prim.MakeVector @
     [Mov, [GlobalValue(freePointer); Reg R11]
      Mov, [size; Deref(0, R11)]
      Or, [Int vectorTag; Reg R11]
@@ -183,7 +182,6 @@ let compileMakeVector size var =
      Add, [Reg R11; GlobalValue(freePointer)]]
 
 let compileMakeString size dest =
-    checkForHeap Prim.MakeString @
     [Mov, [GlobalValue(freePointer); Reg R11]
      Mov, [size; Deref(0, R11)]
      Or, [Int stringTag; Reg R11]
@@ -207,12 +205,18 @@ let rec declToInstrs (dest, x) =
     match x with
     | Simple.EmptyList -> moveInt nilLiteral dest
     | Simple.Int n -> moveInt (convertNumber n) dest
+    | Simple.RawInt n -> moveInt n dest
     | Simple.Char c -> moveInt (((int c) <<< charShift) ||| charTag) dest
     | Simple.Bool true -> moveInt trueLiteral dest
     | Simple.Bool false -> moveInt falseLiteral dest
     | Simple.Prim(Prim.Add, [var1; var2]) ->
         [Mov, [Var var1; Reg Rax]
          Add, [Var var2; Reg Rax]
+         Mov, [Reg Rax; Var dest]]
+    | Simple.Prim(Prim.Sar, [var1; var2]) ->
+        [Mov, [Var var1; Reg Rax]
+         Mov, [Var var2; Reg Rcx]
+         Sar, [Reg Cl; Reg Rax]
          Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Mul, [var1; var2]) ->
         [Mov, [Var var1; Reg Rax]
@@ -281,7 +285,6 @@ let rec declToInstrs (dest, x) =
          Or, [Int charTag; Reg Rax]
          Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Cons, [var1; var2]) ->
-        checkForHeap Prim.Cons @
         [Mov, [GlobalValue(freePointer); Reg R11]
          Mov, [Var var1; Deref(0, R11)]
          Mov, [Var var2; Deref(wordSize, R11)]
@@ -350,7 +353,6 @@ let rec declToInstrs (dest, x) =
     // Closures.
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
         let offset = (List.length args + 1) * wordSize
-        checkForHeap Prim.MakeClosure @
         [Mov, [GlobalValue(freePointer); Reg R11]
          Lea(label), [Deref(0, R11)]] @
         moveClosureArgs args @
@@ -374,6 +376,8 @@ let rec declToInstrs (dest, x) =
          Lea(glob), [Reg Rcx]
          JmpIf(E, globVarErrorHandler), []
          Mov, [GlobalValue(glob); Var dest]]
+    | Simple.Prim(Prim.GlobalRefUncheck, [glob]) ->
+         [Mov, [GlobalValue(glob); Var dest]]
     // Symbols.
     | Simple.Prim(Prim.MakeSymbol, [var1]) ->
         [Mov, [Var var1; Var dest]
@@ -393,6 +397,11 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.Error, [describe]) ->
         [Mov, [Var describe; Reg Rcx]
          Jmp(errorHandlerLabel), []]
+    | Simple.Prim(Prim.Collect, [size]) ->
+        [Mov, [Var size; Reg Rdx]
+         Sar, [Int 2; Reg Rdx]
+         Mov, [Reg Rsp; Reg Rcx]
+         Call(collectFunction), []]
     | e -> failwithf "declToInstrs: %s %A" dest e
 
 let transferToInstrs blocks = function
@@ -411,7 +420,8 @@ let transferToInstrs blocks = function
     | Transfer.If(varc, labelt, labelf) ->
         [Mov, [Var varc; Reg Rax]
          Cmp, [Operand.Int falseLiteral; Reg Rax]
-         JmpIf (E, labelf), []]
+         JmpIf (E, labelf), []
+         Jmp(labelt), []]
     | Transfer.Call(NonTail label, func, args) ->
         compileCall label blocks func args
     | Transfer.Call(Tail, func, args) ->

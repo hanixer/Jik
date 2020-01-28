@@ -21,6 +21,7 @@ type CallCont =
 type Simple =
     | Prim of Prim * Var list
     | Int of int
+    | RawInt of int // Int value as it is, without conversions.
     | Char of char
     | Bool of bool
     | EmptyList
@@ -117,6 +118,7 @@ let rec showBlock (name, vars, stmts) =
                 match s with
                 | Simple.EmptyList -> iStr "'()"
                 | Simple.Int n -> iNum n
+                | Simple.RawInt n -> iNum n
                 | Simple.Char c -> iStr (sprintf "#\\%A" c)
                 | Simple.Bool true -> iStr "#t"
                 | Simple.Bool false -> iStr "#f"
@@ -553,20 +555,34 @@ let exposeAllocations (prog : Program) =
         let cmp = freshLabel "cmp"
         let labCollect = freshLabel "block"
         let labAlloc = freshLabel "block"
-        let labAfterCall = freshLabel "block"
         let fp = freshLabel "fp"
+        let fp2 = freshLabel "fp"
         let fe = freshLabel "fe"
+        let v = freshLabel "v"
+        let s = freshLabel "s"
+        let s2 = freshLabel "s"
+        let n = freshLabel "n"
+        let n2 = freshLabel "n"
+        // TODO try to refactor below computation.
+        // Maybe it is better to make a primitive: CompareHeapPointers.
+        // So that conversion between integers not done here.
         let checkFree =
-           [Decl(fp, Prim(GlobalRef, [freePointer]))
-            Decl(fe, Prim(GlobalRef, [fromSpaceEnd]))
-            Decl(cmp, Prim(Lt, [fp; fe]))
+           [Decl(n, Int wordSize)
+            Decl(n2, RawInt 2)
+            Decl(s, Prim(Mul, [sizeVar; n]))
+            Decl(s2, Prim(Sar, [s; n2]))
+            Decl(fp, Prim(GlobalRefUncheck, [freePointer]))
+            Decl(fp2, Prim(Add, [fp; s2]))
+            Decl(fe, Prim(GlobalRefUncheck, [fromSpaceEnd]))
+            Decl(cmp, Prim(Lt, [fp2; fe]))
             Transfer(If(cmp, labAlloc, labCollect))]
-        let callCollect = [Transfer(ForeignCall(labAfterCall, collectFunction, [sizeVar]))]
-        let blockAfterCall = labAfterCall, [freshLabel "t"], [Transfer(Jump(labAlloc, []))]
+        let callCollect =
+            [Decl(v, Prim(Collect, [s]))
+             Transfer(Jump(labAlloc, []))]
         let blockCollect = labCollect, [], callCollect
         let stmtsPrev = List.rev stmts @ sizeStmts @ checkFree
         let blockPrev = blockName, blockArgs, stmtsPrev
-        let blocks = blockAfterCall :: blockCollect :: blockPrev :: blocks
+        let blocks = blockCollect :: blockPrev :: blocks
         let blockName = labAlloc
         let blockArgs = []
         let stmts = [stmt]
@@ -575,26 +591,30 @@ let exposeAllocations (prog : Program) =
     let handleStmt (blocks, blockName, blockArgs, stmts) stmt =
         match stmt with
         | Decl(var, Prim(MakeVector, [size])) ->
+            let s = freshLabel "s"
             let sizeVar = freshLabel "s"
             let n = freshLabel "n"
+            let n2 = freshLabel "n"
             let sizeStmts =
                [Decl(n, Int 1)
+                Decl(n2, Int 2)
+                // Decl(s, Prim(Sar, [size; n2]))
                 Decl(sizeVar, Prim(Add, [size; n]))]
             handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
         | Decl(var, Prim(MakeString, [size])) ->
             let sizeVar = freshLabel "s"
             let n = freshLabel "n"
             let sizeStmts =
-               [Decl(n, Int 1)
+               [Decl(n, RawInt 1)
                 Decl(sizeVar, Prim(Add, [size; n]))]
             handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
         | Decl(var, Prim(MakeClosure, free)) ->
             let sizeVar = freshLabel "s"
-            let sizeStmts = [Decl(sizeVar, Int free.Length)]
+            let sizeStmts = [Decl(sizeVar, RawInt free.Length)]
             handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
         | Decl(var, Prim(Cons, _)) ->
             let sizeVar = freshLabel "s"
-            let sizeStmts = [Decl(sizeVar, Int 2)]
+            let sizeStmts = [Decl(sizeVar, RawInt 2)]
             handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
         | _ ->
             blocks, blockName, blockArgs, stmt :: stmts

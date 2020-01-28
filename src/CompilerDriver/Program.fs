@@ -27,5 +27,5 @@ let main argv =
             argv |> List.ofArray
         else
             defaultS
-    compileFilesToBinary true sources defaultOutFile
+    compileFilesToBinary false sources defaultOutFile
     0 // return an integer exit code
