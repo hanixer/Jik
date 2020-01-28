@@ -6,6 +6,7 @@ open Display
 open Common
 open Primitive
 open Library
+open RuntimeConstants
 
 type Var = string
 
@@ -237,7 +238,7 @@ let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
     | Expr.Int n -> convertSimpleDecl "n" (Int n) cont
     | Expr.Char c -> convertSimpleDecl "c" (Char c) cont
     | Expr.If(exprc, exprt, exprf) ->
-        let join, fresh = freshLabel "LJ", freshLabel "v"
+        let join, fresh = freshLabel "block", freshLabel "v"
         let blocks, stmts = cont fresh
         let blockJoin = (join, [ fresh ], stmts)
         let blocks = blockJoin :: blocks
@@ -264,7 +265,7 @@ let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
             let func = List.head result
             let args = List.tail result
             let fresh = freshLabel "r"
-            let blockName = freshLabel "LC"
+            let blockName = freshLabel "block"
             let blocks, stmts = cont fresh
             let block = (blockName, [ fresh ], stmts)
             block :: blocks, [ Transfer(Apply(NonTail blockName, func, args)) ])
@@ -277,14 +278,14 @@ let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
         convertExpr func (fun func ->
             convertMany args (fun args ->
                 let fresh = freshLabel "r"
-                let blockName = freshLabel "LC"
+                let blockName = freshLabel "block"
                 let blocks, stmts = cont fresh
                 let block = (blockName, [ fresh ], stmts)
                 block :: blocks, [ Transfer(Call(NonTail blockName, func, args)) ]))
     | Expr.ForeignCall(foreignName, args) ->
         convertMany args (fun args ->
                 let fresh = freshLabel "r"
-                let blockName = freshLabel "LC"
+                let blockName = freshLabel "block"
                 let blocks, stmts = cont fresh
                 let block = (blockName, [ fresh ], stmts)
                 block :: blocks, [ Transfer(ForeignCall(blockName, foreignName, args)) ])
@@ -347,7 +348,7 @@ and convertExprTail expr =
         convertExpr expr jump2
     | Expr.If(exprc, exprt, exprf) ->
         convertExpr exprc (fun var ->
-            let lt, lf = freshLabel "LT", freshLabel "LF"
+            let lt, lf = freshLabel "block", freshLabel "block"
             let blockst, stmtst = convertExprTail exprt
             let blockt = (lt, [], stmtst)
             let blocksf, stmtsf = convertExprTail exprf
@@ -378,7 +379,7 @@ and convertExprTail expr =
 
 and convertIf exprc exprt exprf blocks join =
     convertExpr exprc (fun var ->
-        let lt, lf = freshLabel "LT", freshLabel "LF"
+        let lt, lf = freshLabel "block", freshLabel "block"
         let blockst, stmtst = convertExprJoin exprt join
         let blockt = (lt, [], stmtst)
         let blocksf, stmtsf = convertExprJoin exprf join
@@ -540,7 +541,81 @@ let closureConversion (prog : Program) : Program =
     { prog with Procedures = defs @ procs @ procs1
                 Main = main }
 
+let fromSpaceEnd = "fromSpaceEnd"
+let collectFunction = "collect"
+
+/// Add checks for free space in heap
+/// before allocation and call collect() if needed.
+let exposeAllocations (prog : Program) =
+    let handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts =
+        // TODO: too many jumps are generated here.
+        // This should be optimized somehow.
+        let cmp = freshLabel "cmp"
+        let labCollect = freshLabel "block"
+        let labAlloc = freshLabel "block"
+        let labAfterCall = freshLabel "block"
+        let fp = freshLabel "fp"
+        let fe = freshLabel "fe"
+        let checkFree =
+           [Decl(fp, Prim(GlobalRef, [freePointer]))
+            Decl(fe, Prim(GlobalRef, [fromSpaceEnd]))
+            Decl(cmp, Prim(Lt, [fp; fe]))
+            Transfer(If(cmp, labAlloc, labCollect))]
+        let callCollect = [Transfer(ForeignCall(labAfterCall, collectFunction, [sizeVar]))]
+        let blockAfterCall = labAfterCall, [freshLabel "t"], [Transfer(Jump(labAlloc, []))]
+        let blockCollect = labCollect, [], callCollect
+        let stmtsPrev = List.rev stmts @ sizeStmts @ checkFree
+        let blockPrev = blockName, blockArgs, stmtsPrev
+        let blocks = blockAfterCall :: blockCollect :: blockPrev :: blocks
+        let blockName = labAlloc
+        let blockArgs = []
+        let stmts = [stmt]
+        blocks, blockName, blockArgs, stmts
+
+    let handleStmt (blocks, blockName, blockArgs, stmts) stmt =
+        match stmt with
+        | Decl(var, Prim(MakeVector, [size])) ->
+            let sizeVar = freshLabel "s"
+            let n = freshLabel "n"
+            let sizeStmts =
+               [Decl(n, Int 1)
+                Decl(sizeVar, Prim(Add, [size; n]))]
+            handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
+        | Decl(var, Prim(MakeString, [size])) ->
+            let sizeVar = freshLabel "s"
+            let n = freshLabel "n"
+            let sizeStmts =
+               [Decl(n, Int 1)
+                Decl(sizeVar, Prim(Add, [size; n]))]
+            handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
+        | Decl(var, Prim(MakeClosure, free)) ->
+            let sizeVar = freshLabel "s"
+            let sizeStmts = [Decl(sizeVar, Int free.Length)]
+            handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
+        | Decl(var, Prim(Cons, _)) ->
+            let sizeVar = freshLabel "s"
+            let sizeStmts = [Decl(sizeVar, Int 2)]
+            handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
+        | _ ->
+            blocks, blockName, blockArgs, stmt :: stmts
+
+    let handleBlock (block : Block) =
+        let name, args, stmts = block
+        let blocks, blockName, blockArgs, stmts = List.fold handleStmt ([], name, args, []) stmts
+        let lastBlock = blockName, blockArgs, List.rev stmts
+        List.rev (lastBlock :: blocks)
+
+    let handleFunc (func : Function) =
+        let blocks = List.collect handleBlock func.Blocks
+        { func with Blocks = blocks }
+
+    let procs = List.map handleFunc prog.Procedures
+
+    { prog with Procedures = procs
+                Main = handleFunc prog.Main }
+
 let allIntermediateTransformations =
     convertProgram
     >> analyzeFreeVars
     >> closureConversion
+    >> exposeAllocations

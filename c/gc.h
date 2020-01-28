@@ -15,3 +15,5 @@ extern int64_t* fromSpaceBegin;
 
 /// Points to one memory location past the FromSpace.
 extern int64_t* fromSpaceEnd;
+
+void collect();

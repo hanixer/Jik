@@ -27,6 +27,7 @@ let sourceFile = ""
 
 let allCodegenTransformations =
     selectInstructions
+    >> (fun x -> CodePrinter.programToString false x |> saveToFile (miscPath + "asm.s"); x)
     >> revealGlobals
     >> convertVarsToSlots
     >> convertSlots
@@ -91,8 +92,9 @@ let compileMany files outFile =
     File.WriteAllText(mainFile, mainText)
 
     let runtime = Util.getPathRelativeToRoot "c/runtime.c"
-    let allAsmFiles = asmFiles @ [mainFile] |> String.concat " "
-    let res = Util.executeProcess("gcc", " -g -std=c99 " + allAsmFiles + " " + runtime + " -o " + outFile)
+    let gc = Util.getPathRelativeToRoot "c/gc.c"
+    let filesForGcc = runtime :: gc :: asmFiles @ [mainFile] |> String.concat " "
+    let res = Util.executeProcess("gcc", " -g -std=c99 " + filesForGcc + " -o " + outFile)
     if res.stderr.Trim().Length > 0 then
         failwithf "gcc error:\n%s\n\n" res.stderr
     if res.stdout.Trim().Length > 0 then
