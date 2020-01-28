@@ -228,3 +228,95 @@ What will be store in the table?
 Pairs:
 	First element is an address of global
 	Second element is a string.
+
+# Garbage collector
+- [ ] Expose allocation.
+- [ ] Table of globals and constants for GC roots.
+- [ ] Save closure pointer before collect.
+
+
+Copying garbage collector.
+There are two spaces for objects.
+When current space is filled, the collector reachable objects to the other space.
+Spaces swaps their roles.
+
+Which objects are reachable?
+Those which are referenced from the stack.
+Also objects, that are referenced via closures.
+All closures are saved on the stack.
+And one closure is stored in rsi register.
+
+Definetely, collector needs to scan the stack to search the roots.
+
+When garbage collector is triggered?
+Each time data is allocated, free pointer is checked for available space.
+If no space is available, GC is triggered.
+Each allocation must know how much space is needed.
+
+How know determine the size?
+For pair (cons) the size is 2 words.
+For Closure it is one word + a word for each free variable.
+For string and vectors it can be determined in runtime.
+Make-Vector has number of elements n.
+n + 1 is the number to allocate.
+In which phase this can be done?
+This will be done in core form.
+What about closures? they are added in intermediate phase.
+Add comparison of two global values.
+Then make s foreign call, and pass arguments.
+
+How to make shadow stack aka root stack?
+During assignment variables to slots, how to detect that variable
+should go to a root slot.
+We can collect such variables into a list.
+Find all declarations of variables initialized by make vector string closure, and cons.
+Store it in R15
+rsi (closure pointer) is also strored to shadow stack before call and before garbage collection.
+
+How to represent call collect()?
+We can define it as a primitive, that will receive one parameter - allocation size.
+During codegen it will be converted to a foreign call. It will pass r15 and allocation size.
+
+Where to put calls to allocate()?
+Calls to allocate will be added during instruction selection.
+
+What additional data fields must be added to Program records?
+
+What must be added to each phase?
+After closure conversion add phase: revealAllocations, that will put pointer values to upper bound and call collect().
+```
+(let ([v (make-vector 3)]
+      [u (make-vector 1)])
+	(vector-set! u 0 2)
+	(vector-set! v 0 40)
+	(vector-set! v 1 #t)
+	(vector-set! v 2 u)
+	(if (vector-ref v 1)
+		(+ (vector-ref v 0)
+		   (vector-ref (vector-ref v 2) 0))
+		44))
+```
+```
+def schemeEntry <> ()
+schemeEntry ()
+n = 3
+calculate number of bytes.
+n33 = (n + 1) * wordSize
+if freePointer + n33 < topHeap then jmp L33 else jmp L22
+
+l22()
+collect(rsp)
+jmp L33
+
+L33()
+
+v = MakeVector n
+```
+
+How garbage collector will know about global variables?
+Gather all variables into a table.
+That will be an array of pointers.
+Change printing of constants - add ".global" to them also.
+Retrieve all globals and constants.
+Write table "globalRootTable".
+garbageCollector will use this table.

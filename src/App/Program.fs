@@ -43,27 +43,16 @@ let runTestString source expected =
 
 [<EntryPoint>]
 let main argv =
-    let text = "
- (define uni
-   (lambda (u v s ks kf)
-     (cond
-       [(symbol? u) (try-subst u v s ks kf)]
-       [(symbol? v) (try-subst v u s ks kf)]
-       [(and (eq? (car u) (car v))
-             (= (length u) (length v)))
-        (let f ([u (cdr u)] [v (cdr v)] [s s])
-          (if (null? u)
-              (ks s)
-              (uni (car u)
-                   (car v)
-                   s
-                   (lambda (s) (f (cdr u) (cdr v) s))
-                   kf)))]
-       [else (kf \"clash\")])))"
-
-    let e = SExpr.stringToSExpr text
-    printfn "%s !!!!" (sexprToString (exprsToList(Desugar.desugar e)))
-    // runTestWithLib "(remainder 5 2)" "1\n"
+    runTest false "(let ([v (make-vector 3)]
+      [u (make-vector 1)])
+	(vector-set! u 0 2)
+	(vector-set! v 0 40)
+	(vector-set! v 1 #t)
+	(vector-set! v 2 u)
+	(if (vector-ref v 1)
+		(+ (vector-ref v 0)
+		   (vector-ref (vector-ref v 2) 0))
+		44))" "42\n"
 
     // let expr = stringToSExpr s
     // let desug = Desugar.desugar2 [] expr

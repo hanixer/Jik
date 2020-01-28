@@ -2,7 +2,8 @@
 #load "Util.fs"
 #load "Display.fs"
 
-/// Supported features: 
+/// I believe this is done according to paper of Dybvig, Three models of implementation of Scheme.
+/// Supported features:
 /// - Expr Scheme
 /// - let
 /// - letrec
@@ -15,7 +16,7 @@
 /// some desugaring (let, letrec). Then Expr expression is translated
 /// into Tree-like instructions for ''VM''.
 /// VM has following state:
-/// - accumulator, holding result value 
+/// - accumulator, holding result value
 /// - next instruction to evaluate - emulating instruction pointer
 /// - frame pointer - pointer to beginning of the current frame
 /// - closure - which contains code and free variables for current executing function.
@@ -53,30 +54,30 @@ let rec findFreeVarsExpr bound = function
         ]
     | Assign (v, rhs) ->
         Set.difference (Set.singleton v) bound
-        |> Set.union (findFreeVarsExpr bound rhs) 
+        |> Set.union (findFreeVarsExpr bound rhs)
     | App (head, tail) ->
         freeVarsExprList bound tail
-        |> Set.union (findFreeVarsExpr bound head) 
+        |> Set.union (findFreeVarsExpr bound head)
     | Lambda (vars, body) ->
         let bound' = (Set.union bound (Set.ofList vars))
         freeVarsExprList bound' body
     | Begin exprs ->
         freeVarsExprList bound exprs
     | Callcc expr -> findFreeVarsExpr bound expr
-    | Ref name -> 
+    | Ref name ->
         if Set.contains name bound then
             Set.empty
-        else 
+        else
             Set.singleton name
     | _ -> Set.empty
 
 and freeVarsExprList bound exprList =
-    let results = List.map (findFreeVarsExpr bound) exprList    
+    let results = List.map (findFreeVarsExpr bound) exprList
     Set.unionMany results
 
 let rec findModifiedVars (vars : string seq) expr =
     match expr with
-    | Ref name -> 
+    | Ref name ->
         Set.empty
     | If (cond, thenc, elsec) ->
         Set.unionMany [
@@ -85,11 +86,11 @@ let rec findModifiedVars (vars : string seq) expr =
             findModifiedVars vars elsec
         ]
     | Assign (v, rhs) ->
-        if Seq.contains v vars then Set.singleton v else Set.empty 
-        |> Set.union (findModifiedVars vars rhs) 
+        if Seq.contains v vars then Set.singleton v else Set.empty
+        |> Set.union (findModifiedVars vars rhs)
     | App (head, tail) ->
         findModifiedVarsList vars tail
-        |> Set.union (findModifiedVars vars head) 
+        |> Set.union (findModifiedVars vars head)
     | Lambda (args, body) ->
         let vars' = (Set.difference (Set.ofSeq vars) (Set.ofList args))
         findModifiedVarsList vars' body
@@ -104,7 +105,7 @@ and findModifiedVarsList vars exprList =
     |> Set.unionMany
 
 let findModiedVarsInBody free argVars body =
-    let sets = findModifiedVarsList (Set.ofSeq argVars) body 
+    let sets = findModifiedVarsList (Set.ofSeq argVars) body
     Set.union sets (Set.intersect sets (Set.ofSeq free))
 
 let rec sexprToExpr sexpr =
@@ -140,9 +141,9 @@ let rec sexprToExpr sexpr =
     | List (Symbol "letrec" :: List bindings :: body) ->
         let bindings = transformLetrecBindings bindings
         let fnames = List.map fst bindings
-        let bindInitial fname = 
+        let bindInitial fname =
             Cons (Symbol fname, Cons (Number 0, Nil))
-        let letBindings = 
+        let letBindings =
             fnames
             |> List.map bindInitial
             |> exprsToList
@@ -207,7 +208,7 @@ let rec valueToString = function
     | IntVal n -> (n.ToString())
     | BoolVal true -> "#t"
     | BoolVal false -> "#f"
-    | ConsVal (x, y) as e-> 
+    | ConsVal (x, y) as e->
         printfn "cons cons : %A" e
         let sb = new StringBuilder()
         sb.Append("(").Append(valueToString x) |> ignore
@@ -217,7 +218,7 @@ let rec valueToString = function
             | ConsVal (x, (ConsVal (_, _) as y)) ->
                 sb.Append(valueToString x).Append(" ") |> ignore
                 loop y
-            | ConsVal (x, y) -> 
+            | ConsVal (x, y) ->
                 sb.Append(valueToString x).Append(" . ").Append(valueToString y) |> ignore
             | _ -> ()
         loop y
@@ -242,10 +243,10 @@ let compileLookup name (locals, free : string seq) returnLocal returnFree return
     let tryFind = Seq.tryFindIndex ((=) name)
     match tryFind locals with
     | Some i -> returnLocal i
-    | None -> 
+    | None ->
         match tryFind free with
         | Some i -> returnFree i
-        | None -> 
+        | None ->
             match tryFind globalEnv with
             | Some i -> returnGlobal i
             | None ->
@@ -253,8 +254,8 @@ let compileLookup name (locals, free : string seq) returnLocal returnFree return
                 | Some i -> returnPredefined i
                 | None -> failwithf "compileLookup: name '%s' not found" name
 
-let compileRefer name env next = 
-    compileLookup name env 
+let compileRefer name env next =
+    compileLookup name env
         (fun i -> ReferLocal (i, next))
         (fun i -> ReferFree (i, next))
         (fun i -> ReferGlobal (i, next))
@@ -269,7 +270,7 @@ let freeVarsInBody vars body =
 let collectFree vars env next =
     let fold next name =
         compileRefer name env (Argument next)
-    let result = Seq.fold fold next vars 
+    let result = Seq.fold fold next vars
     result
 
 let makeBoxes sets vars next =
@@ -281,7 +282,7 @@ let makeBoxes sets vars next =
     let _, result = List.foldBack folder vars (List.length vars, next)
     result
 
-let rec getNonArgLocalsCount count expr = 
+let rec getNonArgLocalsCount count expr =
     match expr with
     | Ref name -> count
     | Int(_) -> count
@@ -293,7 +294,7 @@ let rec getNonArgLocalsCount count expr =
         List.max [count1; count2; count3]
     | Assign(_, rhs) -> getNonArgLocalsCount count rhs
     | Lambda(args, body) -> getNonArgLocalsCount 0 (Begin body)
-    | Begin(exprs) -> 
+    | Begin(exprs) ->
         exprs
         |> List.map (getNonArgLocalsCount count)
         |> List.max
@@ -311,9 +312,9 @@ type Env = string list * string seq
 
 let rec compile expr (env : Env) s next =
     match expr with
-    | Ref name -> 
+    | Ref name ->
         let next' =
-            if Set.contains name s 
+            if Set.contains name s
             then Indirect next
             else next
         compileRefer name env next'
@@ -327,7 +328,7 @@ let rec compile expr (env : Env) s next =
         compileCallcc expr env s next
     | App (func, argExprs) ->
         compileApp func argExprs env s next
-    | Assign (name, rhs) -> 
+    | Assign (name, rhs) ->
         compileAssign name rhs env s next
     | Begin exprs ->
         compileBegin exprs env s next
@@ -335,8 +336,8 @@ let rec compile expr (env : Env) s next =
 and compileLambda vars body env next =
     let free = freeVarsInBody vars body
     let sets' = findModiedVarsInBody free vars body
-    let env' : Env =  (vars, free) 
-    let next' = (Return (List.length vars))    
+    let env' : Env =  (vars, free)
+    let next' = (Return (List.length vars))
     let compiledBody = compile (Begin body) env' sets' next'
     let boxed = makeBoxes sets' vars compiledBody
     collectFree free env <| Close (Seq.length free, boxed, next)
@@ -351,19 +352,19 @@ and compileApp func argExprs env s next =
 and compilePredefined i argExprs env s next =
     compileArgs argExprs env s <| PredefinedInstr (i, next)
 
-and compileFuncApp func argExprs env s next = 
+and compileFuncApp func argExprs env s next =
     match func with
     // | Lambda (args, body) ->
         // failwith ""
     | _ ->
         match next with
-        | Return n -> 
+        | Return n ->
             let next' = Shift (List.length argExprs, n, Apply)
             let compiledFunc = compile func env s next'
             compileArgs argExprs env s compiledFunc
-        | _ -> 
+        | _ ->
             let next' = Apply
-            let compiledFunc = compile func env s next'        
+            let compiledFunc = compile func env s next'
             Frame (next, compileArgs argExprs env s compiledFunc)
 
 and compileArgs argExprs env s compiledFunc =
@@ -395,7 +396,7 @@ and compileAssign name rhs env s next =
         (fun i -> failwith "compileAssign: cannot assign to predefined")
 
 and compileBegin exprs env s next =
-    let fold expr next = 
+    let fold expr next =
         compile expr env s next
     List.foldBack fold exprs next
 
@@ -451,8 +452,8 @@ let handleApply accum sp =
     | e -> failwithf "closure expected, got %A" e
 
 let closureIndex clos i =
-    match clos with 
-    | Closure (_, v) | Boxed {contents = Closure (_, v)} -> 
+    match clos with
+    | Closure (_, v) | Boxed {contents = Closure (_, v)} ->
         Array.get v i
     | e -> failwithf "closureIndex: closure expected, got %A" e
 
@@ -472,7 +473,7 @@ let assignRef v = function
     | _ -> failwith "assignRef: "
 
 let saveStack sp =
-    Array.sub stack 0 sp 
+    Array.sub stack 0 sp
 
 let restoreStack savedStack =
     let length = Array.length savedStack
@@ -536,12 +537,12 @@ let rec VM (accum : Value) expr frame clos sp =
     | Test (theni, elsei) ->
         VM accum (testNext accum theni elsei) frame clos sp
     | AssignLocal (i, next) ->
-        let refVal = stackGetValue frame i 
+        let refVal = stackGetValue frame i
         assignRef accum refVal
         VM accum next frame clos sp
     | AssignFree (i, next) ->
-        let refVal = closureIndex clos i 
-        assignRef accum refVal 
+        let refVal = closureIndex clos i
+        assignRef accum refVal
         VM accum next frame clos sp
     | AssignGlobal (i, next) ->
         globalStoreSet i accum
@@ -590,7 +591,7 @@ let pairHelper func sp =
 let car = pairHelper (fun x _ -> x)
 let cdr = pairHelper (fun _ y -> y)
 
-let isPair sp = 
+let isPair sp =
     match stackGetValue sp 0 with
     | ConsVal (_, _) -> BoolVal true
     | _ -> BoolVal false
@@ -649,7 +650,7 @@ let evaluateStringToString =
 
 /// Pretty-printing
 let rec showInstruction instr =
-    let withNumber str n next = 
+    let withNumber str n next =
         iConcat [iStr str; iNum n; iNewline; showInstruction next]
     match instr with
     | Halt -> iStr "Halt"
@@ -661,35 +662,35 @@ let rec showInstruction instr =
     | AssignFree(n, next) -> withNumber "AssignFree " n next
     | AssignGlobal(n, next) -> withNumber "AssignGlobal " n next
     | ConstantInt(n, next) -> withNumber "Constant " n next
-    | ConstantBool(n, next) -> 
+    | ConstantBool(n, next) ->
         let x = if n then iStr "#t" else iStr "#f"
         iConcat [iStr "ConstantBool "; x; iNewline; showInstruction next]
-    | Return(n) -> 
+    | Return(n) ->
         iConcat [iStr "Return "; iNum n; iNewline]
-    | Close(freeCount, body, next) -> 
+    | Close(freeCount, body, next) ->
         iConcat [iStr "Close free="; iNum freeCount; iIndent (iConcat [iNewline; showInstruction body]); iNewline; showInstruction next]
     | Test(t, e) ->
         iConcat [iStr "Test"; iNewline; iStr "then"; iNewline; showInstruction t; iNewline; iStr "else"; iNewline; showInstruction e]
     | Apply -> iStr "Apply"
     | Frame(ret, body) ->
-        iConcat [iStr "Frame"; 
+        iConcat [iStr "Frame";
                  iIndent (iConcat [iNewline; showInstruction ret; iNewline; iStr "---"; iNewline; showInstruction body])]
-    | Argument(next) -> 
+    | Argument(next) ->
         iConcat [iStr "Argument"; iNewline; showInstruction next]
     | Indirect(next) ->
         iConcat [iStr "Indirect"; iNewline; showInstruction next]
     | Shift(newCount, oldCount, next) ->
         iConcat [iStr "Shift new="; iNum newCount; iStr ", old="; iNum oldCount; iNewline; showInstruction next]
     | Box(n, next) -> withNumber "Box " n next
-    | Conti(next) -> 
+    | Conti(next) ->
         iConcat [iStr "Conti"; iNewline; showInstruction next]
-    | Nuate(_, _) -> 
+    | Nuate(_, _) ->
         iConcat [iStr "Nuate"; ]//iNewline; showInstruction next]
     | PredefinedInstr(n, next) -> withNumber "PredefinedInstr " n next
 
-let printInstruction instr = 
+let printInstruction instr =
     showInstruction instr |> iDisplay |> printf "%s"
-let compilePrintInstruction e = 
+let compilePrintInstruction e =
     compileString e |> showInstruction |> iDisplay |> printf "%s"
 
 /// Tests
@@ -701,7 +702,7 @@ let runTest input expected : unit=
         else ()
         ()
     with
-    | e -> 
+    | e ->
         if expected <> "***" then
             printfn "FAIL. Exception <%s>\ninput <%s>" e.Message input
         ()
@@ -728,8 +729,8 @@ let e5 = "(begin
 (let ((x 1))
     (set! x 321))
 x)"
-let e6 = "(((lambda (x) 
-    (lambda (y) x)) 
+let e6 = "(((lambda (x)
+    (lambda (y) x))
     1) 2)"
 let e7 = "(let ((f (lambda (x) x)))
 (f 123)
@@ -753,19 +754,19 @@ let e10 = "
     (let ((g (lambda (y) x)))
         (f g)))"
 let e11 = "
-(let ((f +)) 
+(let ((f +))
     (let ((g f))
         (g 1 2)))"
 let e12 = "(call/cc (lambda (k) (k 2) 3))"
 let e13 = "(call/cc (lambda (k) (+ 1 (k 12))))"
 let e14 = "
-(letrec ((fact (lambda (x) 
+(letrec ((fact (lambda (x)
     (if (< x 2)
         x
         (* x (fact (- x 1)))))))
   (fact 5))"
 let e16 = "
-(letrec ((fact (lambda (x) 
+(letrec ((fact (lambda (x)
     (if (< x 2)
         x
         (* x (fact (- x 1)))))))
@@ -790,7 +791,7 @@ let e18 = "
                 (cons x (insert elem l))))
         (cons elem ())))))
     (sort (cons 333 (cons 222 (cons 111 ())))))"
-(* 
+(*
 // Basic tests
 runTest "1" "1"
 runTest "(if 1 2 3)" "2"
@@ -823,9 +824,9 @@ runTest "(cons 1 (cons 2 3))" "(1 2 . 3)"
 runTest "(cons 1 (cons (cons 2 ()) (cons 3 ())))" "(1 (2) 3)"
 runTest "(car (cons 1 2))" "1"
 runTest "(cdr (cons 1 2))" "2"
-runTest "(cdr (car (cdr (cons 1 (cons (cons 2 ()) (cons 3 ()))))))" "()"
+runTest "(cdr (car (cdr (cons 1 (cons (cons 2 '()) (cons 3 '()))))))" "()"
 
-*)  
+*)
 
 "
 (let ((x 1))
@@ -841,4 +842,4 @@ runTest "(cdr (car (cdr (cons 1 (cons (cons 2 ()) (cons 3 ()))))))" "()"
         (set! x (+ x 1))
         (if x 1234 4321))"
 "(+ 8 (if (+ (+ 1 2)) 3 4))"
-"(let ((x 0)) (+ (+ 1 2) x (+ 3 1)))" |> compilePrintInstruction
+"(let ((x 0)) (+ (+ 1 2) x (+ 3 1)))" |> evaluateStringToString
