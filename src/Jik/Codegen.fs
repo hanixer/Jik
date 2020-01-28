@@ -377,7 +377,7 @@ let convertVarsToSlots (prog : Program) =
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
 
-let createMainModule globals globOriginal entryPoints =
+let createMainModule constants globals globOriginal entryPoints =
     let initGlobal name =
         [Mov, [Int undefinedLiteral; GlobalValue name]]
 
@@ -420,7 +420,7 @@ let createMainModule globals globOriginal entryPoints =
       Main = funcDef
       Globals = List.ofSeq globals
       GlobalsOriginal = List.ofSeq globOriginal
-      ConstantsNames = []
+      ConstantsNames = constants
       ErrorHandler = []
       Entry = schemeEntryLabel
       Strings = [] }

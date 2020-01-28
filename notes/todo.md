@@ -231,7 +231,7 @@ Pairs:
 
 # Garbage collector
 - [x] Expose allocation.
-- [ ] Table of globals and constants for GC roots.
+- [x] Table of globals and constants for GC roots.
 - [ ] Save closure pointer before collect.
 
 

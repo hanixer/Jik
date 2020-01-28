@@ -1,5 +1,7 @@
 #include "gc.h"
 
+extern int64_t* globRootsTable;
+
 int64_t* freePointer;
 
 /// Points to the beginning of FromSpace.

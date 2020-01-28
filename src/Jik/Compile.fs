@@ -75,9 +75,10 @@ let compileMany files outFile =
     let entryOfModule (prog : Codegen.Program) = prog.Entry
 
     let modules = List.map handleFile files
+    let constants = List.collect (fun p -> p.ConstantsNames) modules
     let globals, globOriginal = collectGlobals modules
     let entryPoints = List.map entryOfModule modules
-    let mainModule = createMainModule globals globOriginal entryPoints
+    let mainModule = createMainModule constants globals globOriginal entryPoints
     let asmFiles = List.map (fun (file : string) ->
         let file = Path.GetFileName(file)
         miscPath + file + ".s") files

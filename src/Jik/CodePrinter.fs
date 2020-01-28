@@ -103,6 +103,21 @@ let printGlobalOriginals out originals globals =
     fprintfn out "    .quad 0" // Put zeros to know where table ends.
     fprintfn out "    .quad 0"
 
+let printGlobalRoots out constants globals =
+    let printEntry thing =
+        fprintfn out "    .quad %s" thing
+
+    fprintfn out "########################"
+    fprintfn out "### Global roots for GC"
+    fprintfn out "    .globl %s" globRootsTable
+    fprintfn out "    .section .rdata,\"dr\""
+
+    List.iter printEntry constants
+    List.iter printEntry globals
+    fprintfn out "    .quad 0" // Put zeros to know where table ends.
+    fprintfn out "###"
+
+
 let escapeString chars =
     let rec loop (acc : char list) chars =
         match chars with
@@ -148,6 +163,7 @@ let programToString writeGlobals (prog : Program) =
     List.iter printConstant prog.ConstantsNames
 
     if writeGlobals then
+        printGlobalRoots out prog.ConstantsNames prog.Globals
         printGlobalOriginals out prog.GlobalsOriginal prog.Globals
         List.iter printGlobal prog.Globals
 
