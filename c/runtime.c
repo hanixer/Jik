@@ -254,7 +254,7 @@ void s_exit(ptr p) {
 
 void checkHeapSpaceAvailable(int which) {
     allocations[which]++;
-    if (freePointer >= heapTopPointer) {
+    if (freePointer + 10 >= heapTopPointer) {
         fprintf(stderr, "No space for heap allocation");
         printAllocInfo();
         exit(1);

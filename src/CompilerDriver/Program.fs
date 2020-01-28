@@ -21,6 +21,11 @@ open Compile
 [<EntryPoint>]
 let main argv =
     let toRoot = Util.getPathRelativeToRoot
-
-    compileFilesToBinary false [toRoot "examples/one.scm"] defaultOutFile
+    let defaultS = [toRoot "examples/one.scm"]
+    let sources =
+        if argv.Length > 0 then
+            argv |> List.ofArray
+        else
+            defaultS
+    compileFilesToBinary true sources defaultOutFile
     0 // return an integer exit code

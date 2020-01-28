@@ -230,7 +230,7 @@ Pairs:
 	Second element is a string.
 
 # Garbage collector
-- [ ] Expose allocation.
+- [x] Expose allocation.
 - [ ] Table of globals and constants for GC roots.
 - [ ] Save closure pointer before collect.
 
