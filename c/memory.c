@@ -2,7 +2,7 @@
 #include <windows.h>
 #include <stdio.h>
 
-extern int64_t* globRootsTable;
+extern int64_t** globRootsTable;
 
 int64_t* freePointer;
 
@@ -17,6 +17,10 @@ static int64_t* toSpaceBegin;
 
 /// Points to one memory location past the ToSpace.
 static int64_t* toSpaceEnd;
+
+
+
+int64_t* rootStackBegin;
 
 char* allocateProtectedSpace(int size) {
 	SYSTEM_INFO si;
@@ -38,22 +42,34 @@ void deallocateProtectedSpace(char* ptr, int size) {
 	VirtualFree(ptr - aligned, total, MEM_RELEASE);
 }
 
-void gcInitialize(uint64_t heapSize) {
-    char* heap = allocateProtectedSpace(heapSize);
-    freePointer = (int64_t*) heap;
+void gcInitialize(uint64_t heapSize, uint64_t rootStackSize) {
+    char* pointer = allocateProtectedSpace(heapSize);
+    freePointer = (int64_t*) pointer;
     fromSpaceBegin = freePointer;
-    fromSpaceEnd = (int64_t*) (heap + heapSize);
+    fromSpaceEnd = (int64_t*) (pointer + heapSize);
 
-	heap = allocateProtectedSpace(heapSize);
-    toSpaceBegin = (int64_t*) heap;
-	toSpaceEnd = (int64_t*) (heap + heapSize);
+	pointer = allocateProtectedSpace(heapSize);
+    toSpaceBegin = (int64_t*) pointer;
+	toSpaceEnd = (int64_t*) (pointer + heapSize);
+
+	pointer = allocateProtectedSpace(rootStackSize);
+	rootStackBegin = (int64_t*) pointer;
+	rootStackBegin[0] = 0;
 }
 
-void collect(int64_t** stack, int64_t bytesNeeded) {
-    printf("  --- we are in collect\n");
-    printf("  --- freePointer		= %p\n", freePointer);
-    printf("  --- fromSpaceBegin 	= %p\n", fromSpaceBegin);
-    printf("  --- fromSpaceEnd 		= %p\n", fromSpaceEnd);
-    printf("  --- stack 			= %p\n", stack);
-    printf("  --- size 				= %d\n", bytesNeeded);
+void collect(int64_t** rootStack, int64_t bytesNeeded) {
+    printf("--- we are in collect\n");
+    printf("--- freePointer    = %p\n", freePointer);
+    printf("--- fromSpaceBegin = %p\n", fromSpaceBegin);
+    printf("--- fromSpaceEnd   = %p\n", fromSpaceEnd);
+    printf("--- stack          = %p\n", rootStack);
+    printf("--- size           = %d\n", bytesNeeded);
+
+	for (; *rootStack != 0; rootStack--) {
+		// copy this
+	}
+
+	for (int i = 0; globRootsTable[i] != 0; i++) {
+		// copy this
+	}
 }

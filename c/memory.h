@@ -16,9 +16,12 @@ extern int64_t* fromSpaceBegin;
 /// Points to one memory location past the FromSpace.
 extern int64_t* fromSpaceEnd;
 
-void gcInitialize(uint64_t heapSize);
+/// Begin of the root stack.
+extern int64_t* rootStackBegin;
 
-void collect(int64_t** stack, int64_t size);
+void gcInitialize(uint64_t heapSize, uint64_t rootStackSize);
+
+void collect(int64_t** rootStack, int64_t size);
 
 char* allocateProtectedSpace(int size);
 

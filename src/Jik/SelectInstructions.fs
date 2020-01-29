@@ -411,7 +411,7 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.Collect, [size]) ->
         [Mov, [Var size; Reg Rdx]
          Sar, [Int 2; Reg Rdx]
-         Mov, [Reg Rsp; Reg Rcx]
+         Mov, [Reg R15; Reg Rcx]
          Call(collectFunction), []]
     | e -> failwithf "declToInstrs: %s %A" dest e
 
@@ -453,13 +453,52 @@ let saveArgs args instrs =
     | head :: tail -> head :: saveInstrs @ tail
     | _ -> instrs
 
+let saveToRootIfNeeded rootsCount decl =
+    ()
+
+let doPrimitiveUseHeap (_, simple) =
+    let primitives =
+        [ Cons
+          Car
+          Cdr
+          MakeVector
+          VectorRef
+          MakeString
+          StringInit
+          MakeClosure
+          ClosureRef
+          MakeSymbol ]
+
+
+    match simple with
+    | Simple.Prim(p, _) -> List.contains p primitives
+    | _ -> false
+
 let selectInstructions (prog : Intermediate.Program) : Program =
+    let mutable rootStackSlots = 0
+
+    let moveBlockArgToRootStack arg =
+        rootStackSlots <- rootStackSlots + 1
+        Mov, [Var arg; RootStackSlot(rootStackSlots - 1)]
+
     let handleStmt blocks = function
-        | Decl decl -> declToInstrs decl
+        | Decl decl ->
+            // check type of primitive.
+            // if primitive allocates heap memory, copy to root stack.
+            let instrs = declToInstrs decl
+            let dest, _ = decl
+            if doPrimitiveUseHeap decl then
+                instrs @
+                [moveBlockArgToRootStack dest]
+            else
+                instrs
+
         | Transfer tran -> transferToInstrs blocks tran
 
-    let handleBlock blocks (name, _, stmts) =
-        (Label name, []) :: List.collect (handleStmt blocks) stmts
+    let handleBlock blocks (name, args, stmts) =
+        let saveToRoot = List.map moveBlockArgToRootStack args
+        let stmts = List.collect (handleStmt blocks) stmts
+        (Label name, []) :: saveToRoot @ stmts
 
     let errorHandler =
         [Label(errorHandlerLabel), []
@@ -483,7 +522,8 @@ let selectInstructions (prog : Intermediate.Program) : Program =
           Instrs = instrs
           LiveBefore = Map.empty
           LiveAfter = Map.empty
-          SlotsOccupied = slots }
+          SlotsOccupied = slots
+          RootStackSlots = rootStackSlots }
 
     let entryPointDef =
         match prog.Main.Blocks with

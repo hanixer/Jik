@@ -46,6 +46,7 @@ let showInstr out (op, args) =
         | Var(v) -> fprintf out "[var %s]" v
         | ByteReg(r) -> fprintf out "%s" (reg r)
         | Slot(n) -> fprintfn out "{slot %d}" n
+        | RootStackSlot(n) -> fprintfn out "{root stack slot %d}" n
         | GlobalValue(v) -> fprintf out "%s(%%rip)" v
 
     let showArgs args =

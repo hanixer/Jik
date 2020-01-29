@@ -34,6 +34,7 @@ type Operand =
     | Deref4 of int * Register * Register * int
     | Var of string
     | Slot of int
+    | RootStackSlot of int
     | GlobalValue of string
 
 /// Condition for jump: Equal, Less than, Less than or equal, etc.
@@ -88,7 +89,8 @@ type FunctionDef =
       InterfGraph : Graph<Operand>
       LiveBefore : Map<int, Set<Operand>>
       LiveAfter : Map<int, Set<Operand>>
-      SlotsOccupied : int }
+      SlotsOccupied : int
+      RootStackSlots : int }
 
 type Program =
     { Procedures : FunctionDef list
@@ -109,7 +111,8 @@ let emptyFuncDef =
       Instrs = []
       LiveBefore = Map.empty
       LiveAfter = Map.empty
-      SlotsOccupied = 0 }
+      SlotsOccupied = 0
+      RootStackSlots = 0 }
 
 let allRegisters =
     [Rsp; Rbp; Rax; Rbx; Rcx; Rdx; Rsi; Rdi;
@@ -213,14 +216,16 @@ let spliceSlot stackOffset argsCount =
      Add, [Reg R8; Reg Rcx]]
 
 let convertSlots (prog : Program) =
-    let handleArg slots arg =
+    let handleArg slots rootSlots arg =
         match arg with
         | Slot n ->
             Deref((slots - n) * wordSize, Rsp)
+        | RootStackSlot n ->
+            Deref(-n * wordSize, R15)
         | _ -> arg
 
-    let handleInstr slots (op, args) =
-        op, List.map (handleArg slots) args
+    let handleInstr slots rootSlots (op, args) =
+        op, List.map (handleArg slots rootSlots) args
 
     let splice slots instr =
         match instr with
@@ -229,12 +234,12 @@ let convertSlots (prog : Program) =
             spliceSlot stackOffset argsCount
         | _ -> [instr]
 
-    let handleInstrs slots instrs =
+    let handleInstrs slots rootSlots instrs =
         let instrs' = List.collect (splice slots) instrs
-        List.map (handleInstr slots) instrs'
+        List.map (handleInstr slots rootSlots) instrs'
 
     let handleDef def =
-        {def with Instrs = handleInstrs def.SlotsOccupied def.Instrs}
+        {def with Instrs = handleInstrs def.SlotsOccupied def.RootStackSlots def.Instrs}
 
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
@@ -284,28 +289,34 @@ let constructDottedArgument args =
 /// then construct last argument as list,
 /// otherwise just check for number of arguments.
 /// Allocate stack space for local variables.
-let argumentCheckAndStackAlloc args isDotted space =
+let argumentCheckAndStackAlloc args isDotted space rootStack =
     if isDotted then
         constructDottedArgument args @
-        [Sub, [Int space; Reg Rsp]]
+        [Sub, [Int space; Reg Rsp]
+         Add, [Int rootStack; Reg R15]]
     else
         [Cmp, [Int (List.length args); Reg Rcx]
          JmpIf(Ne, errorHandlerLabel), []
-         Sub, [Int space; Reg Rsp]]
+         Sub, [Int space; Reg Rsp]
+         Add, [Int rootStack; Reg R15]]
 
 /// Add code in the beginning and the end of functions:
 /// stack corrections, number of arguments checking,
 /// dotted arguments construction.
 let addFuncPrologAndEpilog (prog : Program) =
-    let restoreStack n = function
-        | RestoreStack, [] -> Add, [Operand.Int n; Reg Rsp]
-        | x -> x
+    let restoreStack stack rootStack = function
+        | RestoreStack, [] ->
+            [Add, [Int stack; Reg Rsp]
+             Sub, [Int rootStack; Reg R15]]
+
+        | x -> [x]
 
     let handleDef def =
         let firstInstr, rest = List.head def.Instrs, List.tail def.Instrs
-        let n = (def.SlotsOccupied + 1) * wordSize
-        let rest = List.map (restoreStack n) rest
-        let instrs = argumentCheckAndStackAlloc def.Args def.IsDotted n
+        let stack = (def.SlotsOccupied + 1) * wordSize
+        let rootStack = def.RootStackSlots * wordSize
+        let rest = List.collect (restoreStack stack def.RootStackSlots) rest
+        let instrs = argumentCheckAndStackAlloc def.Args def.IsDotted stack rootStack
         { def with Instrs = firstInstr :: instrs @ rest }
 
     { prog with Procedures = List.map handleDef prog.Procedures }
@@ -398,7 +409,8 @@ let createMainModule constants globals globOriginal entryPoints =
          Push, [Reg R14]
          Push, [Reg R13]
          Push, [Reg R12]
-         Push, [Reg Rbx]] @
+         Push, [Reg Rbx]
+         Mov, [GlobalValue rootStackBegin; Reg R15]] @
         initGlobals @
         calls @
         [Pop, [Reg Rbx]

@@ -233,7 +233,16 @@ Pairs:
 - [x] Expose allocation.
 - [x] Table of globals and constants for GC roots.
 - [ ] Save closure pointer before collect.
+- [ ] Add a root stack.
 
+Root stack.
+It will contain values that could be a reachable object for garbage collection.
+It can also contain primitive values.
+But it will not contain result of primitive operations that return for example, int, chars, bools...
+Separate register will be used for root stack pointer - r15.
+When function is started - allocate place of the root stack.
+When function exits - return root stack.
+How to count number of root stack slots for function?
 
 Copying garbage collector.
 There are two spaces for objects.
@@ -322,7 +331,11 @@ Write table "globalRootTable".
 garbageCollector will use this table.
 
 ```
-0000 0000 0000 0000
+63        |55        |47        |39        |31        |23        |15        |7
+0000 0000  0000 0000  0000 0000  0000 0000  0000 0000  0000 0000  0000 0000  0000 0000
+
+0000 0000  0000 0000  0000 0000  0000 0000  0000 0000  0000 0000  0000 0000  0000 0001
+
 
 0111 - mask
 0001 - pair

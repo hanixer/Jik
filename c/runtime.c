@@ -240,7 +240,8 @@ int main() {
     char* stackHigherAddr = stack + stackSize - 2 * wordSize;
     int heapSize = 32;
     // int heapSize = 100 * 1024 * 4096;
-    gcInitialize(heapSize);
+    int rootStackSize = stackSize;
+    gcInitialize(heapSize, rootStackSize);
     ptr result = schemeEntry(stackHigherAddr);
     printPtr(result);
     return 0;
