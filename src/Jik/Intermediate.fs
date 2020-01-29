@@ -567,14 +567,7 @@ let exposeAllocations (prog : Program) =
         // Maybe it is better to make a primitive: CompareHeapPointers.
         // So that conversion between integers not done here.
         let checkFree =
-           [Decl(n, Int wordSize)
-            Decl(n2, RawInt 2)
-            Decl(s, Prim(Mul, [sizeVar; n]))
-            Decl(s2, Prim(Sar, [s; n2]))
-            Decl(fp, Prim(GlobalRefUncheck, [freePointer]))
-            Decl(fp2, Prim(Add, [fp; s2]))
-            Decl(fe, Prim(GlobalRefUncheck, [fromSpaceEnd]))
-            Decl(cmp, Prim(Lt, [fp2; fe]))
+           [Decl(cmp, Prim(CheckFreePointer, [sizeVar]))
             Transfer(If(cmp, labAlloc, labCollect))]
         let callCollect =
             [Decl(v, Prim(Collect, [s]))

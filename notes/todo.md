@@ -320,3 +320,14 @@ Change printing of constants - add ".global" to them also.
 Retrieve all globals and constants.
 Write table "globalRootTable".
 garbageCollector will use this table.
+
+```
+0000 0000 0000 0000
+
+0111 - mask
+0001 - pair
+0010 - closure
+0011 - symbol
+0101 - vector
+0110 - string
+```

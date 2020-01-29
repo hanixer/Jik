@@ -397,6 +397,17 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.Error, [describe]) ->
         [Mov, [Var describe; Reg Rcx]
          Jmp(errorHandlerLabel), []]
+    | Simple.Prim(Prim.CheckFreePointer, [size]) ->
+        [Mov, [Var size; Reg Rax]
+         Sar, [Int fixnumShift; Reg Rax]
+         IMul, [Int wordSize; Reg Rax]
+         Add, [GlobalValue freePointer; Reg Rax]
+         Cmp, [GlobalValue fromSpaceEnd; Reg Rax]
+         Set L, [Reg Al]
+         Movzb, [Reg Al; Reg Rax]
+         Sal, [Operand.Int boolBit; Reg Rax]
+         Or, [Operand.Int falseLiteral; Reg Rax]
+         Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Collect, [size]) ->
         [Mov, [Var size; Reg Rdx]
          Sar, [Int 2; Reg Rdx]

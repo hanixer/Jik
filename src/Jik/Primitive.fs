@@ -51,6 +51,7 @@ type Prim =
     | EofObject
     | IsEofObject
     | Collect
+    | CheckFreePointer
 
 let stringPrimop = [
     "+", Add
