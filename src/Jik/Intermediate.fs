@@ -593,9 +593,17 @@ let exposeAllocations (prog : Program) =
         | Decl(var, Prim(MakeString, [size])) ->
             let sizeVar = freshLabel "s"
             let n = freshLabel "n"
+            let n2 = freshLabel "n"
+            let n3 = freshLabel "n"
+            let n4 = freshLabel "n"
+            let n5 = freshLabel "n"
             let sizeStmts =
-               [Decl(n, Int 1)
-                Decl(sizeVar, Prim(Add, [size; n]))]
+               [Decl(n, Int (wordSize - 1))
+                Decl(n2, Prim(Add, [size; n]))
+                Decl(n3, Int wordSize)
+                Decl(n4, Prim(Quotient, [n2; n3]))
+                Decl(n5, Int 1)
+                Decl(sizeVar, Prim(Add, [n4; n5]))]
             handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
         | Decl(var, Prim(MakeClosure, free)) ->
             let sizeVar = freshLabel "s"

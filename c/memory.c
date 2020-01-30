@@ -71,7 +71,7 @@ void copyData(ptr_t* p) {
 		}
 		else {
 			ptr_t* pFrom = (ptr_t*)pHeap;
-			ptr_t size = (*pFrom) >> wordSize + 1;
+			ptr_t size = ((*pFrom) >> fixnumShift) + 1;
 			ptr_t pTo = (ptr_t) copyPtrEnd;
 			memcpy(copyPtrEnd, pFrom, size * wordSize);
 			*pFrom = pTo | 1; // Add forward bit.

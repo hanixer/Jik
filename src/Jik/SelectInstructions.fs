@@ -164,10 +164,7 @@ let callRuntime func =
 let compileMakeVector size dest =
     let shift = if wordSize = 8 then 3 else 2
     [Mov, [GlobalValue(freePointer); Reg R11]
-     Mov, [size; Reg Rax]
-     Sar, [Int fixnumShift; Reg Rax]
-     Sal, [Int (wordSize / 2); Reg Rax]
-     Mov, [Reg Rax; Deref(0, R11)]
+     Mov, [size; Deref(0, R11)]
      Or, [Int vectorTag; Reg R11]
      Mov, [Reg R11; Var dest]
      Mov, [size; Reg R11]
@@ -178,10 +175,7 @@ let compileMakeVector size dest =
 
 let compileMakeString size dest =
     [Mov, [GlobalValue(freePointer); Reg R11]
-     Mov, [size; Reg Rax]
-     Sar, [Int fixnumShift; Reg Rax]
-     Sal, [Int (wordSize / 2); Reg Rax]
-     Mov, [Reg Rax; Deref(0, R11)]
+     Mov, [size; Deref(0, R11)]
      Or, [Int stringTag; Reg R11]
      Mov, [Reg R11; Var dest]
      Mov, [size; Reg R11]
@@ -313,9 +307,7 @@ let rec declToInstrs (dest, x) =
         compileMakeVector (Var var1) dest
     | Simple.Prim(Prim.VectorLength, [var1]) ->
         [Mov, [Var var1; Reg R11]
-         Mov, [Deref(-vectorTag, R11); Var dest]
-         Sar, [Int (wordSize / 2); Var dest]
-         Sal, [Int fixnumShift; Var dest]]
+         Mov, [Deref(-vectorTag, R11); Var dest]]
     | Simple.Prim(Prim.IsVector, [var1]) ->
         compileIsOfType dest var1 vectorMask vectorTag
     | Simple.Prim(Prim.VectorSet, [vec; index; value]) ->
@@ -329,9 +321,7 @@ let rec declToInstrs (dest, x) =
         compileMakeString (Var var1) dest
     | Simple.Prim(Prim.StringLength, [var1]) ->
         [Mov, [Var var1; Reg R11]
-         Mov, [Deref(-stringTag, R11); Var dest]
-         Sar, [Int (wordSize / 2); Var dest]
-         Sal, [Int fixnumShift; Var dest]]
+         Mov, [Deref(-stringTag, R11); Var dest]]
     | Simple.Prim(Prim.IsString, [var1]) ->
         compileIsOfType dest var1 stringMask stringTag
     | Simple.Prim(Prim.StringSet, [instance; index; value]) ->
