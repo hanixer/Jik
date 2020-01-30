@@ -94,7 +94,8 @@ let compileMany files outFile =
 
     let runtime = Util.getPathRelativeToRoot "c/runtime.c"
     let gc = Util.getPathRelativeToRoot "c/memory.c"
-    let filesForGcc = runtime :: gc :: asmFiles @ [mainFile] |> String.concat " "
+    let objects = Util.getPathRelativeToRoot "c/objects.c"
+    let filesForGcc = runtime :: objects :: gc :: asmFiles @ [mainFile] |> String.concat " "
     let res = Util.executeProcess("gcc", " -g -std=c99 " + filesForGcc + " -o " + outFile)
     if res.stderr.Trim().Length > 0 then
         failwithf "gcc error:\n%s\n\n" res.stderr

@@ -2,25 +2,29 @@
 #include <windows.h>
 #include <stdio.h>
 
-extern int64_t** globRootsTable;
 
-int64_t* freePointer;
+extern ptr_t** globRootsTable;
+
+uint64_t* freePointer;
 
 /// Points to the beginning of FromSpace.
-int64_t* fromSpaceBegin;
+uint64_t* fromSpaceBegin;
 
 /// Points to one memory location past the FromSpace.
-int64_t* fromSpaceEnd;
+uint64_t* fromSpaceEnd;
 
 /// Points to the beginning of ToSpace.
-static int64_t* toSpaceBegin;
+static uint64_t* toSpaceBegin;
 
 /// Points to one memory location past the ToSpace.
-static int64_t* toSpaceEnd;
+static uint64_t* toSpaceEnd;
+
+/// Pointers used in copying of live data.
+static uint64_t* copyPtrBegin;
+static uint64_t* copyPtrEnd;
 
 
-
-int64_t* rootStackBegin;
+uint64_t* rootStackBegin;
 
 char* allocateProtectedSpace(int size) {
 	SYSTEM_INFO si;
@@ -44,20 +48,44 @@ void deallocateProtectedSpace(char* ptr, int size) {
 
 void gcInitialize(uint64_t heapSize, uint64_t rootStackSize) {
     char* pointer = allocateProtectedSpace(heapSize);
-    freePointer = (int64_t*) pointer;
+    freePointer = (uint64_t*) pointer;
     fromSpaceBegin = freePointer;
-    fromSpaceEnd = (int64_t*) (pointer + heapSize);
+    fromSpaceEnd = (uint64_t*) (pointer + heapSize);
 
 	pointer = allocateProtectedSpace(heapSize);
-    toSpaceBegin = (int64_t*) pointer;
-	toSpaceEnd = (int64_t*) (pointer + heapSize);
+    toSpaceBegin = (uint64_t*) pointer;
+	toSpaceEnd = (uint64_t*) (pointer + heapSize);
 
 	pointer = allocateProtectedSpace(rootStackSize);
-	rootStackBegin = (int64_t*) pointer;
+	rootStackBegin = (uint64_t*) pointer;
 	rootStackBegin[0] = 0;
 }
 
-void collect(int64_t** rootStack, int64_t bytesNeeded) {
+/// Cheney copying algorithm.
+void copyData(ptr_t* p) {
+	if (isVector(*p)) {
+		ptr_t pHeap = (*p - vectorTag);
+		if (pHeap & 1) {
+			// forward pointer.
+			*p = (pHeap - 1) + vectorTag;
+		}
+		else {
+			ptr_t* pFrom = (ptr_t*)pHeap;
+			ptr_t size = (*pFrom) >> wordSize + 1;
+			ptr_t pTo = (ptr_t) copyPtrEnd;
+			memcpy(copyPtrEnd, pFrom, size * wordSize);
+			*pFrom = pTo | 1; // Add forward bit.
+			copyPtrEnd += size;
+			*p = pTo;
+		}
+	}
+
+	// if (isPair(p) || isVector(p) || isString(p) || isClosure(p)) {
+
+	// }
+}
+
+void collect(uint64_t* rootStack, int64_t bytesNeeded) {
     printf("--- we are in collect\n");
     printf("--- freePointer    = %p\n", freePointer);
     printf("--- fromSpaceBegin = %p\n", fromSpaceBegin);
@@ -65,11 +93,26 @@ void collect(int64_t** rootStack, int64_t bytesNeeded) {
     printf("--- stack          = %p\n", rootStack);
     printf("--- size           = %d\n", bytesNeeded);
 
-	for (; *rootStack != 0; rootStack--) {
-		// copy this
+	// Copy root stack data.
+	for (uint64_t* curr = rootStack; *curr != 0; curr--) {
+		copyData(curr);
 	}
 
+	// Copy data pointed by globals.
 	for (int i = 0; globRootsTable[i] != 0; i++) {
-		// copy this
+		copyData(globRootsTable[i]);
 	}
+
+	while (copyPtrBegin < copyPtrEnd) {
+		copyData(copyPtrBegin);
+		copyPtrBegin++;
+	}
+
+	uint64_t* pBegin = fromSpaceBegin;
+	uint64_t* pEnd = fromSpaceEnd;
+
+	fromSpaceBegin = toSpaceBegin;
+	fromSpaceEnd = toSpaceEnd;
+	toSpaceBegin = pBegin;
+	toSpaceEnd = pEnd;
 }

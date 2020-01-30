@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "objects.h"
 
 /// Copying garbage collector.
 /// There are two spaces: FromSpace and ToSpace.
@@ -8,20 +9,20 @@
 /// After that FromSpace and ToSpace switch their roles.
 
 /// A pointer to the next free memory location in the FromSpace.
-extern int64_t* freePointer;
+extern uint64_t* freePointer;
 
 /// Points to the beginning of FromSpace.
-extern int64_t* fromSpaceBegin;
+extern uint64_t* fromSpaceBegin;
 
 /// Points to one memory location past the FromSpace.
-extern int64_t* fromSpaceEnd;
+extern uint64_t* fromSpaceEnd;
 
 /// Begin of the root stack.
-extern int64_t* rootStackBegin;
+extern uint64_t* rootStackBegin;
 
 void gcInitialize(uint64_t heapSize, uint64_t rootStackSize);
 
-void collect(int64_t** rootStack, int64_t size);
+void collect(uint64_t* rootStack, int64_t size);
 
 char* allocateProtectedSpace(int size);
 
