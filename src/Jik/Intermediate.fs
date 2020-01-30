@@ -584,30 +584,27 @@ let exposeAllocations (prog : Program) =
     let handleStmt (blocks, blockName, blockArgs, stmts) stmt =
         match stmt with
         | Decl(var, Prim(MakeVector, [size])) ->
-            let s = freshLabel "s"
             let sizeVar = freshLabel "s"
             let n = freshLabel "n"
-            let n2 = freshLabel "n"
             let sizeStmts =
                [Decl(n, Int 1)
-                Decl(n2, Int 2)
-                // Decl(s, Prim(Sar, [size; n2]))
                 Decl(sizeVar, Prim(Add, [size; n]))]
             handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
         | Decl(var, Prim(MakeString, [size])) ->
             let sizeVar = freshLabel "s"
             let n = freshLabel "n"
             let sizeStmts =
-               [Decl(n, RawInt 1)
+               [Decl(n, Int 1)
                 Decl(sizeVar, Prim(Add, [size; n]))]
             handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
         | Decl(var, Prim(MakeClosure, free)) ->
             let sizeVar = freshLabel "s"
-            let sizeStmts = [Decl(sizeVar, RawInt free.Length)]
+            let size = free.Length + 2 // See SelectInstruction for MakeClosure.
+            let sizeStmts = [Decl(sizeVar, Int size)]
             handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
         | Decl(var, Prim(Cons, _)) ->
             let sizeVar = freshLabel "s"
-            let sizeStmts = [Decl(sizeVar, RawInt 2)]
+            let sizeStmts = [Decl(sizeVar, Int 3)]
             handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
         | _ ->
             blocks, blockName, blockArgs, stmt :: stmts

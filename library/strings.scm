@@ -12,14 +12,14 @@
 
 (define %strings=?
     (lambda (s s*)
-      (if (string? s)
-            (if (empty? s*)
-                #t
-                (let ([s2 (car s*)] [s* (cdr s*)])
-                    (if (%strings2=? s s2)
-                        (%strings=? s2 s*)
-                        #f)))
-            (error "string=? - not a string"))))
+      (unless (string? s)
+        (error "string=? - not a string"))
+      (if (empty? s*)
+          #t
+          (let ([s2 (car s*)] [s* (cdr s*)])
+              (if (%strings2=? s s2)
+                  (%strings=? s2 s*)
+                  #f)))))
 
 (define string=?
     (lambda (s . s*)

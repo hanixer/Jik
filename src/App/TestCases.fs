@@ -156,12 +156,13 @@ let basicTests =
       (+ c (+ d e)))
     (let ([f 6])
       (+ a (+ c f)))))", "12\n"
-      e2, "2\n"
-      e3, "13\n"
+
        ]
 
 let defineTests =
-    [ e4, "2\n"
+    [ e2, "2\n"
+      e3, "13\n"
+      e4, "2\n"
       e6, "4\n"
       e7, "27\n"
       e8, "-4\n"

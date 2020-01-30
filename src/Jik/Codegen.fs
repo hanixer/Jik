@@ -135,8 +135,8 @@ let isArithm = function
 let isRegister = function | Reg _ -> true | _ -> false
 
 
-let getCar reg dest = Mov, [Deref(-pairTag, reg); dest]
-let getCdr reg dest = Mov, [Deref(-pairTag + wordSize, reg); dest]
+let getCar reg dest = Mov, [Deref(-pairTag + wordSize, reg); dest]
+let getCdr reg dest = Mov, [Deref(-pairTag + 2 * wordSize, reg); dest]
 
 /// Applies transformations to instructions.
 let transformInstructions handleInstrs (prog : Program) =
@@ -244,6 +244,15 @@ let convertSlots (prog : Program) =
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
 
+let allocateCons car cdr dest =
+     [Mov, [GlobalValue(freePointer); Reg R11]
+      Mov, [Int 0; Deref(0, R11)]
+      Mov, [car; Deref(wordSize, R11)]
+      Mov, [cdr; Deref(2 * wordSize, R11)]
+      Mov, [Reg R11; dest]
+      Or, [Int pairTag; dest]
+      Add, [Int (3 * wordSize); GlobalValue(freePointer)]]
+
 let constructDottedArgument args =
     let loopStart = freshLabel "loopStart"
     let loopEnd = freshLabel "loopEnd"
@@ -257,30 +266,26 @@ let constructDottedArgument args =
      Sub, [Int (List.length args - 1); Reg Rcx]
      JmpIf(S, errorHandlerLabel), []
 
-     // initialize registers
+     // Initialize registers.
      IMul, [Int wordSize; Reg Rax]
      Mov, [Reg Rsp; Reg R9]
      Sub, [Reg Rax; Reg R9] // point to the last argument
      Mov, [Int nilLiteral; Reg R10]
 
-     // loop start
+     // Loop start.
      Label(loopStart), []
      Cmp, [Int 0; Reg Rcx]
-     JmpIf(E, loopEnd), []
+     JmpIf(E, loopEnd), []] @
 
-     // Allocate cons
-     Mov, [GlobalValue(freePointer); Reg R11]
-     Mov, [Deref(0, R9); Deref(0, R11)]
-     Mov, [Reg R10; Deref(wordSize, R11)]
-     Add, [Int (2 * wordSize); GlobalValue(freePointer)]
-     Mov, [Reg R11; Reg R10]
-     Or, [Int pairTag; Reg R10]
-     Sub, [Int 1; Reg Rcx]
+    // Allocate cons.
+    allocateCons (Deref(0, R9)) (Reg R10) (Reg R10) @
+
+    // Decrement arg counter, increment pointer to next arg.
+    [Sub, [Int 1; Reg Rcx]
      Add, [Int wordSize; Reg R9]
 
-     // Repeat
+     // Repeat.
      Jmp(loopStart), []
-
      // loop end
      Label(loopEnd), []
      Mov, [Reg R10; Deref(finalPos, Rsp)]]
