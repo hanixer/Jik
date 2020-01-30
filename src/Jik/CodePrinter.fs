@@ -112,6 +112,7 @@ let printGlobalRoots out constants globals =
     fprintfn out "### Global roots for GC"
     fprintfn out "    .globl %s" globRootsTable
     fprintfn out "    .section .rdata,\"dr\""
+    fprintfn out "%s:" globRootsTable
 
     List.iter printEntry constants
     List.iter printEntry globals
