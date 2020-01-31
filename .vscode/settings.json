@@ -5,5 +5,4 @@
         "memory.h": "c",
         "objects.h": "c"
     },
-    "search.useIgnoreFiles": true
 }
