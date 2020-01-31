@@ -5,6 +5,27 @@
    "version": "0.2.0",
    "configurations": [
       {
+         "name": "(gdb) Launch",
+         "type": "cppdbg",
+         "request": "launch",
+         "program": "${workspaceFolder}/misc/a.exe",
+         "args": [],
+         "stopAtEntry": false,
+         "preLaunchTask": "compileScheme",
+         "cwd": "${workspaceFolder}",
+         "environment": [],
+         "externalConsole": false,
+         "MIMode": "gdb",
+         "miDebuggerPath": "gdb.exe",
+         "setupCommands": [
+             {
+                 "description": "Enable pretty-printing for gdb",
+                 "text": "-enable-pretty-printing",
+                 "ignoreFailures": true
+             }
+         ]
+      },
+      {
          "name": "Tests",
          "type": "coreclr",
          "request": "launch",

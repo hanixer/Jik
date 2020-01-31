@@ -21,6 +21,7 @@
 	(vector-set! v 0 255)
 
 	(let ([v (make-vector 1)])
+		(vector-set! v 0 127)
 	1)
 
 	(vector-ref v 0))

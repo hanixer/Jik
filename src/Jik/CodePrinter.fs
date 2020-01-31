@@ -107,16 +107,18 @@ let printGlobalOriginals out originals globals =
 let printGlobalRoots out constants globals =
     let printEntry thing =
         fprintfn out "    .quad %s" thing
-
+    let label = freshLabel ".LC"
     fprintfn out "########################"
     fprintfn out "### Global roots for GC"
     fprintfn out "    .globl %s" globRootsTable
     fprintfn out "    .section .rdata,\"dr\""
-    fprintfn out "%s:" globRootsTable
+    fprintfn out "%s:" label
 
     List.iter printEntry constants
     List.iter printEntry globals
     fprintfn out "    .quad 0" // Put zeros to know where table ends.
+    fprintfn out "%s:" globRootsTable
+    fprintfn out "    .quad %s" label
     fprintfn out "###"
 
 
