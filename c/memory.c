@@ -2,6 +2,8 @@
 #include <windows.h>
 #include <stdio.h>
 
+// #define DEBUG_LOG_GC
+
 extern ptr_t **globRootsTable;
 
 uint64_t *freePointer;
@@ -71,7 +73,9 @@ void copyVectorOrClosure(ptr_t *p, uint64_t tag)
 	{
 		// forward pointer.
 		*p = (firstCell - 1) + tag;
+#ifdef DEBUG_LOG_GC
 		printf("Already copied to ToSpace. New address: %p\n", *p);
+#endif
 	}
 	else
 	{
@@ -81,23 +85,31 @@ void copyVectorOrClosure(ptr_t *p, uint64_t tag)
 		*pFrom = pTo | 1; // Add forward bit.
 		copyPtrEnd += size;
 		*p = pTo | tag;
+#ifdef DEBUG_LOG_GC
 		printf("Copy object to ToSpace.\n");
 		printf("size = %d, new address = %p\n", size, pTo);
+#endif
 	}
 }
 
 /// Cheney copying algorithm.
 void copyData(ptr_t *p)
 {
+#ifdef DEBUG_LOG_GC
 	printf("copyData: %p\n", *p);
+#endif
 	if (isVector(*p))
 	{
+#ifdef DEBUG_LOG_GC
 		printf("vector\n");
+#endif
 		copyVectorOrClosure(p, vectorTag);
 	}
 	else if (isClosure(*p))
 	{
+#ifdef DEBUG_LOG_GC
 		printf("closure\n");
+#endif
 		copyVectorOrClosure(p, closureTag);
 	}
 
@@ -116,6 +128,7 @@ void collect(uint64_t *rootStack, int64_t bytesNeeded)
 		exit(1);
 	}
 
+#ifdef DEBUG_LOG_GC
 	printf("--- we are in collect\n");
 	printf("--- freePointer    = 0x%p\n", freePointer);
 	printf("--- fromSpaceBegin = 0x%p\n", fromSpaceBegin);
@@ -125,6 +138,7 @@ void collect(uint64_t *rootStack, int64_t bytesNeeded)
 	hexDump("root stack", rootStackBegin, (rootStack - rootStackBegin) * wordSize);
 	hexDump("from space", fromSpaceBegin, (fromSpaceEnd - fromSpaceBegin) * wordSize);
 	hexDump("to space", toSpaceBegin, (toSpaceEnd - toSpaceBegin) * wordSize);
+#endif
 
 	copyPtrBegin = toSpaceBegin;
 	copyPtrEnd = toSpaceBegin;
@@ -158,8 +172,10 @@ void collect(uint64_t *rootStack, int64_t bytesNeeded)
 
 	memset(toSpaceBegin, 0, (toSpaceEnd - toSpaceBegin) * wordSize);
 
+#ifdef DEBUG_LOG_GC
 	hexDump("from space", fromSpaceBegin, (fromSpaceEnd - fromSpaceBegin) * wordSize);
 	hexDump("to space", toSpaceBegin, (toSpaceEnd - toSpaceBegin) * wordSize);
+#endif
 }
 
 void hexDump(const char *desc, const void *addr, const int len)
