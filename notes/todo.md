@@ -232,7 +232,7 @@ Pairs:
 # Garbage collector
 - [x] Expose allocation.
 - [x] Table of globals and constants for GC roots.
-- [ ] Save closure pointer before collect.
+- [x] Save closure pointer before collect.
 - [x] Add a root stack.
 
 Root stack.

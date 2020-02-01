@@ -223,7 +223,7 @@ let convertSlots (prog : Program) =
         | Slot n ->
             Deref((slots - n) * wordSize, Rsp)
         | RootStackSlot n ->
-            Deref(-n * wordSize, R15)
+            Deref(-(n + 1) * wordSize, R15) // + 1 because closure pointer is store at 0(r15).
         | _ -> arg
 
     let handleInstr slots rootSlots (op, args) =
@@ -322,7 +322,7 @@ let addFuncPrologAndEpilog (prog : Program) =
 
     let handleDef def =
         let stack = (def.SlotsOccupied + 1) * wordSize // What is + 1? Maybe for closure pointer rsi.
-        let rootStack = def.RootStackSlots * wordSize
+        let rootStack = (def.RootStackSlots + 1) * wordSize // + 1 because closure pointer is stored at 0(r15).
         let rest = List.collect (restoreStack stack rootStack) def.Instrs
         let instrs = argumentCheckAndStackAlloc def.Args def.IsDotted stack rootStack
         { def with Instrs = instrs @ rest }

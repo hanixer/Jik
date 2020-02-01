@@ -20,8 +20,12 @@
 	(vector-set! v 0 x)
 	v))
 
-(f 1)
+(define (g x y)
+	(+ x y))
 
-(let ([v (f 2)])
-	(f 3)
-	(vector-ref v 0))
+(apply g (cons 1 (cons 2 '())))
+
+; (let ([v (f 2)])
+; 	(f 3)
+; 	(vector-ref v 0))
+; (make-vector 1)

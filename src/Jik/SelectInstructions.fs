@@ -61,11 +61,11 @@ let checkForClosureTag =
      JmpIf(Ne, errorHandlerLabel), []]
 
 let makeIndirectCall func =
-    [Mov, [Reg Rsi; Deref(0, Rsp)] // Save current closure pointer
+    [Mov, [Reg Rsi; Deref(0, R15)] // Save current closure pointer
      Mov, [Var func; Reg Rsi]] @
     checkForClosureTag @
     [CallIndirect, [Deref(-closureTag + wordSize, Rsi)]
-     Mov, [Deref(0, Rsp); Reg Rsi]]
+     Mov, [Deref(0, R15); Reg Rsi]] // Restore closure pointer
 
 /// Main function for indirect non-tail call.
 let compileCall label blocks func args =
@@ -407,7 +407,9 @@ let rec declToInstrs (dest, x) =
         [Mov, [Var size; Reg Rdx]
          Sar, [Int 2; Reg Rdx]
          Mov, [Reg R15; Reg Rcx]
-         Call(collectFunction), []]
+         Mov, [Reg Rsi; Deref(0, R15)]
+         Call(collectFunction), []
+         Mov, [Deref(0, R15); Reg Rsi]]
     | e -> failwithf "declToInstrs: %s %A" dest e
 
 let transferToInstrs blocks = function

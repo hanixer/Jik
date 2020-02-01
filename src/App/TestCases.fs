@@ -593,9 +593,9 @@ let quotientRemainderTests =
       "(remainder -17 -9)", "-8\n" ]
 
 let writeInt =
-    [ "(write-int 1)(flush-output-port (current-output-port))(exit-scheme)", "1\n"
-      "(write-int 102030)(flush-output-port (current-output-port))(exit-scheme)", "102030\n"
-      "(write-int -102030)(flush-output-port (current-output-port))(exit-scheme)", "-102030\n" ]
+    [ "(write-int 1 (current-output-port))(flush-output-port (current-output-port))(exit-scheme)", "1\n"
+      "(write-int 102030 (current-output-port))(flush-output-port (current-output-port))(exit-scheme)", "102030\n"
+      "(write-int -102030 (current-output-port))(flush-output-port (current-output-port))(exit-scheme)", "-102030\n" ]
 
 let localDefine =
     [ "
