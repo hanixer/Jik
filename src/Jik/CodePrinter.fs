@@ -160,6 +160,7 @@ let programToString writeGlobals (prog : Program) =
     let handleDef def =
         fprintfn out "    .text"
         fprintfn out "    .globl %s" def.Name
+        fprintfn out "%s:" def.Name
         showInstrs out def.Instrs
         fprintfn out "\n\n"
 

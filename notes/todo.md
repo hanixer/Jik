@@ -233,9 +233,21 @@ Pairs:
 - [x] Expose allocation.
 - [x] Table of globals and constants for GC roots.
 - [ ] Save closure pointer before collect.
-- [ ] Add a root stack.
+- [x] Add a root stack.
 
 Root stack.
+Need to save all values of the root stack.
+Because it's necessary to change value of garbage collected values.
+It is not possible to do that for stack saved values.
+How to do that?
+Probably, add a tag to each Var to denote where it should be stored.
+Then during slot allocation plase, we place it in correct slot.
+Можно иначе сделать...
+Во время selectInstruction можно запомнить переменные, которые пойдут на root stack.
+Далее, в более поздней фазе, заменить все такие переменные ссылками на root stack.
+Кроме, нужно обработать все аргументы. Их нужно перенести на root stack, а ссылки на
+аргументы заменить ссылками на root stack.
+
 It will contain values that could be a reachable object for garbage collection.
 It can also contain primitive values.
 But it will not contain result of primitive operations that return for example, int, chars, bools...

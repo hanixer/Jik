@@ -471,6 +471,7 @@ let doPrimitiveUseHeap (_, simple) =
 
 let selectInstructions (prog : Intermediate.Program) : Program =
     let mutable rootStackSlots = 0
+    let rootStackVars = System.Collections.Generic.HashSet<string>()
 
     let moveBlockArgToRootStack arg =
         rootStackSlots <- rootStackSlots + 1
@@ -481,19 +482,25 @@ let selectInstructions (prog : Intermediate.Program) : Program =
             // check type of primitive.
             // if primitive allocates heap memory, copy to root stack.
             let instrs = declToInstrs decl
-            let dest, _ = decl
             if doPrimitiveUseHeap decl then
-                instrs @
-                [moveBlockArgToRootStack dest]
-            else
-                instrs
+                let dest, _ = decl
+                rootStackVars.Add(dest) |> ignore
+            instrs
 
         | Transfer tran -> transferToInstrs blocks tran
 
-    let handleBlock blocks (name, args, stmts) =
-        let saveToRoot = List.map moveBlockArgToRootStack args
+    let handleBlock procName blocks (name, args, stmts) =
         let stmts = List.collect (handleStmt blocks) stmts
-        (Label name, []) :: saveToRoot @ stmts
+        if procName <> name then
+            // Add args to the root stack unless current block is function entry block.
+            // Arguments of the procedure is handled differently.
+            // See convertVarsToSlots().
+            rootStackVars.UnionWith(args) |> ignore
+            (Label name, []) :: stmts
+        else
+            /// Do not add label to the function entry block.
+            /// It will be added in CodePrinter.
+            stmts
 
     let errorHandler =
         [Label(errorHandlerLabel), []
@@ -504,9 +511,9 @@ let selectInstructions (prog : Intermediate.Program) : Program =
 
     let entryPointLabel = freshLabel "entryPoint"
 
-    let handleDef proc =
+    let handleDef (proc : Intermediate.Function) =
         let instrs =
-            List.collect (handleBlock proc.Blocks) proc.Blocks
+            List.collect (handleBlock proc.Name proc.Blocks) proc.Blocks
         let graph = makeGraph []
         let slots = List.length proc.Args
         { Name = proc.Name
@@ -518,7 +525,8 @@ let selectInstructions (prog : Intermediate.Program) : Program =
           LiveBefore = Map.empty
           LiveAfter = Map.empty
           SlotsOccupied = slots
-          RootStackSlots = rootStackSlots }
+          RootStackSlots = rootStackSlots
+          RootStackVars = Seq.toList rootStackVars }
 
     let entryPointDef =
         match prog.Main.Blocks with

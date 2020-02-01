@@ -90,7 +90,8 @@ type FunctionDef =
       LiveBefore : Map<int, Set<Operand>>
       LiveAfter : Map<int, Set<Operand>>
       SlotsOccupied : int
-      RootStackSlots : int }
+      RootStackSlots : int
+      RootStackVars : string list }
 
 type Program =
     { Procedures : FunctionDef list
@@ -112,7 +113,8 @@ let emptyFuncDef =
       LiveBefore = Map.empty
       LiveAfter = Map.empty
       SlotsOccupied = 0
-      RootStackSlots = 0 }
+      RootStackSlots = 0
+      RootStackVars = [] }
 
 let allRegisters =
     [Rsp; Rbp; Rax; Rbx; Rcx; Rdx; Rsi; Rdi;
@@ -253,6 +255,8 @@ let allocateCons car cdr dest =
       Or, [Int pairTag; dest]
       Add, [Int (3 * wordSize); GlobalValue(freePointer)]]
 
+/// Construct a list from arguments that belongs to the dotted argument,
+/// (lambda (one . dotted) ...)
 let constructDottedArgument args =
     let loopStart = freshLabel "loopStart"
     let loopEnd = freshLabel "loopEnd"
@@ -317,12 +321,11 @@ let addFuncPrologAndEpilog (prog : Program) =
         | x -> [x]
 
     let handleDef def =
-        let firstInstr, rest = List.head def.Instrs, List.tail def.Instrs
-        let stack = (def.SlotsOccupied + 1) * wordSize
+        let stack = (def.SlotsOccupied + 1) * wordSize // What is + 1? Maybe for closure pointer rsi.
         let rootStack = def.RootStackSlots * wordSize
-        let rest = List.collect (restoreStack stack rootStack) rest
+        let rest = List.collect (restoreStack stack rootStack) def.Instrs
         let instrs = argumentCheckAndStackAlloc def.Args def.IsDotted stack rootStack
-        { def with Instrs = firstInstr :: instrs @ rest }
+        { def with Instrs = instrs @ rest }
 
     { prog with Procedures = List.map handleDef prog.Procedures }
 
@@ -351,12 +354,19 @@ let rec patchInstr (prog : Program) =
 
     transformInstructions handleInstrs prog
 
+/// Convert local variables and arguments to stack and root stack slots.
+///
+/// All arguments are moved to root stack slots.
+/// Local variables that belongs to def.RootStackVars
+/// are also stored on  root stack.
+/// All other variables are stored on the normal stack.
+/// Root count of stack vars also is set here.
 let convertVarsToSlots (prog : Program) =
     let handleArg env arg =
         match arg with
         | Var var ->
             match Map.tryFind var env with
-            | Some(slot) -> Slot slot
+            | Some(slot) -> slot
             | _ ->
                 failwithf "var %s was not found in env %A" var env
         | _ -> arg
@@ -371,24 +381,29 @@ let convertVarsToSlots (prog : Program) =
         }
         Set.ofSeq vars
 
-    let makeEnv args vars =
-        let addToEnv (env, i) var =
+    let makeEnv args rootStackVars vars =
+        let addToEnv (env, stackI, rootI) var =
             if Map.containsKey var env then
-                env, i
+                env, stackI, rootI
+            else if Seq.contains var rootStackVars then
+                Map.add var (RootStackSlot rootI) env, stackI, rootI + 1
             else
-                Map.add var i env, i + 1
+                Map.add var (Slot stackI) env, stackI + 1, rootI
 
-        let initial = Seq.mapi (fun i arg -> arg, i) args |> Map.ofSeq
-        let env, _ = Seq.fold addToEnv (initial, initial.Count) vars
-        env
+        let initial = Seq.mapi (fun i arg -> arg, RootStackSlot i) args |> Map.ofSeq
+        let env, _, rootCount = Seq.fold addToEnv (initial, Seq.length args, Seq.length args) vars
+        env, rootCount
 
     let handleDef def =
         let vars = collectVars def.Instrs
-        let env = makeEnv def.Args vars
-        let used = def.SlotsOccupied + env.Count
+        let env, rootCount = makeEnv def.Args def.RootStackVars vars
+        let used = def.SlotsOccupied + env.Count // Probably, this can be just env.Count.
         let slots = if used % 2 <> 0 then used + 1 else used // To preserve alignment.
-        {def with Instrs = List.map (handleInstr env) def.Instrs
-                  SlotsOccupied = slots }
+        let moveArgs = List.mapi (fun i _ -> Mov, [Slot i; RootStackSlot i]) def.Args
+        let instrs = List.map (handleInstr env) def.Instrs
+        {def with Instrs = moveArgs @ instrs
+                  SlotsOccupied = slots
+                  RootStackSlots = rootCount }
 
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
@@ -405,8 +420,7 @@ let createMainModule constants globals globOriginal entryPoints =
     let initGlobals = Seq.collect initGlobal globals |> Seq.toList
 
     let instrs =
-        [Label(schemeEntryLabel), []
-         Push, [Reg R15]
+        [Push, [Reg R15]
          Mov, [Reg Rsp; Reg R15]
          Mov, [Reg Rcx; Reg Rsp]
          Push, [Reg Rbp]
