@@ -346,8 +346,9 @@ let rec declToInstrs (dest, x) =
     // Closures.
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
         let offset = (List.length args + 2) * wordSize
+        let size = (List.length args + 1) <<< fixnumShift
         [Mov, [GlobalValue(freePointer); Reg R11]
-         Mov, [Int 0; Deref(0, R11)]
+         Mov, [Int size; Deref(0, R11)]
          Lea(label), [Deref(wordSize, R11)]] @
         moveClosureArgs args @
         [Mov, [Int offset; Reg R12]

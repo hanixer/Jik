@@ -15,13 +15,13 @@
 ; 		   (vector-ref (vector-ref v 2) 0))
 ; 		44))
 
-(let ([v (make-vector 1)])
-	1)
-(let ([v (make-vector 1)])
-	(vector-set! v 0 255)
-
+(define (f x)
 	(let ([v (make-vector 1)])
-		(vector-set! v 0 127)
-	1)
+	(vector-set! v 0 x)
+	v))
 
+(f 1)
+
+(let ([v (f 2)])
+	(f 3)
 	(vector-ref v 0))

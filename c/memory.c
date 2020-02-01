@@ -62,27 +62,43 @@ void gcInitialize(uint64_t heapSize, uint64_t rootStackSize)
 	rootStackBegin[0] = 0;
 }
 
+void copyVectorOrClosure(ptr_t *p, uint64_t tag)
+{
+	ptr_t pHeap = (*p - tag);
+	ptr_t *pFrom = (ptr_t *)pHeap;
+	uint64_t firstCell = *pFrom; // Value in the first cell of the object.
+	if (firstCell & 1)
+	{
+		// forward pointer.
+		*p = (firstCell - 1) + tag;
+		printf("Already copied to ToSpace. New address: %p\n", *p);
+	}
+	else
+	{
+		ptr_t size = (firstCell >> fixnumShift) + 1;
+		ptr_t pTo = (ptr_t)copyPtrEnd;
+		memcpy(copyPtrEnd, pFrom, size * wordSize);
+		*pFrom = pTo | 1; // Add forward bit.
+		copyPtrEnd += size;
+		*p = pTo | tag;
+		printf("Copy object to ToSpace.\n");
+		printf("size = %d, new address = %p\n", size, pTo);
+	}
+}
+
 /// Cheney copying algorithm.
 void copyData(ptr_t *p)
 {
+	printf("copyData: %p\n", *p);
 	if (isVector(*p))
 	{
-		ptr_t pHeap = (*p - vectorTag);
-		if (pHeap & 1)
-		{
-			// forward pointer.
-			*p = (pHeap - 1) + vectorTag;
-		}
-		else
-		{
-			ptr_t *pFrom = (ptr_t *)pHeap;
-			ptr_t size = ((*pFrom) >> fixnumShift) + 1;
-			ptr_t pTo = (ptr_t)copyPtrEnd;
-			memcpy(copyPtrEnd, pFrom, size * wordSize);
-			*pFrom = pTo | 1; // Add forward bit.
-			copyPtrEnd += size;
-			*p = pTo;
-		}
+		printf("vector\n");
+		copyVectorOrClosure(p, vectorTag);
+	}
+	else if (isClosure(*p))
+	{
+		printf("closure\n");
+		copyVectorOrClosure(p, closureTag);
 	}
 
 	// if (isPair(p) || isVector(p) || isString(p) || isClosure(p)) {
@@ -94,12 +110,19 @@ void hexDump(const char *desc, const void *addr, const int len);
 
 void collect(uint64_t *rootStack, int64_t bytesNeeded)
 {
+	if (rootStack < rootStackBegin)
+	{
+		printf("Error! rootStack (0x%p) is less than rootStackBegin (0x%p)", rootStack, rootStackBegin);
+		exit(1);
+	}
+
 	printf("--- we are in collect\n");
-	printf("--- freePointer    = %p\n", freePointer);
-	printf("--- fromSpaceBegin = %p\n", fromSpaceBegin);
-	printf("--- fromSpaceEnd   = %p\n", fromSpaceEnd);
-	printf("--- stack          = %p\n", rootStack);
+	printf("--- freePointer    = 0x%p\n", freePointer);
+	printf("--- fromSpaceBegin = 0x%p\n", fromSpaceBegin);
+	printf("--- fromSpaceEnd   = 0x%p\n", fromSpaceEnd);
+	printf("--- stack          = 0x%p\n", rootStack);
 	printf("--- size           = %d\n", bytesNeeded);
+	hexDump("root stack", rootStackBegin, (rootStack - rootStackBegin) * wordSize);
 	hexDump("from space", fromSpaceBegin, (fromSpaceEnd - fromSpaceBegin) * wordSize);
 	hexDump("to space", toSpaceBegin, (toSpaceEnd - toSpaceBegin) * wordSize);
 
@@ -107,9 +130,10 @@ void collect(uint64_t *rootStack, int64_t bytesNeeded)
 	copyPtrEnd = toSpaceBegin;
 
 	// Copy root stack data.
-	for (uint64_t *curr = rootStack; *curr != 0; curr--)
+	for (uint64_t *curr = rootStack; curr != rootStackBegin; curr--)
 	{
 		copyData(curr);
+		// hexDump("from space after copy", fromSpaceBegin, (fromSpaceEnd - fromSpaceBegin) * wordSize);
 	}
 
 	// Copy data pointed by globals.
@@ -171,7 +195,6 @@ void hexDump(const char *desc, const void *addr, const int len)
 			uint64_t va = pu64[j];
 			printf("0x%016x ", pu64[j]);
 		}
-
 
 		// New line.
 		printf("\n");

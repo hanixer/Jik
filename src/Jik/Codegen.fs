@@ -320,7 +320,7 @@ let addFuncPrologAndEpilog (prog : Program) =
         let firstInstr, rest = List.head def.Instrs, List.tail def.Instrs
         let stack = (def.SlotsOccupied + 1) * wordSize
         let rootStack = def.RootStackSlots * wordSize
-        let rest = List.collect (restoreStack stack def.RootStackSlots) rest
+        let rest = List.collect (restoreStack stack rootStack) rest
         let instrs = argumentCheckAndStackAlloc def.Args def.IsDotted stack rootStack
         { def with Instrs = firstInstr :: instrs @ rest }
 
