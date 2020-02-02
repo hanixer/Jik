@@ -163,35 +163,39 @@ let callRuntime func =
 
 let compileMakeVector size dest =
     let shift = if wordSize = 8 then 3 else 2
-    [Mov, [GlobalValue(freePointer); Reg R11]
+    [Mov, [size; Reg Rax]
+     Sar, [Int fixnumShift; Reg Rax]
+     Add, [Int 1; Reg Rax]
+     IMul, [Int wordSize; Reg Rax]
+     Mov, [Reg Rax; Reg Rdx]
+     Mov, [Reg Rsi; Deref(0, R15)]
+     Mov, [Reg R15; Reg Rcx]
+     Call("allocate"), []
+     Mov, [Deref(0, R15); Reg Rsi]
+     Mov, [Reg Rax; Reg R11]
      Mov, [size; Deref(0, R11)]
      Or, [Int vectorTag; Reg R11]
-     Mov, [Reg R11; Var dest]
-     Mov, [size; Reg R11]
-     Sar, [Int fixnumShift; Reg R11]
-     Add, [Int 1; Reg R11]
-     Sal, [Int shift; Reg R11]
-     Add, [Reg R11; GlobalValue(freePointer)]]
+     Mov, [Reg R11; Var dest]]
 
 let compileMakeString size dest =
-    [Mov, [GlobalValue(freePointer); Reg R11]
+    [Mov, [size; Reg Rax]
+     Sar, [Int fixnumShift; Reg Rax]
+     Add, [Int wordSize; Reg Rax]
+     Mov, [Reg Rax; Reg Rdx]
+     Mov, [Reg Rsi; Deref(0, R15)]
+     Mov, [Reg R15; Reg Rcx]
+     Call("allocate"), []
+     Mov, [Deref(0, R15); Reg Rsi]
+     Mov, [Reg Rax; Reg R11]
      Mov, [size; Deref(0, R11)]
      Or, [Int stringTag; Reg R11]
-     Mov, [Reg R11; Var dest]
-     Mov, [size; Reg R11]
-     Sar, [Int fixnumShift; Reg R11]
-     Add, [Int wordSize; Reg R11]
-     Add, [Int (wordSize - 1); Reg R11]
-     And, [Int (-wordSize); Reg R11]
-     Add, [Reg R11; GlobalValue(freePointer)]]
+     Mov, [Reg R11; Var dest]]
 
 let vectorAddress vec index =
     [Mov, [Var vec; Reg R11]
      Mov, [index; Reg R12]
      Sar, [Int fixnumShift; Reg R12]
      Add, [Int 1; Reg R12]]
-
-
 
 let rec declToInstrs (dest, x) =
     match x with
@@ -277,13 +281,7 @@ let rec declToInstrs (dest, x) =
          Or, [Int charTag; Reg Rax]
          Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Cons, [var1; var2]) ->
-        [Mov, [GlobalValue(freePointer); Reg R11]
-         Mov, [Int 0; Deref(0, R11)]
-         Mov, [Var var1; Deref(wordSize, R11)]
-         Mov, [Var var2; Deref(2 * wordSize, R11)]
-         Or, [Int pairTag; Reg R11]
-         Mov, [Reg R11; Var dest]
-         Add, [Int (3 * wordSize); GlobalValue(freePointer)]]
+        allocateCons (Var var1) (Var var2) (Var dest)
     | Simple.Prim(Prim.IsPair, [var1]) ->
         compileIsOfType dest var1 pairMask pairTag
     | Simple.Prim(Prim.IsNull, [var1]) ->
@@ -347,14 +345,18 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
         let offset = (List.length args + 2) * wordSize
         let size = (List.length args + 1) <<< fixnumShift
-        [Mov, [GlobalValue(freePointer); Reg R11]
-         Mov, [Int size; Deref(0, R11)]
-         Lea(label), [Deref(wordSize, R11)]] @
-        moveClosureArgs args @
-        [Mov, [Int offset; Reg R12]
-         Add, [Reg R12; GlobalValue(freePointer)]
-         Or, [Int closureTag; Reg R11]
+        [Mov, [Int offset; Reg Rdx] // Size to allocate.
+         Mov, [Reg Rsi; Deref(0, R15)]
+         Mov, [Reg R15; Reg Rcx] // Root stack pointer.
+         Call("allocate"), []
+         Mov, [Deref(0, R15); Reg Rsi]
+         Mov, [Reg Rax; Reg R11]
+         Mov, [Int size; Deref(0, R11)] // The first cell is for size and forwarding bit.
+         Lea(label), [Deref(wordSize, R11)]] @ // The second is for label.
+        moveClosureArgs args @ // Remaining cells are for free variables.
+        [Or, [Int closureTag; Reg R11]
          Mov, [Reg R11; Var dest]]
+
     | Simple.Prim(Prim.ClosureRef, [var1]) ->
         [Mov, [Var var1; Reg Rax]
          Sar, [Int fixnumShift; Reg Rax]
@@ -547,4 +549,3 @@ let selectInstructions (prog : Intermediate.Program) : Program =
       ErrorHandler = errorHandler
       Entry = entryPointLabel
       Strings = prog.Strings }
-

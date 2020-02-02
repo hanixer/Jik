@@ -234,6 +234,24 @@ Pairs:
 - [x] Table of globals and constants for GC roots.
 - [x] Save closure pointer before collect.
 - [x] Add a root stack.
+- [x] move allocate() to C.
+
+How to allocate strings?
+How many bytes do we need for a string? A quad for size + forward pointer beet + a byte for each character.
+It is possible that a string have odd number of characters.
+What information does GC need about size?
+GC needs to know what amount of data it needs to copy.
+
+Тут проблемка возникла.
+При копировании данных в ToSpace копируются все данные объекта. В случае, если это замыкание,
+то копируется и адрес функции.
+А мы смотрим, что представляет из себя адрес.
+Как же мы можем понять, что копируем правильные данные?
+Если мы сейчас указываем на замыкание, то можно пропускать ту ячейку, в которой лежит адрес функции.
+А как мы можем понять, что мы копируем замыкание?
+
+Решение проблемы - использовать bitmap. Каждый бит соответствует чему? слову в heap. Если он 1, значит
+соответствующий адрес занят блоком.
 
 Root stack.
 Need to save all values of the root stack.

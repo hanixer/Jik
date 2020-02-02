@@ -247,13 +247,17 @@ let convertSlots (prog : Program) =
                 Main = handleDef prog.Main }
 
 let allocateCons car cdr dest =
-     [Mov, [GlobalValue(freePointer); Reg R11]
-      Mov, [Int 0; Deref(0, R11)]
-      Mov, [car; Deref(wordSize, R11)]
-      Mov, [cdr; Deref(2 * wordSize, R11)]
-      Mov, [Reg R11; dest]
-      Or, [Int pairTag; dest]
-      Add, [Int (3 * wordSize); GlobalValue(freePointer)]]
+    [Mov, [Int (3 * wordSize); Reg Rdx]
+     Mov, [Reg Rsi; Deref(0, R15)]
+     Mov, [Reg R15; Reg Rcx]
+     Call("allocate"), []
+     Mov, [Deref(0, R15); Reg Rsi]
+     Mov, [Reg Rax; Reg R11]
+     Mov, [Int 0; Deref(0, R11)]
+     Mov, [car; Deref(wordSize, R11)]
+     Mov, [cdr; Deref(2 * wordSize, R11)]
+     Or, [Int pairTag; Reg R11]
+     Mov, [Reg R11; dest]]
 
 /// Construct a list from arguments that belongs to the dotted argument,
 /// (lambda (one . dotted) ...)
@@ -429,7 +433,8 @@ let createMainModule constants globals globOriginal entryPoints =
          Push, [Reg R13]
          Push, [Reg R12]
          Push, [Reg Rbx]
-         Mov, [GlobalValue rootStackBegin; Reg R15]] @
+         Mov, [GlobalValue rootStackBegin; Reg R15]
+         Mov, [Int 0; Reg Rsi]] @
         initGlobals @
         calls @
         [Pop, [Reg Rbx]

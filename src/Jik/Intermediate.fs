@@ -636,4 +636,4 @@ let allIntermediateTransformations =
     convertProgram
     >> analyzeFreeVars
     >> closureConversion
-    >> exposeAllocations
+    // >> exposeAllocations

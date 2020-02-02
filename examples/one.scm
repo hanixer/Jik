@@ -15,17 +15,20 @@
 ; 		   (vector-ref (vector-ref v 2) 0))
 ; 		44))
 
-(define (f x)
-	(let ([v (make-vector 1)])
-	(vector-set! v 0 x)
-	v))
+; (define (f x)
+; 	(let ([v (make-vector 1)])
+; 	(vector-set! v 0 x)
+; 	v))
 
-(define (g x y)
-	(+ x y))
+; (define (g x y)
+; 	(+ x y))
 
-(apply g (cons 1 (cons 2 '())))
+; (apply g (cons 1 (cons 2 '())))
 
 ; (let ([v (f 2)])
 ; 	(f 3)
 ; 	(vector-ref v 0))
 ; (make-vector 1)
+(write-int 1 (current-output-port))
+(flush-output-port (current-output-port))
+(exit-scheme)

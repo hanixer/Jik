@@ -3,6 +3,7 @@
         "*.ss": "scheme",
         "windows.h": "c",
         "memory.h": "c",
-        "objects.h": "c"
+        "objects.h": "c",
+        "assert.h": "c"
     },
 }

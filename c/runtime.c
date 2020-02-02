@@ -15,7 +15,7 @@ extern char *globVarNameTable[];
 static void printPair(ptr_t p);
 static void printVector(ptr_t p);
 static void printString(ptr_t p);
-char *copyString(ptr_t p);
+char *allocAndCopyString(ptr_t p);
 
 void printPtr(ptr_t p)
 {
@@ -175,7 +175,7 @@ void s_error(ptr_t x)
     exit(1);
 }
 
-char *copyString(ptr_t p)
+char *allocAndCopyString(ptr_t p)
 {
     int size = stringSize(p);
     char *str = stringData(p);
@@ -190,7 +190,7 @@ char *copyString(ptr_t p)
 
 ptr_t s_openFileW(ptr_t filename)
 {
-    char *str = copyString(filename);
+    char *str = allocAndCopyString(filename);
     int fd = open(str, O_CREAT | O_WRONLY);
     int err = errno;
     char *estr = strerror(err);
@@ -200,7 +200,7 @@ ptr_t s_openFileW(ptr_t filename)
 
 ptr_t s_openFileR(ptr_t filename)
 {
-    char *str = copyString(filename);
+    char *str = allocAndCopyString(filename);
     int fd = open(str, O_RDONLY);
     int err = errno;
     char *estr = strerror(err);
