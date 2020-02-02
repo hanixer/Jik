@@ -48,7 +48,7 @@ let main argv =
     // printf "result: %s" (sexprToString desug)
 
 
-    // runTestGroupWithLib "symbols" symbols
+    runTestGroupWithLib "symbols" symbols
     runTestGroupWithLib "apply nontail" applyNonTail
     runTestGroupWithLib "apply tail" applyTail
     runTestGroup true "eofTests" eofTests

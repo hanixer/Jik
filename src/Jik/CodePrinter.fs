@@ -144,6 +144,7 @@ let programToString writeGlobals (prog : Program) =
         fprintfn out "    .space %d" wordSize
 
     let printConstant globl =
+        fprintfn out "    .globl %s" globl
         fprintfn out "    .bss"
         fprintfn out "    .align %d" wordSize
         fprintfn out "%s:" globl
@@ -165,12 +166,12 @@ let programToString writeGlobals (prog : Program) =
         fprintfn out "\n\n"
 
     List.iter printStringConst prog.Strings
-    List.iter printConstant prog.ConstantsNames
 
     if writeGlobals then
         printGlobalRoots out prog.ConstantsNames prog.Globals
         printGlobalOriginals out prog.GlobalsOriginal prog.Globals
         List.iter printGlobal prog.Globals
+        List.iter printGlobal prog.ConstantsNames
 
     List.iter handleDef prog.Procedures
 

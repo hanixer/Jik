@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define DEBUG_LOG_GC
+// #define DEBUG_LOG_GC
 #define DEBUG_FORCE_GC
 
 extern ptr_t **globRootsTable;
@@ -86,8 +86,6 @@ void markInBitmap(uint8_t *bitmap, uint64_t *spaceBegin, uint64_t *address)
 	uint64_t q = diff / 8;
 	uint64_t r = diff % 8;
 	bitmap[q] = bitmap[q] | (1 << r);
-
-	hexDump("bitmap changed: ", bitmap, bitmapSize);
 }
 
 void copyHelper(ptr_t *p, ptr_t *pFrom, uint64_t size, uint64_t tag)
@@ -171,8 +169,6 @@ void copyPair(ptr_t *p)
 	ptr_t pHeap = (*p - pairTag);
 	ptr_t *pFrom = (ptr_t *)pHeap;
 
-	printf("valid address? %d\n", isAddressValid(pFrom));
-
 	if (!isAddressValid(pFrom)) return;
 
 	uint64_t firstCell = *pFrom; // Value in the first cell of the object.
@@ -217,7 +213,6 @@ void copyData(ptr_t *p)
 
 void *allocate(uint64_t *rootStack, uint64_t size)
 {
-	printf("allocate size = %d\n", (int) size);
 #ifdef DEBUG_FORCE_GC
 	collect(rootStack, size);
 #endif
