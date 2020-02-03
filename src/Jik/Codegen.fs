@@ -412,6 +412,32 @@ let convertVarsToSlots (prog : Program) =
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
 
+/// Removes saving values of global variables to temporary variables,
+/// replace by direct access.
+/// This is necessary for garbage collection.
+/// Whitout it we will have broken pointers on the stack.
+let convertGlobalRefs (prog : Program) =
+    let env = System.Collections.Generic.Dictionary<string, string>()
+
+    let handleArg arg =
+        match arg with
+        | Var var ->
+            if env.ContainsKey(var) then
+                GlobalValue(env.[var])
+            else
+                Var var
+        | _ -> arg
+
+    let handleInstr (instr : Instr) =
+        match instr with
+        | Mov, [GlobalValue(glob); Var dest] ->
+            env.Add(dest, glob)
+            []
+        | op, args ->
+            [op, List.map handleArg args]
+
+    transformInstructions (List.collect handleInstr) prog
+
 let createMainModule constants globals globOriginal entryPoints =
     let initGlobal name =
         [Mov, [Int undefinedLiteral; GlobalValue name]]

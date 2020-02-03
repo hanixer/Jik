@@ -112,9 +112,6 @@ let e19 = "
 (foreign-call \"s_print6args\" 1 2 3 4 5 6)
 (foreign-call \"s_print6args\" 1 2 3 4 5 6)
 #t"
-let e20 = "
-(define (sum x y) (+ x y))
-(foreign-call \"apply\" sum (cons 1 (cons 2 '())))"
 let apply = "
 (let ((sum (lambda (x y) (+ x y))))
     (let ((args (cons 1 (cons 2 '()))))

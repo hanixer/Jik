@@ -21,7 +21,7 @@ open Compile
 [<EntryPoint>]
 let main argv =
     let toRoot = Util.getPathRelativeToRoot
-    let defaultS = [toRoot "misc/sourceFile.scm"]
+    let defaultS = [toRoot "examples/one.scm"]
     let sources =
         if argv.Length > 0 then
             argv |> List.ofArray

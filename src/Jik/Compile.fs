@@ -28,7 +28,8 @@ let sourceFile = ""
 let allCodegenTransformations =
     selectInstructions
     >> (fun x -> CodePrinter.programToString false x |> saveToFile (miscPath + "asm.s"); x)
-    >> revealGlobals
+    // >> revealGlobals // seems that this is useless
+    >> convertGlobalRefs
     >> convertVarsToSlots
     >> convertSlots
     >> addFuncPrologAndEpilog

@@ -106,16 +106,30 @@ void copyHelper(ptr_t *p, ptr_t *pFrom, uint64_t size, uint64_t tag)
 /// We only check FromSpace case.
 int isAddressValid(uint64_t *p)
 {
-	if (!(p >= fromSpaceBegin && p < fromSpaceEnd))
+	if (p >= fromSpaceBegin && p < fromSpaceEnd)
+	{
+		uint64_t diff = p - fromSpaceBegin;
+		uint64_t q = diff / 8;
+		uint64_t r = diff % 8;
+
+		return fromBitmap[q] & (1 << r);
+	}
+	else if (1)
 	{
 		return 0;
 	}
+	else if (p >= toSpaceBegin && p < toSpaceEnd)
+	{
+		uint64_t diff = p - toSpaceBegin;
+		uint64_t q = diff / 8;
+		uint64_t r = diff % 8;
 
-	uint64_t diff = p - fromSpaceBegin;
-	uint64_t q = diff / 8;
-	uint64_t r = diff % 8;
-
-	return fromBitmap[q] & (1 << r);
+		return toBitmap[q] & (1 << r);
+	}
+	else
+	{
+		return 0;
+	}
 }
 
 void copyVectorOrClosure(ptr_t *p, uint64_t tag)
@@ -248,6 +262,11 @@ static void finishCollection()
 	memset(toBitmap, 0, bitmapSize);
 
 #ifdef DEBUG_LOG_GC
+	hexDump("root stack", rootStackBegin, 10 * wordSize);
+	for (int i = 0; globRootsTable[i] != 0; i++)
+	{
+		hexDump("global", globRootsTable[i], wordSize);
+	}
 	hexDump("from space", fromSpaceBegin, (fromSpaceEnd - fromSpaceBegin) * wordSize);
 	hexDump("to space", toSpaceBegin, (toSpaceEnd - toSpaceBegin) * wordSize);
 	printf("######################\n");
