@@ -116,23 +116,23 @@
 (define %header
      (lambda (rows)
           (newline)
-          (write (length rows))
-          (write "-queen(s)")
+          (display (length rows))
+          (display "-queen(s)")
           (newline)
-          (write "list: ")
-          (write (reverse rows))
+          (display "list: ")
+          (display (reverse rows))
           (newline)
           (for 0 (length rows)
-               (lambda (x) (write " _")))
+               (lambda (x) (display " _")))
           (newline)))
 
 (define %row
      (lambda (p n)
           (for 0 n
                (lambda (x)
-                    (write "|")
-                    (write (if (= (+ x 1) p) "o" " "))))
-          (write "|")
+                    (display "|")
+                    (display (if (= (+ x 1) p) "o" " "))))
+          (display "|")
           (newline)))
 
 (define %print-rows
@@ -151,7 +151,7 @@
           (newline)
           (if (= (length rows) 0)
               (begin
-                (write "no solution found!")
+                (display "no solution found!")
                 (newline))
               (%print-rows (reverse rows) (length rows)))))
 
@@ -170,4 +170,4 @@
 
 ;; "main"
 (tui)
-
+; (queens 4)

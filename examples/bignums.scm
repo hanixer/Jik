@@ -4,9 +4,9 @@
 
 (define % (lambda (a b) (remainder a b)))
 (define / (lambda (a b) (quotient a b)))
-(define print-int write-int)
+(define print-int write)
 (define print-char write-char)
-(define print-string write-string)
+(define print-string write)
 (define nil '())
 
 
@@ -64,16 +64,15 @@
 
 (define bignum-fact
   (lambda (n)
+    (display "bignumfact: ")
+    (write n)
+    (newline)
     (if (= 0 n)
         (int->bignum 1)
         (*b (int->bignum n) (bignum-fact (- n 1))))))
 
 (print-string "Compute the factorial of? ")
 (let ((n (read-int)))
-  ; (foreign-call "printPtr" n)
-  ; (print-int n)
-n
-  ; (print-string "! = ")
-  ; (bignum-print (bignum-fact n))
-  ; (newline)
+  (bignum-print (bignum-fact n))
+  (newline)
   )

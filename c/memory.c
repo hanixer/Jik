@@ -283,6 +283,7 @@ static void finishCollection()
 
 void collect(uint64_t *rootStack, int64_t bytesNeeded)
 {
+	// printf("!!!!!! collect: size = %d\n", bytesNeeded);
 	if (rootStack < rootStackBegin)
 	{
 		printf("Error! rootStack (0x%p) is less than rootStackBegin (0x%p)", rootStack, rootStackBegin);

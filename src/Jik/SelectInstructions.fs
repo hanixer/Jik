@@ -157,6 +157,7 @@ let compileIsOfType dest var1 mask tag =
     @ compileSetOnEqual dest
 
 let callRuntime func =
+    alignStackPointer @
     [Sub, [Int (4 * wordSize); Reg Rsp]
      Call(func), []
      Add, [Int (4 * wordSize); Reg Rsp]]

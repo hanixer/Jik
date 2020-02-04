@@ -136,6 +136,7 @@ let isArithm = function
 
 let isRegister = function | Reg _ -> true | _ -> false
 
+let alignStackPointer = [And, [Int -16; Reg Rsp]]
 
 let getCar reg dest = Mov, [Deref(-pairTag + wordSize, reg); dest]
 let getCdr reg dest = Mov, [Deref(-pairTag + 2 * wordSize, reg); dest]
