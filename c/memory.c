@@ -88,17 +88,17 @@ void markInBitmap(uint8_t *bitmap, uint64_t *spaceBegin, uint64_t *address)
 	bitmap[q] = bitmap[q] | (1 << r);
 }
 
-void copyHelper(ptr_t *p, ptr_t *pFrom, uint64_t size, uint64_t tag)
+void copyHelper(ptr_t *p, ptr_t *pFrom, uint64_t quadsCount, uint64_t tag)
 {
 	ptr_t pTo = (ptr_t)copyPtrEnd;
-	memcpy(copyPtrEnd, pFrom, size * wordSize);
+	memcpy(copyPtrEnd, pFrom, quadsCount * wordSize);
 	*pFrom = pTo | 1; // Add forward bit.
-	copyPtrEnd += size;
+	copyPtrEnd += quadsCount;
 	*p = pTo | tag;
 	markInBitmap(toBitmap, toSpaceBegin, (uint64_t*) pTo);
 #ifdef DEBUG_LOG_GC
 	printf("Copy object to ToSpace.\n");
-	printf("size = %d, new address = %p\n", size, pTo);
+	printf("size = %d, new address = %p\n", quadsCount, pTo);
 #endif
 }
 
@@ -173,7 +173,9 @@ void copyString(ptr_t *p)
 	}
 	else
 	{
-		ptr_t size = ((firstCell >> fixnumShift) + (wordSize - 1) / wordSize) + 1;
+		uint64_t shifted = firstCell >> fixnumShift;
+		uint64_t rounded = shifted + (wordSize - 1);
+		uint64_t size = (rounded / wordSize) + 1;
 		copyHelper(p, pFrom, size, stringTag);
 	}
 }
@@ -227,10 +229,13 @@ void copyData(ptr_t *p)
 
 void *allocate(uint64_t *rootStack, uint64_t size)
 {
+	uint64_t sizeAligned = (size + (wordSize - 1)) / wordSize;
+#ifdef DEBUG_LOG_GC
+	printf("allocate: size = %d, aligned = %d\n", size, sizeAligned);
+#endif
 #ifdef DEBUG_FORCE_GC
 	collect(rootStack, size);
 #endif
-	uint64_t sizeAligned = (size + (wordSize - 1)) / wordSize;
 	if (freePointer + size >= fromSpaceEnd)
 	{
 		collect(rootStack, size);

@@ -161,33 +161,36 @@ let callRuntime func =
      Call(func), []
      Add, [Int (4 * wordSize); Reg Rsp]]
 
+let callAllocate size dest =
+    [Mov, [size; Reg Rdx] // Size to allocate.
+     Mov, [Reg Rsi; Deref(0, R15)]
+     Mov, [Reg R15; Reg Rcx] // Root stack pointer.
+     Mov, [Reg Rsp; Reg Rbp]
+     Sub, [Int wordSize; Reg Rsp]
+     And, [Int -32; Reg Rsp]
+     Sub, [Int (4*wordSize); Reg Rsp]
+     Call("allocate"), []
+     Mov, [Deref(0, R15); Reg Rsi]
+     Mov, [Reg Rbp; Reg Rsp]
+     Mov, [Reg Rax; dest]]
+
 let compileMakeVector size dest =
-    let shift = if wordSize = 8 then 3 else 2
     [Mov, [size; Reg Rax]
      Sar, [Int fixnumShift; Reg Rax]
      Add, [Int 1; Reg Rax]
      IMul, [Int wordSize; Reg Rax]
-     Mov, [Reg Rax; Reg Rdx]
-     Mov, [Reg Rsi; Deref(0, R15)]
-     Mov, [Reg R15; Reg Rcx]
-     Call("allocate"), []
-     Mov, [Deref(0, R15); Reg Rsi]
-     Mov, [Reg Rax; Reg R11]
-     Mov, [size; Deref(0, R11)]
+     Mov, [Reg Rax; Reg Rdx]] @
+    callAllocate (Reg Rax) (Reg R11) @
+    [Mov, [size; Deref(0, R11)]
      Or, [Int vectorTag; Reg R11]
      Mov, [Reg R11; Var dest]]
 
 let compileMakeString size dest =
     [Mov, [size; Reg Rax]
      Sar, [Int fixnumShift; Reg Rax]
-     Add, [Int wordSize; Reg Rax]
-     Mov, [Reg Rax; Reg Rdx]
-     Mov, [Reg Rsi; Deref(0, R15)]
-     Mov, [Reg R15; Reg Rcx]
-     Call("allocate"), []
-     Mov, [Deref(0, R15); Reg Rsi]
-     Mov, [Reg Rax; Reg R11]
-     Mov, [size; Deref(0, R11)]
+     Add, [Int wordSize; Reg Rax]] @
+    callAllocate (Reg Rax) (Reg R11) @
+    [Mov, [size; Deref(0, R11)]
      Or, [Int stringTag; Reg R11]
      Mov, [Reg R11; Var dest]]
 
@@ -281,7 +284,12 @@ let rec declToInstrs (dest, x) =
          Or, [Int charTag; Reg Rax]
          Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Cons, [var1; var2]) ->
-        allocateCons (Var var1) (Var var2) (Var dest)
+        let restoreStack = [Mov, [Reg Rbp; Reg Rsp]]
+        [Mov, [Reg Rsp; Reg Rbp]
+         Sub, [Int wordSize; Reg Rsp]
+         And, [Int -32; Reg Rsp]
+         Sub, [Int (4*wordSize); Reg Rsp]] @
+        allocateCons (Var var1) (Var var2) (Var dest) restoreStack
     | Simple.Prim(Prim.IsPair, [var1]) ->
         compileIsOfType dest var1 pairMask pairTag
     | Simple.Prim(Prim.IsNull, [var1]) ->
@@ -345,13 +353,8 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
         let offset = (List.length args + 2) * wordSize
         let size = (List.length args + 1) <<< fixnumShift
-        [Mov, [Int offset; Reg Rdx] // Size to allocate.
-         Mov, [Reg Rsi; Deref(0, R15)]
-         Mov, [Reg R15; Reg Rcx] // Root stack pointer.
-         Call("allocate"), []
-         Mov, [Deref(0, R15); Reg Rsi]
-         Mov, [Reg Rax; Reg R11]
-         Mov, [Int size; Deref(0, R11)] // The first cell is for size and forwarding bit.
+        callAllocate (Int offset) (Reg R11) @
+        [Mov, [Int size; Deref(0, R11)] // The first cell is for size and forwarding bit.
          Lea(label), [Deref(wordSize, R11)]] @ // The second is for label.
         moveClosureArgs args @ // Remaining cells are for free variables.
         [Or, [Int closureTag; Reg R11]

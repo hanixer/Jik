@@ -246,12 +246,13 @@ let convertSlots (prog : Program) =
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
 
-let allocateCons car cdr dest =
+let allocateCons car cdr dest restoreStack =
     [Mov, [Int (3 * wordSize); Reg Rdx]
      Mov, [Reg Rsi; Deref(0, R15)]
      Mov, [Reg R15; Reg Rcx]
-     Call("allocate"), []
-     Mov, [Deref(0, R15); Reg Rsi]
+     Call("allocate"), []] @
+    restoreStack @
+    [Mov, [Deref(0, R15); Reg Rsi]
      Mov, [Reg Rax; Reg R11]
      Mov, [Int 0; Deref(0, R11)]
      Mov, [car; Deref(wordSize, R11)]
@@ -266,36 +267,43 @@ let constructDottedArgument args =
     let loopEnd = freshLabel "loopEnd"
     let finalPos = -wordSize * (List.length args)
 
-    // r9 - points to argument on stack
-    // r11 - points to allocated cell
-    // r10 - previous cell or nil
-    // rcx - number of remaining arguments
+    // R12 - points to argument on stack
+    // R13 - previous cell or nil
+    // R14 - number of remaining arguments
+    // RBP - holds RSP.
     [Mov, [Reg Rcx; Reg Rax]
-     Sub, [Int (List.length args - 1); Reg Rcx]
+     Mov, [Reg Rcx; Reg R14]
+     Sub, [Int (List.length args - 1); Reg R14]
      JmpIf(S, errorHandlerLabel), []
 
      // Initialize registers.
      IMul, [Int wordSize; Reg Rax]
-     Mov, [Reg Rsp; Reg R9]
-     Sub, [Reg Rax; Reg R9] // point to the last argument
-     Mov, [Int nilLiteral; Reg R10]
+     Mov, [Reg Rsp; Reg R12]
+     Sub, [Reg Rax; Reg R12] // point to the last argument
+     Mov, [Int nilLiteral; Reg R13]
+     Mov, [Reg Rsp; Reg Rbp]
+     Sub, [Reg Rax; Reg Rsp]
+     Sub, [Int wordSize; Reg Rsp]
+     And, [Int -32; Reg Rsp]
+     Sub, [Int (4*wordSize); Reg Rsp]
 
      // Loop start.
      Label(loopStart), []
-     Cmp, [Int 0; Reg Rcx]
+     Cmp, [Int 0; Reg R14]
      JmpIf(E, loopEnd), []] @
 
     // Allocate cons.
-    allocateCons (Deref(0, R9)) (Reg R10) (Reg R10) @
+    allocateCons (Deref(0, R12)) (Reg R13) (Reg R13) [] @
 
     // Decrement arg counter, increment pointer to next arg.
-    [Sub, [Int 1; Reg Rcx]
-     Add, [Int wordSize; Reg R9]
+    [Sub, [Int 1; Reg R14]
+     Add, [Int wordSize; Reg R12]
 
      // Repeat.
      Jmp(loopStart), []
      // loop end
      Label(loopEnd), []
+     Mov, [Reg Rbp; Reg Rsp]
      Mov, [Reg R10; Deref(finalPos, Rsp)]]
 
 /// If function has variable arity (isDotted = true)

@@ -23,17 +23,6 @@ let printIr s =
     |> saveToFile (miscPath + s)
     prog)
 
-let testLambda str =
-    let r = stringToProgram str
-    let r = fixArithmeticPrims r
-    let r = convertGlobalRefs r
-    let r = alphaRename r
-    let r = assignmentConvert r
-    let r = Intermediate.convertProgram r
-    let r = Intermediate.analyzeFreeVars r
-    let r = Intermediate.closureConversion r
-    printIr "test.ir" r |> ignore
-
 let runTestString source expected =
     let exe = Util.getPathRelativeToRoot ("misc/a.exe")
     Compile.compileSchemeStringToBinary true source exe
@@ -48,11 +37,11 @@ let main argv =
     // printf "result: %s" (sexprToString desug)
 
 
-    runTestGroupWithLib "symbols" symbols
-    runTestGroupWithLib "apply nontail" applyNonTail
-    runTestGroupWithLib "apply tail" applyTail
-    runTestGroup true "eofTests" eofTests
-    runTestGroup true "writeInt" writeInt
+    // runTestGroupWithLib "symbols" symbols
+    // runTestGroupWithLib "apply nontail" applyNonTail
+    // runTestGroupWithLib "apply tail" applyTail
+    // runTestGroup true "eofTests" eofTests
+    // runTestGroup true "writeInt" writeInt
     runTestGroup false "defineTests" defineTests
     runTestGroup false "localDefine" localDefine
     runTestGroup false "quotientTests" quotientRemainderTests

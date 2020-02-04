@@ -244,7 +244,7 @@ int main()
     char *stack = allocateProtectedSpace(stackSize);
     char *stackHigherAddr = stack + stackSize - 2 * wordSize;
     // int heapSize = 50;
-    int heapSize = 100 * 1024 * 4096;
+    int heapSize = 1000 * 1024;
     int rootStackSize = stackSize;
     gcInitialize(heapSize, rootStackSize);
     ptr_t result = schemeEntry(stackHigherAddr);
