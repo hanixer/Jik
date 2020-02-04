@@ -47,7 +47,6 @@ type Prim =
     | MakeSymbol
     | SymbolString
     | IsSymbol
-    | Error // this primitive receives a single argument - a string. Should be called from scheme library.
     | EofObject
     | IsEofObject
     | Collect

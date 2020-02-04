@@ -39,7 +39,8 @@ let symbolMask = 0x07
 
 let freePointer = "freePointer"
 let errorHandlerLabel = ".L_errorHandler"
-let wrongArgCountHandle = ".L_wrongArgCountHandler"
+let wrongArgCountHandler = ".L_wrongArgCountHandler"
+let procErrorHandler = ".L_procErrorHandler"
 let globVarErrorHandler = ".L_globVarErrorHandler"
 let globVarNameTable = "globVarNameTable"
 let globRootsTable = "globRootsTable"

@@ -58,7 +58,7 @@ let checkForClosureTag =
     [Mov, [Int closureMask; Reg Rax]
      And, [Reg Rsi; Reg Rax]
      Cmp, [Int closureTag; Reg Rax]
-     JmpIf(Ne, errorHandlerLabel), []]
+     JmpIf(Ne, procErrorHandler), []]
 
 let makeIndirectCall func =
     [Mov, [Reg Rsi; Deref(0, R15)] // Save current closure pointer
@@ -395,9 +395,6 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.IsEofObject, [var1]) ->
         compileIsOfType dest var1 eofMask eofTag
 
-    | Simple.Prim(Prim.Error, [describe]) ->
-        [Mov, [Var describe; Reg Rcx]
-         Jmp(errorHandlerLabel), []]
     | Simple.Prim(Prim.CheckFreePointer, [size]) ->
         [Mov, [Var size; Reg Rax]
          Sar, [Int fixnumShift; Reg Rax]
@@ -515,7 +512,11 @@ let selectInstructions (prog : Intermediate.Program) : Program =
          Sub, [Int wordSize; Reg Rsp]] @
         callRuntime "asmError" @
         [Label(globVarErrorHandler), []] @
-        callRuntime "globVarError"
+        callRuntime "globVarError" @
+        [Label(wrongArgCountHandler), []] @
+        callRuntime "wrongArgCountError" @
+        [Label(procErrorHandler), []] @
+        callRuntime "procError"
 
     let entryPointLabel = freshLabel "entryPoint"
 

@@ -148,6 +148,18 @@ void asmError()
     exit(1);
 }
 
+void procError()
+{
+    fprintf(stderr, "error, closure is expected for call, but wrong object is given");
+    exit(1);
+}
+
+void wrongArgCountError()
+{
+    fprintf(stderr, "error, wrong number of arguments is passed to a function");
+    exit(1);
+}
+
 void globVarError(char *varAddress)
 {
     // see printGlobalOriginals in CodePrinter.fs

@@ -279,7 +279,7 @@ let constructDottedArgument args =
     [Mov, [Reg Rcx; Reg Rax]
      Mov, [Reg Rcx; Reg R14]
      Sub, [Int (List.length args - 1); Reg R14]
-     JmpIf(S, errorHandlerLabel), []
+     JmpIf(S, wrongArgCountHandler), []
 
      // Initialize registers.
      IMul, [Int wordSize; Reg Rax]
@@ -336,7 +336,7 @@ let argumentCheckAndStackAlloc args isDotted space rootStack =
          Add, [Int rootStack; Reg R15]]
     else
         [Cmp, [Int (List.length args); Reg Rcx]
-         JmpIf(Ne, errorHandlerLabel), []
+         JmpIf(Ne, wrongArgCountHandler), []
          Sub, [Int space; Reg Rsp]
          Add, [Int rootStack; Reg R15]]
 
