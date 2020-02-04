@@ -37,11 +37,11 @@ let main argv =
     // printf "result: %s" (sexprToString desug)
 
 
-    // runTestGroupWithLib "symbols" symbols
-    // runTestGroupWithLib "apply nontail" applyNonTail
-    // runTestGroupWithLib "apply tail" applyTail
-    // runTestGroup true "eofTests" eofTests
-    // runTestGroup true "writeInt" writeInt
+    runTestGroupWithLib "symbols" symbols
+    runTestGroupWithLib "apply nontail" applyNonTail
+    runTestGroupWithLib "apply tail" applyTail
+    runTestGroup true "eofTests" eofTests
+    runTestGroup true "writeInt" writeInt
     runTestGroup false "defineTests" defineTests
     runTestGroup false "localDefine" localDefine
     runTestGroup false "quotientTests" quotientRemainderTests

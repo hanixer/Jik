@@ -266,6 +266,10 @@ let constructDottedArgument args =
     let loopStart = freshLabel "loopStart"
     let loopEnd = freshLabel "loopEnd"
     let finalPos = -wordSize * (List.length args)
+    // Stack is aligned. RSP is set to point before arguments,
+    // so that call to allocate() won't clobber them.
+    // Root stack is extended to store intermediate result list (R13),
+    // because GC could remove that list.
 
     // R12 - points to argument on stack
     // R13 - previous cell or nil
@@ -286,25 +290,39 @@ let constructDottedArgument args =
      Sub, [Int wordSize; Reg Rsp]
      And, [Int -32; Reg Rsp]
      Sub, [Int (4*wordSize); Reg Rsp]
+     Add, [Int wordSize; Reg R15]
 
      // Loop start.
      Label(loopStart), []
      Cmp, [Int 0; Reg R14]
-     JmpIf(E, loopEnd), []] @
+     JmpIf(E, loopEnd), []
+     Mov, [Reg R13; Deref(-wordSize, R15)]] @ // Save intermediate list.
 
     // Allocate cons.
-    allocateCons (Deref(0, R12)) (Reg R13) (Reg R13) [] @
+    [Mov, [Int (3 * wordSize); Reg Rdx]
+     Mov, [Reg Rsi; Deref(0, R15)]
+     Mov, [Reg R15; Reg Rcx]
+     Call("allocate"), []] @
+    [Mov, [Deref(0, R15); Reg Rsi]
+     Mov, [Deref(-wordSize, R15); Reg R13] // Restore intermediate list.
+     Mov, [Reg Rax; Reg R11]
+     Mov, [Int 0; Deref(0, R11)] // First cell of block.
+     Mov, [(Deref(0, R12)); Deref(wordSize, R11)] // car
+     Mov, [(Reg R13); Deref(2 * wordSize, R11)] // cdr
+     Or, [Int pairTag; Reg R11]
+     Mov, [Reg R11; Reg R13]
 
-    // Decrement arg counter, increment pointer to next arg.
-    [Sub, [Int 1; Reg R14]
-     Add, [Int wordSize; Reg R12]
+     Sub, [Int 1; Reg R14]  // Decrement arg counter.
+     Add, [Int wordSize; Reg R12] // Increment pointer to next arg.
 
      // Repeat.
      Jmp(loopStart), []
-     // loop end
+
+     // Loop end.
      Label(loopEnd), []
+     Sub, [Int wordSize; Reg R15]
      Mov, [Reg Rbp; Reg Rsp]
-     Mov, [Reg R10; Deref(finalPos, Rsp)]]
+     Mov, [Reg R13; Deref(finalPos, Rsp)]]
 
 /// If function has variable arity (isDotted = true)
 /// then construct last argument as list,

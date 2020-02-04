@@ -1,1 +1,2 @@
-'(1 . 3)
+(let ([f (lambda args args)])
+      (f 10 20))

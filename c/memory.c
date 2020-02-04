@@ -305,7 +305,7 @@ void collect(uint64_t *rootStack, int64_t bytesNeeded)
 	copyPtrEnd = toSpaceBegin;
 
 	// Copy root stack data.
-	for (uint64_t *curr = rootStack; curr != rootStackBegin; curr--)
+	for (uint64_t *curr = rootStack; curr >= rootStackBegin; curr--)
 	{
 		copyData(curr);
 		// hexDump("from space after copy", fromSpaceBegin, (fromSpaceEnd - fromSpaceBegin) * wordSize);
