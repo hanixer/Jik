@@ -342,3 +342,4 @@ references.fsx
 .ionide
 
 *.stackdump
+gdb.txt

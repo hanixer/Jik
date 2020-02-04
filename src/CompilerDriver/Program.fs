@@ -24,8 +24,9 @@ let main argv =
     let defaultS = [toRoot "examples/queens.scm"]
     let sources =
         if argv.Length > 0 then
-            argv |> List.ofArray
+            argv |> List.ofArray |> List.filter (fun (a:string) -> a.StartsWith("-") |> not)
         else
             defaultS
-    compileFilesToBinary true sources defaultOutFile
+    let useLib = Seq.contains "-nolib" argv |> not
+    compileFilesToBinary useLib sources defaultOutFile
     0 // return an integer exit code

@@ -326,6 +326,8 @@ void collect(uint64_t *rootStack, int64_t bytesNeeded)
 	}
 
 	finishCollection();
+
+	// printf("in the end %p\n", *rootStack);
 }
 
 void hexDump(const char *desc, const void *addr, int len)

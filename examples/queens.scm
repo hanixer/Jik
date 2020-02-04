@@ -30,7 +30,15 @@
 
 (define list-every?
      (lambda (p l)
+          (unless (or (pair? l) (null? l))
+               (write l)
+               (newline)
+               (error "list-every?: not null and not pair")) ;; debug
           (let loop ((l l))
+               (unless (or (pair? l) (null? l))
+                    (write l)
+                    (newline)
+                    (error "list-every?(inner): not null and not pair")) ;; debug
                (or (empty? l)
                    (and (p (car l))
                         (loop (cdr l)))))))
@@ -83,16 +91,18 @@
 ;;;;;;;;;;;;;;;;;;;;;
 ;; FINDING A SOLUTION
 
-(define queens
-     (letrec ((%advance
-               (lambda (partial n)
+(define %advance
+     (lambda (partial n)
                     (if (< (car partial) n)
                         (%queens (cons (+ 1 (car partial))
                                        (cdr partial))
                                  n) ;; try next value of (car partial)
-                        '())))   ;; there's no solution for (cdr partial)
-              (%queens
-               (lambda (partial n)
+                        '())))
+
+(define %queens
+     (lambda (partial n)
+                    (unless (procedure? %queens)
+                         (error "%queens: not a procedure!"))
                     (if (partial-ok partial)
                         (if (= (length partial) n)
                             partial ;; partial solution with full length: we're done
@@ -100,8 +110,10 @@
                               (if (empty? sol)
                                   (%advance partial n)
                                   sol)))
-                        (%advance partial n)))))
-       (lambda (n) (%queens (list 1) n))))
+                        (%advance partial n))))
+
+(define queens
+       (lambda (n) (%queens (list 1) n)))
 
 ;;;;;;;;;;;
 ;; PRINTING

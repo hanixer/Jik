@@ -259,10 +259,11 @@ let trySubstitute v mapping =
 
 let extendMapping vars mapping =
     let rec loop mapping var =
-        if Map.containsKey var mapping then
-            loop mapping (freshLabel var)
+        let newVar = (freshLabel var)
+        if Map.containsKey newVar mapping then
+            loop mapping newVar
         else
-            var
+            newVar
 
     let newVars = System.Collections.Generic.List<string>()
 

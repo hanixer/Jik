@@ -54,41 +54,42 @@ let getCallResultVar label blocks =
         failwith "handleTransfer: wrong number of vars"
     List.head argsOfBlock
 
-let checkForClosureTag =
+let checkForClosureTag procName =
     [Mov, [Int closureMask; Reg Rax]
      And, [Reg Rsi; Reg Rax]
      Cmp, [Int closureTag; Reg Rax]
+     Lea(procName), [Reg R10]
      JmpIf(Ne, procErrorHandler), []]
 
-let makeIndirectCall func =
+let makeIndirectCall procName func =
     [Mov, [Reg Rsi; Deref(0, R15)] // Save current closure pointer
      Mov, [Var func; Reg Rsi]] @
-    checkForClosureTag @
+    checkForClosureTag procName @
     [CallIndirect, [Deref(-closureTag + wordSize, Rsi)]
      Mov, [Deref(0, R15); Reg Rsi]] // Restore closure pointer
 
 /// Main function for indirect non-tail call.
-let compileCall label blocks func args =
+let compileCall procName label blocks func args =
     let resultVar = getCallResultVar label blocks
     moveArgsForCall args @
     [Mov, [Int args.Length; Reg Rcx]] @
-    makeIndirectCall func @
+    makeIndirectCall procName func @
     [Mov, [Reg Rax; Var resultVar]
      Jmp label, []]
 
-let compileApply label blocks func args =
+let compileApply procName label blocks func args =
     let resultVar = getCallResultVar label blocks
     let total = List.length args
     let stackOffset = (-1 - total) * wordSize // points to last argument
     moveArgsForCall args @
     spliceSlot stackOffset total @
-    makeIndirectCall func @
+    makeIndirectCall procName func @
     [Mov, [Reg Rax; Var resultVar]
      Jmp(label), []]
 
 /// Tail call compilation. Handles simple tail calls and tail 'apply'.
 /// shouldSplice - if true then the last argument is spliced for 'apply' support.
-let compileTailCall shouldSplice func args =
+let compileTailCall procName shouldSplice func args =
     let shiftArg i instr =
         match instr with
         | Mov, [_; arg2] -> Mov, [arg2; Slot(i)]
@@ -109,7 +110,7 @@ let compileTailCall shouldSplice func args =
     [Mov, [Var func; Reg Rsi]] @
     shiftStackArgs @
     restoreStack @
-    checkForClosureTag @
+    checkForClosureTag procName @
     [JmpIndirect, [Deref(-closureTag + wordSize, Rsi)]]
 
 let compileForeignCall label blocks foreignName args =
@@ -415,7 +416,7 @@ let rec declToInstrs (dest, x) =
          Mov, [Deref(0, R15); Reg Rsi]]
     | e -> failwithf "declToInstrs: %s %A" dest e
 
-let transferToInstrs blocks = function
+let transferToInstrs procName blocks = function
     | Return var ->
         [Mov, [Var var; Reg Rax]
          RestoreStack, []
@@ -434,13 +435,13 @@ let transferToInstrs blocks = function
          JmpIf (E, labelf), []
          Jmp(labelt), []]
     | Transfer.Call(NonTail label, func, args) ->
-        compileCall label blocks func args
+        compileCall procName label blocks func args
     | Transfer.Call(Tail, func, args) ->
-        compileTailCall false func args
+        compileTailCall procName false func args
     | Transfer.Apply(NonTail label, func, args) ->
-        compileApply label blocks func args
+        compileApply procName label blocks func args
     | Transfer.Apply(Tail, func, args) ->
-        compileTailCall true func args
+        compileTailCall procName true func args
     | ForeignCall(label, foreignName, args) ->
         compileForeignCall label blocks foreignName args
 
@@ -482,7 +483,7 @@ let selectInstructions (prog : Intermediate.Program) : Program =
         rootStackSlots <- rootStackSlots + 1
         Mov, [Var arg; RootStackSlot(rootStackSlots - 1)]
 
-    let handleStmt blocks = function
+    let handleStmt procName blocks = function
         | Decl decl ->
             // check type of primitive.
             // if primitive allocates heap memory, copy to root stack.
@@ -492,10 +493,10 @@ let selectInstructions (prog : Intermediate.Program) : Program =
                 rootStackVars.Add(dest) |> ignore
             instrs
 
-        | Transfer tran -> transferToInstrs blocks tran
+        | Transfer tran -> transferToInstrs procName blocks tran
 
     let handleBlock procName blocks (name, args, stmts) =
-        let stmts = List.collect (handleStmt blocks) stmts
+        let stmts = List.collect (handleStmt procName blocks) stmts
         if procName <> name then
             // Add args to the root stack unless current block is function entry block.
             // Arguments of the procedure is handled differently.
@@ -515,7 +516,8 @@ let selectInstructions (prog : Intermediate.Program) : Program =
         callRuntime "globVarError" @
         [Label(wrongArgCountHandler), []] @
         callRuntime "wrongArgCountError" @
-        [Label(procErrorHandler), []] @
+        [Label(procErrorHandler), []
+         Mov, [Reg R10; Reg Rcx]] @ // Pass address of the caller.
         callRuntime "procError"
 
     let entryPointLabel = freshLabel "entryPoint"

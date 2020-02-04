@@ -291,7 +291,7 @@ let constructDottedArgument args =
      Sub, [Int wordSize; Reg Rsp]
      And, [Int -32; Reg Rsp]
      Sub, [Int (4*wordSize); Reg Rsp]
-     Add, [Int wordSize; Reg R15]
+     Add, [Int (2*wordSize); Reg R15]
 
      // Loop start.
      Label(loopStart), []
@@ -321,7 +321,7 @@ let constructDottedArgument args =
 
      // Loop end.
      Label(loopEnd), []
-     Sub, [Int wordSize; Reg R15]
+     Sub, [Int (2*wordSize); Reg R15]
      Mov, [Reg Rbp; Reg Rsp]
      Mov, [Reg R13; Deref(finalPos, Rsp)]]
 

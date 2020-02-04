@@ -148,9 +148,9 @@ void asmError()
     exit(1);
 }
 
-void procError()
+void procError(void* caller)
 {
-    fprintf(stderr, "error, closure is expected for call, but wrong object is given");
+    fprintf(stderr, "error, closure is expected for call, but wrong object is given, caller = 0x%p", caller);
     exit(1);
 }
 
