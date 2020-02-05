@@ -261,37 +261,49 @@ let allocateCons car cdr dest restoreStack =
      Or, [Int pairTag; Reg R11]
      Mov, [Reg R11; dest]]
 
+let temporarySaveArgsOnRootStack args rootSlots =
+    let save i _ =
+        let slot = rootSlots - i - 1
+        Mov, [Deref(-(i + 1) * wordSize, Rsp); Deref(-slot * wordSize, R15)]
+    List.mapi save args
+
 /// Construct a list from arguments that belongs to the dotted argument,
 /// (lambda (one . dotted) ...)
 let constructDottedArgument args =
     let loopStart = freshLabel "loopStart"
     let loopEnd = freshLabel "loopEnd"
     let finalPos = -wordSize * (List.length args)
+    let rootSlots = List.length args + 1 + 1
+    let rootSpace = rootSlots * wordSize
     // Stack is aligned. RSP is set to point before arguments,
     // so that call to allocate() won't clobber them.
-    // Root stack is extended to store intermediate result list (R13),
+    // Root stack is extended to store arguments and intermediate result list (R13),
     // because GC could remove that list.
 
-    // R12 - points to argument on stack
+    // R12 - points to argument
     // R13 - previous cell or nil
     // R14 - number of remaining arguments
+    // RBX = arg count * wordSize
     // RBP - holds RSP.
-    [Mov, [Reg Rcx; Reg Rax]
+    [Mov, [Reg Rcx; Reg Rbx]
      Mov, [Reg Rcx; Reg R14]
      Sub, [Int (List.length args - 1); Reg R14]
      JmpIf(S, wrongArgCountHandler), []
 
+     // Prepare root stack.
+     Add, [Int rootSpace; Reg R15]] @
+    temporarySaveArgsOnRootStack args rootSlots @
+
      // Initialize registers.
-     IMul, [Int wordSize; Reg Rax]
-     Mov, [Reg Rsp; Reg R12]
-     Sub, [Reg Rax; Reg R12] // point to the last argument
+    [IMul, [Int wordSize; Reg Rbx]
+     Mov, [Reg R15; Reg R12]
+     Sub, [Int (2 * wordSize); Reg R12] // point to the last argument
      Mov, [Int nilLiteral; Reg R13]
      Mov, [Reg Rsp; Reg Rbp]
-     Sub, [Reg Rax; Reg Rsp]
+     Sub, [Reg Rbx; Reg Rsp]
      Sub, [Int wordSize; Reg Rsp]
      And, [Int -32; Reg Rsp]
-     Sub, [Int (4*wordSize); Reg Rsp]
-     Add, [Int (2*wordSize); Reg R15]
+     Sub, [Int (4 * wordSize); Reg Rsp]
 
      // Loop start.
      Label(loopStart), []
@@ -314,18 +326,18 @@ let constructDottedArgument args =
      Mov, [Reg R11; Reg R13]
 
      Sub, [Int 1; Reg R14]  // Decrement arg counter.
-     Add, [Int wordSize; Reg R12] // Increment pointer to next arg.
+     Sub, [Int wordSize; Reg R12] // Go to the next arg.
 
      // Repeat.
      Jmp(loopStart), []
 
      // Loop end.
      Label(loopEnd), []
-     Sub, [Int (2*wordSize); Reg R15]
+     Sub, [Int rootSpace; Reg R15]
      Mov, [Reg Rbp; Reg Rsp]
      Mov, [Reg R13; Deref(finalPos, Rsp)]]
 
-/// If function has variable arity (isDotted = true)
+/// If a function has variable arity (isDotted = true)
 /// then construct last argument as list,
 /// otherwise just check for number of arguments.
 /// Allocate stack space for local variables.

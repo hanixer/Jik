@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-// #define DEBUG_LOG_GC
+#define DEBUG_LOG_GC
 #define DEBUG_FORCE_GC
 
 extern ptr_t **globRootsTable;
@@ -230,6 +230,7 @@ void copyData(ptr_t *p)
 void *allocate(uint64_t *rootStack, uint64_t size)
 {
 	uint64_t sizeAligned = (size + (wordSize - 1)) / wordSize;
+	// int isFirstClos =
 #ifdef DEBUG_LOG_GC
 	printf("allocate: size = %d, aligned = %d\n", size, sizeAligned);
 #endif
@@ -246,7 +247,7 @@ void *allocate(uint64_t *rootStack, uint64_t size)
 	return p;
 }
 
-static void finishCollection()
+static void finishCollection(uint64_t *rootStack)
 {
 	uint64_t *pBegin = fromSpaceBegin;
 	uint64_t *pEnd = fromSpaceEnd;
@@ -267,13 +268,13 @@ static void finishCollection()
 	memset(toBitmap, 0, bitmapSize);
 
 #ifdef DEBUG_LOG_GC
-	hexDump("root stack", rootStackBegin, 10 * wordSize);
+	hexDump("root stack", rootStackBegin, (rootStack - rootStackBegin + 1) * wordSize);
 	for (int i = 0; globRootsTable[i] != 0; i++)
 	{
 		hexDump("global", globRootsTable[i], wordSize);
 	}
-	hexDump("from space", fromSpaceBegin, (fromSpaceEnd - fromSpaceBegin) * wordSize);
-	hexDump("to space", toSpaceBegin, (toSpaceEnd - toSpaceBegin) * wordSize);
+	hexDump("from space", fromSpaceBegin, (freePointer - fromSpaceBegin + 2) * wordSize);
+	hexDump("to space", toSpaceBegin, 10 * wordSize);
 	printf("######################\n");
 	printf("## collection finished\n");
 	printf("######################\n");
@@ -281,7 +282,7 @@ static void finishCollection()
 
 }
 
-void collect(uint64_t *rootStack, int64_t bytesNeeded)
+void collect(uint64_t * const rootStack, int64_t bytesNeeded)
 {
 	// printf("!!!!!! collect: size = %d\n", bytesNeeded);
 	if (rootStack < rootStackBegin)
@@ -297,9 +298,9 @@ void collect(uint64_t *rootStack, int64_t bytesNeeded)
 	printf("-- fromSpaceEnd   = 0x%p\n", fromSpaceEnd);
 	printf("-- stack          = 0x%p\n", rootStack);
 	printf("-- size           = %d\n", bytesNeeded);
-	hexDump("root stack", rootStackBegin, (rootStack - rootStackBegin) * wordSize);
-	hexDump("from space", fromSpaceBegin, (fromSpaceEnd - fromSpaceBegin) * wordSize);
-	hexDump("to space", toSpaceBegin, (toSpaceEnd - toSpaceBegin) * wordSize);
+	hexDump("root stack", rootStackBegin, (rootStack - rootStackBegin + 1) * wordSize);
+	hexDump("from space", fromSpaceBegin, (freePointer - fromSpaceBegin + 2) * wordSize);
+	hexDump("to space", toSpaceBegin, (freePointer - fromSpaceBegin + 2) * wordSize);
 #endif
 
 	copyPtrBegin = toSpaceBegin;
@@ -325,9 +326,7 @@ void collect(uint64_t *rootStack, int64_t bytesNeeded)
 		copyPtrBegin++;
 	}
 
-	finishCollection();
-
-	// printf("in the end %p\n", *rootStack);
+	finishCollection(rootStack);
 }
 
 void hexDump(const char *desc, const void *addr, int len)
@@ -337,7 +336,7 @@ void hexDump(const char *desc, const void *addr, int len)
 		printf("%s:\n", desc);
 	}
 
-	if (len > 126) len = 126;
+	// if (len > 126) len = 126;
 
 	const unsigned char *pch = (const unsigned char *)addr;
 

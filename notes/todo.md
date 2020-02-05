@@ -15,3 +15,6 @@
 - [ ] garbage collection - far far away...
 
 - [ ] Change alignment of stack pointer from 32 to 16.
+
+Need to save all args on the root stack, so we need another loop?
+First, put all arguments on the root stack.

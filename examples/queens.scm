@@ -30,18 +30,20 @@
 
 (define list-every?
      (lambda (p l)
-          (unless (or (pair? l) (null? l))
-               (write l)
-               (newline)
-               (error "list-every?: not null and not pair")) ;; debug
+          (display "list-every?: ")
+          (display l)
+          (newline)
           (let loop ((l l))
-               (unless (or (pair? l) (null? l))
-                    (write l)
-                    (newline)
-                    (error "list-every?(inner): not null and not pair")) ;; debug
                (or (empty? l)
                    (and (p (car l))
                         (loop (cdr l)))))))
+
+(define dbg
+     (lambda (s l)
+          (display s)
+          (display " ")
+          (display l)
+          (newline)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; CHECK IF NO TWO QUEENS IN A COLUMN
@@ -49,6 +51,7 @@
 ;; essentially checks for duplicates
 (define col-ok
   (lambda (rows)
+       (dbg "col-ok:" rows)
        (or (empty? rows)
            (and (list-every? (lambda (x) (not (= (car rows) x)))
                              (cdr rows))
@@ -65,6 +68,9 @@
 
 (define diag-ok
   (lambda (rows)
+       (dbg "diag-ok:" rows)
+       (list-every? (lambda (x) #t) rows)
+       (dbg "diag-ok:" rows)
        (or (empty? rows)
            (and (list-every? (lambda (pair)
                                   (not (on-diag (car rows)
@@ -78,12 +84,14 @@
 
 (define partial-ok
      (lambda (rows)
+          (dbg "partial-ok: " rows)
           (and (col-ok rows)
                (diag-ok rows))))
 
 ;; not actually used in the algorithm below
 (define queens-ok
      (lambda (rows n)
+          (dbg "queens-ok" rows)
           (and (list-every? (lambda (x) (<= x n)) rows) ; no elt. bigger than n
                (= n (length rows))              ; n queens
                (partial-ok rows))))             ; no conflict
@@ -91,18 +99,17 @@
 ;;;;;;;;;;;;;;;;;;;;;
 ;; FINDING A SOLUTION
 
-(define %advance
-     (lambda (partial n)
+(define queens
+     (letrec ((%advance
+               (lambda (partial n)
                     (if (< (car partial) n)
                         (%queens (cons (+ 1 (car partial))
                                        (cdr partial))
                                  n) ;; try next value of (car partial)
-                        '())))
-
-(define %queens
-     (lambda (partial n)
-                    (unless (procedure? %queens)
-                         (error "%queens: not a procedure!"))
+                        '())))   ;; there's no solution for (cdr partial)
+              (%queens
+               (lambda (partial n)
+                    (dbg "%queens: " partial)
                     (if (partial-ok partial)
                         (if (= (length partial) n)
                             partial ;; partial solution with full length: we're done
@@ -110,10 +117,8 @@
                               (if (empty? sol)
                                   (%advance partial n)
                                   sol)))
-                        (%advance partial n))))
-
-(define queens
-       (lambda (n) (%queens (list 1) n)))
+                        (%advance partial n)))))
+       (lambda (n) (%queens (list 1) n))))
 
 ;;;;;;;;;;;
 ;; PRINTING
@@ -181,5 +186,5 @@
 
 
 ;; "main"
-(tui)
-; (queens 4)
+; (tui)
+(queens 4)
