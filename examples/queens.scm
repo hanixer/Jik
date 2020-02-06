@@ -154,6 +154,8 @@
 
 (define %print-rows
   (lambda (rows n)
+     ; (display "entered print-rows")
+     ; (newline)
        (if (= (length rows) n)
            (%header rows))
        (if (empty? rows)
@@ -187,4 +189,5 @@
 
 ;; "main"
 ; (tui)
-(queens 4)
+; (print-solution (queens 10))
+(print-solution (list 1 3 2 4))

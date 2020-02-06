@@ -18,3 +18,5 @@
 
 Need to save all args on the root stack, so we need another loop?
 First, put all arguments on the root stack.
+
+Necessary to memset root stack before use.

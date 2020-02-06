@@ -461,14 +461,19 @@ let convertVarsToSlots (prog : Program) =
         else
             List.mapi (fun i _ -> Mov, [Slot i; RootStackSlot i]) args
 
+    let initRoot args rootCount =
+        let slots = [List.length args..rootCount - 1]
+        List.map (fun slot -> Mov, [Int 0; RootStackSlot slot]) slots
+
     let handleDef def =
         let vars = collectVars def.Instrs
         let env, rootCount = makeEnv def.Args def.RootStackVars vars
         let used = def.SlotsOccupied + env.Count // Probably, this can be just env.Count.
         let slots = if used % 2 <> 0 then used + 1 else used // To preserve alignment.
         let moveArgs = moveArgsToRoot def.IsDotted def.Args
+        let initRootSlots = initRoot def.Args rootCount
         let instrs = List.map (handleInstr env) def.Instrs
-        {def with Instrs = moveArgs @ instrs
+        {def with Instrs = moveArgs @ initRootSlots @ instrs
                   SlotsOccupied = slots
                   RootStackSlots = rootCount }
 
