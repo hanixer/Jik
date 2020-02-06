@@ -1,6 +1,6 @@
 (define %input-port-id 11644978)
 (define %input-port-length 7)
-(define %input-buf-size 4096)
+(define %input-buf-size 16)
 
 (define input-port?
     (lambda (port)

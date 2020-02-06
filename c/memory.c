@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define DEBUG_LOG_GC
+// #define DEBUG_LOG_GC
 #define DEBUG_FORCE_GC
 
 extern ptr_t **globRootsTable;
@@ -274,10 +274,11 @@ static void finishCollection(uint64_t *rootStack)
 		hexDump("global", globRootsTable[i], wordSize);
 	}
 	hexDump("from space", fromSpaceBegin, (freePointer - fromSpaceBegin + 2) * wordSize);
-	hexDump("to space", toSpaceBegin, 10 * wordSize);
+	// hexDump("to space", toSpaceBegin, 10 * wordSize);
 	printf("######################\n");
 	printf("## collection finished\n");
 	printf("######################\n");
+	fflush(stdout);
 #endif
 
 }
@@ -300,7 +301,7 @@ void collect(uint64_t * const rootStack, int64_t bytesNeeded)
 	printf("-- size           = %d\n", bytesNeeded);
 	hexDump("root stack", rootStackBegin, (rootStack - rootStackBegin + 1) * wordSize);
 	hexDump("from space", fromSpaceBegin, (freePointer - fromSpaceBegin + 2) * wordSize);
-	hexDump("to space", toSpaceBegin, (freePointer - fromSpaceBegin + 2) * wordSize);
+	// hexDump("to space", toSpaceBegin, (freePointer - fromSpaceBegin + 2) * wordSize);
 #endif
 
 	copyPtrBegin = toSpaceBegin;
