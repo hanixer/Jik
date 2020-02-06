@@ -137,6 +137,7 @@ let isArithm = function
 let isRegister = function | Reg _ -> true | _ -> false
 
 let alignStackPointer = [And, [Int -16; Reg Rsp]]
+let allocShadowSpace = [Sub, [Int (4 * wordSize); Reg Rsp]]
 
 let getCar reg dest = Mov, [Deref(-pairTag + wordSize, reg); dest]
 let getCdr reg dest = Mov, [Deref(-pairTag + 2 * wordSize, reg); dest]
@@ -224,7 +225,7 @@ let convertSlots (prog : Program) =
         | Slot n ->
             Deref((slots - n) * wordSize, Rsp)
         | RootStackSlot n ->
-            Deref(-(n + 1) * wordSize, R15) // + 1 because closure pointer is store at 0(r15).
+            Deref((rootSlots - n) * -wordSize, R15) // + 1 because closure pointer is stored at 0(r15).
         | _ -> arg
 
     let handleInstr slots rootSlots (op, args) =
@@ -267,90 +268,107 @@ let temporarySaveArgsOnRootStack args rootSlots =
         Mov, [Deref(-(i + 1) * wordSize, Rsp); Deref(-slot * wordSize, R15)]
     List.mapi save args
 
-/// Construct a list from arguments that belongs to the dotted argument,
-/// (lambda (one . dotted) ...)
-let constructDottedArgument args =
+let copyArgsToRootStack =
     let loopStart = freshLabel "loopStart"
     let loopEnd = freshLabel "loopEnd"
-    let finalPos = -wordSize * (List.length args)
-    let rootSlots = List.length args + 1 + 1
-    let rootSpace = rootSlots * wordSize
-    // Stack is aligned. RSP is set to point before arguments,
-    // so that call to allocate() won't clobber them.
-    // Root stack is extended to store arguments and intermediate result list (R13),
-    // because GC could remove that list.
-
-    // R12 - points to argument
-    // R13 - previous cell or nil
-    // R14 - number of remaining arguments
-    // RBX = arg count * wordSize
-    // RBP - holds RSP.
+    // RCX - number of arguments
+    // RBX - counter
+    // In the end R15 should point to 1 past the last argument.
     [Mov, [Reg Rcx; Reg Rbx]
-     Mov, [Reg Rcx; Reg R14]
-     Sub, [Int (List.length args - 1); Reg R14]
-     JmpIf(S, wrongArgCountHandler), []
-
-     // Prepare root stack.
-     Add, [Int rootSpace; Reg R15]] @
-    temporarySaveArgsOnRootStack args rootSlots @
-
-     // Initialize registers.
-    [IMul, [Int wordSize; Reg Rbx]
-     Mov, [Reg R15; Reg R12]
-     Sub, [Int (2 * wordSize); Reg R12] // point to the last argument
-     Mov, [Int nilLiteral; Reg R13]
-     Mov, [Reg Rsp; Reg Rbp]
-     Sub, [Reg Rbx; Reg Rsp]
-     Sub, [Int wordSize; Reg Rsp]
-     And, [Int -32; Reg Rsp]
-     Sub, [Int (4 * wordSize); Reg Rsp]
-
-     // Loop start.
+     Add, [Int wordSize; Reg R15]
      Label(loopStart), []
-     Cmp, [Int 0; Reg R14]
+     Cmp, [Int 0; Reg Rbx]
      JmpIf(E, loopEnd), []
-     Mov, [Reg R13; Deref(-wordSize, R15)]] @ // Save intermediate list.
+     Mov, [Deref4(0, Rsp, Rbx, wordSize); Deref(0, R15)]
+     Sub, [Int 1; Reg Rbx]
+     Add, [Int wordSize; Reg R15]
+     Jmp(loopStart), []
+     Label(loopEnd), []]
 
-    // Allocate cons.
-    [Mov, [Int (3 * wordSize); Reg Rdx]
+/// Construct dotted argument, that is construct a list from rest arguments.
+/// After this all arguments will be on the root stack
+/// and R15 will point one after the last argument.
+let constructDotted =
+    let loopStart = freshLabel "loopStart"
+    let loopEnd = freshLabel "loopEnd"
+    // RCX - number of actual arguments
+    // RDX - number of formal parameters
+    copyArgsToRootStack @
+    [Add, [Int wordSize; Reg R15]
+     Mov, [Int nilLiteral; Deref(-wordSize, R15)]
+
+    // Adjust stack pointer.
+     Push, [Reg Rbp]
+     Mov, [Reg Rsp; Reg Rbp]] @
+    alignStackPointer @
+    allocShadowSpace @
+
+    // Prepare counter RBX.
+    [Mov, [Reg Rcx; Reg Rbx]
+     Sub, [Reg Rdx; Reg Rbx]
+     Add, [Int 1; Reg Rbx]
+
+     Label(loopStart), []
+     Cmp, [Int 0; Reg Rbx]
+     JmpIf(E, loopEnd), []
+
+    // Call allocate().
+     Mov, [Int (3 * wordSize); Reg Rdx]
      Mov, [Reg Rsi; Deref(0, R15)]
      Mov, [Reg R15; Reg Rcx]
-     Call("allocate"), []] @
-    [Mov, [Deref(0, R15); Reg Rsi]
-     Mov, [Deref(-wordSize, R15); Reg R13] // Restore intermediate list.
+     Call("allocate"), []
+     Mov, [Deref(0, R15); Reg Rsi]
+
      Mov, [Reg Rax; Reg R11]
      Mov, [Int 0; Deref(0, R11)] // First cell of block.
-     Mov, [(Deref(0, R12)); Deref(wordSize, R11)] // car
-     Mov, [(Reg R13); Deref(2 * wordSize, R11)] // cdr
+     Mov, [Deref(-2 * wordSize, R15); Deref(wordSize, R11)] // car
+     Mov, [Deref(-wordSize, R15); Deref(2 * wordSize, R11)] // cdr
      Or, [Int pairTag; Reg R11]
-     Mov, [Reg R11; Reg R13]
 
-     Sub, [Int 1; Reg R14]  // Decrement arg counter.
-     Sub, [Int wordSize; Reg R12] // Go to the next arg.
-
-     // Repeat.
+     Sub, [Int wordSize; Reg R15]
+     Mov, [Reg R11; Deref(-wordSize, R15)]
+     Sub, [Int 1; Reg Rbx]
      Jmp(loopStart), []
 
-     // Loop end.
      Label(loopEnd), []
-     Sub, [Int rootSpace; Reg R15]
-     Mov, [Reg Rbp; Reg Rsp]
-     Mov, [Reg R13; Deref(finalPos, Rsp)]]
+     Mov, [Reg Rbp; Reg Rsp] // Restore stack pointer.
+     Pop, [Reg Rbp]
+     Ret, []]
 
 /// If a function has variable arity (isDotted = true)
 /// then construct last argument as list,
 /// otherwise just check for number of arguments.
 /// Allocate stack space for local variables.
-let argumentCheckAndStackAlloc args isDotted space rootStack =
+let argumentCheckAndStackAlloc args isDotted space rootSpace =
+    let argsCount = (List.length args)
     if isDotted then
-        constructDottedArgument args @
-        [Sub, [Int space; Reg Rsp]
-         Add, [Int rootStack; Reg R15]]
+        [Cmp, [Int (argsCount - 1); Reg Rcx]
+         JmpIf(L, wrongArgCountHandler), []
+
+         // Change stack pointer to the last argument
+         Mov, [Reg Rsp; Reg Rbp]
+         Mov, [Reg Rcx; Reg Rbx]
+         Sal, [Int 3; Reg Rbx]
+         Sub, [Reg Rbx; Reg Rsp]
+
+         Mov, [Int argsCount; Reg Rdx]
+         Call(constructDottedLabel), []
+
+         Mov, [Reg Rbp; Reg Rsp]
+
+         // Restore root stack pointer to previous value
+         // and then allocate space needed for function.
+         Mov, [Int (argsCount + 1); Reg Rbx]
+         Sal, [Int 3; Reg Rbx]
+         Sub, [Reg Rbx; Reg R15]
+
+         Sub, [Int space; Reg Rsp]
+         Add, [Int rootSpace; Reg R15]]
     else
-        [Cmp, [Int (List.length args); Reg Rcx]
+        [Cmp, [Int argsCount; Reg Rcx]
          JmpIf(Ne, wrongArgCountHandler), []
          Sub, [Int space; Reg Rsp]
-         Add, [Int rootStack; Reg R15]]
+         Add, [Int rootSpace; Reg R15]]
 
 /// Add code in the beginning and the end of functions:
 /// stack corrections, number of arguments checking,
@@ -437,12 +455,18 @@ let convertVarsToSlots (prog : Program) =
         let env, _, rootCount = Seq.fold addToEnv (initial, Seq.length args, Seq.length args) vars
         env, rootCount
 
+    let moveArgsToRoot isDotted args =
+        if isDotted then
+            []
+        else
+            List.mapi (fun i _ -> Mov, [Slot i; RootStackSlot i]) args
+
     let handleDef def =
         let vars = collectVars def.Instrs
         let env, rootCount = makeEnv def.Args def.RootStackVars vars
         let used = def.SlotsOccupied + env.Count // Probably, this can be just env.Count.
         let slots = if used % 2 <> 0 then used + 1 else used // To preserve alignment.
-        let moveArgs = List.mapi (fun i _ -> Mov, [Slot i; RootStackSlot i]) def.Args
+        let moveArgs = moveArgsToRoot def.IsDotted def.Args
         let instrs = List.map (handleInstr env) def.Instrs
         {def with Instrs = moveArgs @ instrs
                   SlotsOccupied = slots
@@ -517,11 +541,18 @@ let createMainModule constants globals globOriginal entryPoints =
             Name = schemeEntryLabel
             Instrs = instrs }
 
-    { Procedures = []
-      Main = funcDef
-      Globals = List.ofSeq globals
-      GlobalsOriginal = List.ofSeq globOriginal
-      ConstantsNames = constants
-      ErrorHandler = []
-      Entry = schemeEntryLabel
-      Strings = [] }
+    let constructDotted =
+        { emptyFuncDef with
+            Name = constructDottedLabel
+            Instrs = constructDotted }
+    let p =
+        { Procedures = [constructDotted]
+          Main = funcDef
+          Globals = List.ofSeq globals
+          GlobalsOriginal = List.ofSeq globOriginal
+          ConstantsNames = constants
+          ErrorHandler = []
+          Entry = schemeEntryLabel
+          Strings = [] }
+
+    patchInstr p

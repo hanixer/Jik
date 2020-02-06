@@ -20,6 +20,8 @@ let showInstr out (op, args) =
             fprintf out "jne %s" label
         | JmpIf (S, label) ->
             fprintf out "js %s" label
+        | JmpIf (L, label) ->
+            fprintf out "jl %s" label
         | Jmp label ->
             fprintf out "jmp %s" label
         | Call label ->

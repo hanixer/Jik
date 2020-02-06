@@ -59,6 +59,7 @@ type Program =
       Strings : (string * string) list }
 
 let schemeEntryLabel = "schemeEntry"
+let constructDottedLabel = "constructDotted"
 
 let emptyFunction =
     { Name = ""

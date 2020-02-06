@@ -157,20 +157,22 @@ let compileIsOfType dest var1 mask tag =
      Cmp, [Int tag; Reg Rax]]
     @ compileSetOnEqual dest
 
+/// Do not work for more than 4 arguments.
 let callRuntime func =
+    [Mov, [Reg Rsp; Reg Rbp]] @
     alignStackPointer @
     [Sub, [Int (4 * wordSize); Reg Rsp]
      Call(func), []
-     Add, [Int (4 * wordSize); Reg Rsp]]
+     Mov, [Reg Rbp; Reg Rsp]]
 
 let callAllocate size dest =
     [Mov, [size; Reg Rdx] // Size to allocate.
      Mov, [Reg Rsi; Deref(0, R15)]
      Mov, [Reg R15; Reg Rcx] // Root stack pointer.
      Mov, [Reg Rsp; Reg Rbp]
-     Sub, [Int wordSize; Reg Rsp]
-     And, [Int -32; Reg Rsp]
-     Sub, [Int (4*wordSize); Reg Rsp]
+     Sub, [Int wordSize; Reg Rsp]] @
+    alignStackPointer @
+    [Sub, [Int (4*wordSize); Reg Rsp]
      Call("allocate"), []
      Mov, [Deref(0, R15); Reg Rsi]
      Mov, [Reg Rbp; Reg Rsp]
@@ -288,9 +290,9 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.Cons, [var1; var2]) ->
         let restoreStack = [Mov, [Reg Rbp; Reg Rsp]]
         [Mov, [Reg Rsp; Reg Rbp]
-         Sub, [Int wordSize; Reg Rsp]
-         And, [Int -32; Reg Rsp]
-         Sub, [Int (4*wordSize); Reg Rsp]] @
+         Sub, [Int wordSize; Reg Rsp]] @
+        alignStackPointer @
+        [Sub, [Int (4*wordSize); Reg Rsp]] @
         allocateCons (Var var1) (Var var2) (Var dest) restoreStack
     | Simple.Prim(Prim.IsPair, [var1]) ->
         compileIsOfType dest var1 pairMask pairTag

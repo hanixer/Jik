@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#define DEBUG_LOG_GC
+// #define DEBUG_LOG_GC
 #define DEBUG_FORCE_GC
 
 extern ptr_t **globRootsTable;
