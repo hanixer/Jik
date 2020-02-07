@@ -189,5 +189,5 @@
 
 ;; "main"
 ; (tui)
-; (print-solution (queens 10))
-(print-solution (list 1 3 2 4))
+(print-solution (queens 10))
+; (print-solution (list 1 3 2 4))

@@ -9,6 +9,7 @@ let trueLiteral = 0x6F
 let eofTag = 0x5F
 let eofMask = 0xFF
 let voidTag = 0x6F
+let voidMask = 0xFF
 let unboundTag = 0x7F
 let boolBit = 6
 let boolTag = 0x2F

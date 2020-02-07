@@ -250,11 +250,14 @@ void checkHeapSpaceAvailable(int which)
     allocations[which]++;
 }
 
+char *stackTop;
+
 int main()
 {
     int stackSize = 10 * 16 * 4096;
     char *stack = allocateProtectedSpace(stackSize);
     char *stackHigherAddr = stack + stackSize - 2 * wordSize;
+    stackTop = stackHigherAddr;
     // int heapSize = 50;
     int heapSize = 100 * 1024;
     int rootStackSize = stackSize;
