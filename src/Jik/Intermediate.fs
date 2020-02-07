@@ -25,7 +25,7 @@ type Simple =
     | Char of char
     | Bool of bool
     | EmptyList
-    | Lambda of Var list * Var list * bool * Block list
+    | Lambda of debugName : string option * Var list * Var list * bool * Block list
 
 and Transfer =
     | Return of Var
@@ -127,7 +127,7 @@ let rec showBlock (name, vars, stmts) =
                     iConcat [ (sprintf "%A" op |> iStr)
                               iStr " "
                               List.map iStr vars |> comma ]
-                | Simple.Lambda(free, args, dotted, blocks) ->
+                | Simple.Lambda(_, free, args, dotted, blocks) ->
                     let deff =
                         { Name = "lam"
                           Free = free
@@ -246,12 +246,14 @@ let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
         let blockJoin = (join, [ fresh ], stmts)
         let blocks = blockJoin :: blocks
         convertIf exprc exprt exprf blocks join
+    | Expr.PrimApp(GlobalSet, [Ref name; Expr.Lambda(args, dotted, body)]) ->
+        let debugName = freshLabel (name + "_proc")
+        convertLambda (Some debugName) args dotted body (fun var ->
+            let fresh = freshLabel "v"
+            let blocks, stmts = cont fresh
+            blocks, [ Decl(fresh, Prim(GlobalSet, [name; var])) ] @ stmts)
     | Expr.Lambda(args, dotted, body) ->
-        let var = freshLabel "lam"
-        let blocks, stmts = cont var
-        let lamBlocks, lamStmts = convertExprTail (Begin body)
-        let body = (var, args, lamStmts) :: lamBlocks
-        blocks, (Decl(var, Lambda([], args, dotted, body))) :: stmts
+        convertLambda None args dotted body cont
     | Expr.Begin(exprs) ->
         convertMany exprs (fun vars ->
             let last = List.last vars
@@ -396,6 +398,13 @@ and convertMany exprs (cont : Var list -> (Block list * Stmt list)) =
         | [] -> cont (List.rev vars)
     loop [] exprs
 
+and convertLambda debugName args dotted body cont =
+    let var = freshLabel "lam"
+    let blocks, stmts = cont var
+    let lamBlocks, lamStmts = convertExprTail (Begin body)
+    let body = (var, args, lamStmts) :: lamBlocks
+    blocks, (Decl(var, Lambda(debugName, [], args, dotted, body))) :: stmts
+
 let convertMainExprs expr : Function =
     let blocks, stmts = convertExprTail expr
     { Name = schemeEntryLabel
@@ -418,9 +427,10 @@ let analyzeFreeVars (prog : Program) : Program =
 
     let rec transformStmt stmt =
         match stmt with
-        | Decl(var, Lambda(_, args, dotted, blocks)) ->
+        | Decl(var, Lambda(debugName, _, args, dotted, blocks)) ->
             let free, blocks = transformLambda (args, blocks)
-            Set.singleton var, Set.remove var (Set.ofList free), Decl(var, Lambda(free, args, dotted, blocks))
+            let lambda = Lambda(debugName, free, args, dotted, blocks)
+            Set.singleton var, Set.remove var (Set.ofList free), Decl(var, lambda)
         | Decl(var, _) -> Set.singleton var, Set.difference (getUsed stmt) globals, stmt
         | _ -> Set.empty, Set.difference (getUsed stmt) globals, stmt
 
@@ -478,8 +488,9 @@ let closureConversion (prog : Program) : Program =
         | Decl(var, Prim(op, args)) ->
             let stmts, args = replaceClosureRefs free args
             [], stmts @ [ Decl(var, Prim(op, args)) ]
-        | Decl(var, Lambda(freeInner, args, dotted, blocks)) ->
-            let proc = freshLabel "proc"
+        | Decl(var, Lambda(debugName, freeInner, args, dotted, blocks)) ->
+            let name = Option.defaultValue "proc" debugName
+            let proc = freshLabel name
             let procs = convertLambda proc (freeInner, args, dotted, blocks)
             let stmts, freeInner = replaceClosureRefs free freeInner
             procs, stmts @ [ Decl(var, Prim(Prim.MakeClosure, proc :: freeInner)) ]
