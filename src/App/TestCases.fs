@@ -608,3 +608,24 @@ let localDefine =
     (define a 2)
     a)
   a)", "(2 . 1)\n" ]
+
+let doTests =
+    [ "
+(define factorial
+  (lambda (n)
+    (do ((i n (- i 1)) (a 1 (* a i)))
+        ((zero? i) a))))
+(factorial 10)", "3628800\n"
+      "(do ((i 0 (+ i 1))) ((= i 10) i))", "10\n"
+      "
+(define scale-vector!
+  (lambda (v k)
+    (let ((n (vector-length v)))
+      (do ((i 0 (+ i 1)))
+          ((= i n))
+        (vector-set! v i (* (vector-ref v i) k))))))
+
+(define vec (vector 1 2 3 4 5))
+(scale-vector! vec 2)
+vec ", "#(2 4 6 8 10)\n"
+]
