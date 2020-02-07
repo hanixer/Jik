@@ -22,6 +22,8 @@
 #define stringMask 0x07
 #define closureTag 0x02
 #define closureMask 0x07
+#define symbolTag 0x03
+#define symbolMask 0x07
 #define eofTag 0x5F
 #define eofMask 0xFF
 #define carOffset 0
@@ -41,8 +43,10 @@ int isPair(ptr_t p);
 int isVector(ptr_t p);
 int isString(ptr_t p);
 int isClosure(ptr_t p);
+int isSymbol(ptr_t p);
 int isEof(ptr_t p);
 int isNil(ptr_t p);
+ptr_t stringOfSymbol(ptr_t p);
 ptr_t car(ptr_t p);
 ptr_t cdr(ptr_t p);
 int vectorSize(ptr_t p);

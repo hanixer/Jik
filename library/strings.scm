@@ -13,7 +13,7 @@
 (define %strings=?
     (lambda (s s*)
       (unless (string? s)
-        (error "string=? - not a string"))
+        (error "string=? - not a string" s s*))
       (if (empty? s*)
           #t
           (let ([s2 (car s*)] [s* (cdr s*)])
@@ -68,3 +68,4 @@
          (let ([n (length ls)])
            (let ([s (make-string n)])
              (fill s 0 ls))))))
+

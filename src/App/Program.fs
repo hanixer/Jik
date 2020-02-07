@@ -37,7 +37,7 @@ let main argv =
     // printf "result: %s" (sexprToString desug)
 
 
-    // runTestGroupWithLib "symbols" symbols
+    runTestGroupWithLib "symbols" symbolsTests
     // runTestGroupWithLib "apply nontail" applyNonTail
     // runTestGroupWithLib "apply tail" applyTail
     // runTestGroup true "eofTests" eofTests
@@ -66,7 +66,7 @@ let main argv =
     // runTestGroup false "andOr" andOrTests
     // runTestGroup false "letrec" letrecTests
     // runTestGroup false "basic" basicTests
-    runTestGroup true "do" doTests
+    // runTestGroup true "do" doTests
 
     // runTest false e2 "2"
 

@@ -547,10 +547,11 @@ let stringsLib =
     [ "(string=? \"one\")", "#t\n"
       "(string=? \"one\" \"one\" \"one\")", "#t\n" ]
 
-let symbols =
+let symbolsTests =
     [ "(let ([s1 (string->symbol \"look\")]
             [s2 (string->symbol \"look\")])
-        (eq? s1 s2))", "#t\n" ]
+        (eq? s1 s2))", "#t\n"
+      "'abc", "'abc\n" ]
 
 let exitTest =
     [ "(foreign-call \"exit\" 0)", "" ]

@@ -89,3 +89,10 @@
                    (cons
                     (cons (car l1) (car l2))
                     (loop (cdr l1) (cdr l2)))))))
+
+(define (assq k m)
+  (if (null? m)
+      #f
+      (if (eq? k (car (car m)))
+          (car m)
+          (assq k (cdr m)))))

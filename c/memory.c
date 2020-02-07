@@ -4,7 +4,7 @@
 #include <assert.h>
 
 // #define DEBUG_LOG_GC
-// #define DEBUG_FORCE_GC
+#define DEBUG_FORCE_GC
 
 extern ptr_t **globRootsTable;
 
@@ -203,6 +203,29 @@ void copyPair(ptr_t *p)
 	}
 }
 
+void copySymbol(ptr_t *p)
+{
+	ptr_t pHeap = (*p - symbolTag);
+	ptr_t *pFrom = (ptr_t *)pHeap;
+
+	if (!isAddressValid(pFrom)) return;
+
+	uint64_t firstCell = *pFrom; // Value in the first cell of the object.
+	if (firstCell & 1)
+	{
+		// forward pointer.
+		*p = (firstCell - 1) + symbolTag;
+#ifdef DEBUG_LOG_GC
+		printf("Already copied to ToSpace. New address: %p\n", *p);
+#endif
+	}
+	else
+	{
+		ptr_t size = 2;
+		copyHelper(p, pFrom, size, symbolTag);
+	}
+}
+
 /// Cheney copying algorithm.
 void copyData(ptr_t *p)
 {
@@ -225,12 +248,16 @@ void copyData(ptr_t *p)
 	{
 		copyPair(p);
 	}
+	else if (isSymbol(*p))
+	{
+		copySymbol(p);
+	}
 }
 
 void *allocate(uint64_t *rootStack, uint64_t size)
 {
 	uint64_t sizeAligned = (size + (wordSize - 1)) / wordSize;
-	// int isFirstClos =
+	// printf("allocate: size = %d, aligned = %d, remaining = %d\n", size, sizeAligned, fromSpaceEnd - freePointer);
 #ifdef DEBUG_LOG_GC
 	printf("allocate: size = %d, aligned = %d\n", size, sizeAligned);
 #endif

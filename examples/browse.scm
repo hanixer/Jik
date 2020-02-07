@@ -1,5 +1,5 @@
 
-  (define (lookup key table)
+(define (lookup key table)
     (let loop ((x table))
       (if (null? x)
         #f
@@ -8,9 +8,9 @@
             pair
             (loop (cdr x)))))))
 
-  (define properties '())
+(define properties '())
 
-  (define (get key1 key2)
+(define (get key1 key2)
     (let ((x (lookup key1 properties)))
       (if x
         (let ((y (lookup key2 (cdr x))))
@@ -19,7 +19,7 @@
             #f))
         #f)))
 
-  (define (put key1 key2 val)
+(define (put key1 key2 val)
     (let ((x (lookup key1 properties)))
       (if x
         (let ((y (lookup key2 (cdr x))))
@@ -29,13 +29,13 @@
         (set! properties
           (cons (list key1 (cons key2 val)) properties)))))
 
-  (define *current-gensym* 0)
+(define *current-gensym* 0)
 
-  (define (generate-symbol)
+(define (generate-symbol)
     (set! *current-gensym* (+ *current-gensym* 1))
     (string->symbol (number->string *current-gensym*)))
 
-  (define (append-to-tail! x y)
+(define (append-to-tail! x y)
     (if (null? x)
         y
         (do ((a x b)
@@ -44,7 +44,7 @@
              (set-cdr! a y)
              x))))
 
-  (define (tree-copy x)
+(define (tree-copy x)
     (if (not (pair? x))
         x
         (cons (tree-copy (car x))
@@ -55,9 +55,9 @@
   ;;; npats is the number of basic patterns on the unit
   ;;; ipats is the instantiated copies of the patterns
 
-  (define *rand* 21)
+(define *rand* 21)
 
-  (define (init n m npats ipats)
+(define (init n m npats ipats)
     (let ((ipats (tree-copy ipats)))
       (do ((p ipats (cdr p)))
           ((null? (cdr p)) (set-cdr! p ipats)))
@@ -82,11 +82,11 @@
               ((zero? j))
               (put name (generate-symbol) #f)))))
 
-  (define (browse-random)
+(define (browse-random)
     (set! *rand* (remainder (* *rand* 17) 251))
     *rand*)
 
-  (define (randomize l)
+(define (randomize l)
     (do ((a '()))
         ((null? l) a)
         (let ((n (remainder (browse-random) (length l))))
@@ -102,7 +102,7 @@
                       (set-cdr! x (cddr x))
                       x)))))))
 
-  (define (my-match pat dat alist)
+(define (my-match pat dat alist)
     (cond ((null? pat)
            (null? dat))
           ((null? dat) '())
@@ -157,19 +157,19 @@
                              (my-match (cdr pat)
                                     (cdr dat) alist)))))))
 
-  (define database
+(define database
      (randomize
       (init 100 10 4 '((a a a b b b b a a a a a b b a a a)
                        (a a b b b b a a
                                       (a a)(b b))
                        (a a a b (b a) b a b a)))))
 
-  (define (browse pats)
+(define (browse pats)
     (investigate
       database
       pats))
 
-  (define (investigate units pats)
+(define (investigate units pats)
     (do ((units units (cdr units)))
         ((null? units))
         (do ((pats pats (cdr pats)))
@@ -179,4 +179,8 @@
                 ((null? p))
                 (my-match (car pats) (car p) '())))))
 
-1
+(define pats1 '((*a ?b *b ?b a *a a *b *a)
+      (*a *b *b *a (*a) (*b))
+      (? ? * (b a) * ? ?)))
+
+(browse pats1)

@@ -361,10 +361,10 @@ let rec declToInstrs (dest, x) =
          Or, [Int stringTag; Var dest]]
     // Closures.
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
-        let offset = (List.length args + 2) * wordSize
-        let size = convertToFixnum (List.length args + 1)
-        callAllocate (Int offset) (Reg R11) @
-        [Mov, [Int size; Deref(0, R11)] // The first cell is for size and forwarding bit.
+        let allocatedSize = (List.length args + 2) * wordSize
+        let savedSize = convertToFixnum (List.length args + 1)
+        callAllocate (Int allocatedSize) (Reg R11) @
+        [Mov, [Int savedSize; Deref(0, R11)] // The first cell is for size and forwarding bit.
          Lea(label), [Deref(wordSize, R11)]] @ // The second is for label.
         moveClosureArgs args @ // Remaining cells are for free variables.
         [Or, [Int closureTag; Reg R11]
@@ -391,13 +391,17 @@ let rec declToInstrs (dest, x) =
          [Mov, [GlobalValue(glob); Var dest]]
     // Symbols.
     | Simple.Prim(Prim.MakeSymbol, [var1]) ->
-        [Mov, [Var var1; Var dest]
-         Sub, [Int stringTag; Var dest]
-         Or, [Int symbolTag; Var dest]]
+        let allocatedSize = 2 * wordSize
+        let savedSize = convertToFixnum 1
+        callAllocate (Int allocatedSize) (Reg R11) @
+        [Mov, [Int savedSize; Deref(0, R11)] // The first cell is for size and forwarding bit.
+         Mov, [Var var1; Deref(wordSize, R11)]] @ // The second is for string.
+        [Or, [Int symbolTag; Reg R11]
+         Mov, [Reg R11; Var dest]]
     | Simple.Prim(Prim.SymbolString, [var1]) ->
-        [Mov, [Var var1; Var dest]
-         Sub, [Int symbolTag; Var dest]
-         Or, [Int stringTag; Var dest]]
+        // String lives in the second cell of the object.
+        [Mov, [Var var1; Reg R11]
+         Mov, [Deref(-symbolTag + wordSize, R11); Var dest]]
     | Simple.Prim(Prim.IsSymbol, [var1]) ->
         compileIsOfType dest var1 symbolMask symbolTag
 
@@ -487,10 +491,6 @@ let doPrimitiveUseHeap (_, simple) =
 let selectInstructions (prog : Intermediate.Program) : Program =
     let mutable rootStackSlots = 0
     let rootStackVars = System.Collections.Generic.HashSet<string>()
-
-    let moveBlockArgToRootStack arg =
-        rootStackSlots <- rootStackSlots + 1
-        Mov, [Var arg; RootStackSlot(rootStackSlots - 1)]
 
     let handleStmt procName blocks = function
         | Decl decl ->

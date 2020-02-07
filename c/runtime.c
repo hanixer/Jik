@@ -12,9 +12,10 @@
 extern int schemeEntry();
 extern char *globVarNameTable[];
 
+static void printSymbol(ptr_t p);
 static void printPair(ptr_t p);
 static void printVector(ptr_t p);
-static void printString(ptr_t p);
+static void printString(ptr_t p, int);
 char *allocAndCopyString(ptr_t p);
 
 void printPtr(ptr_t p)
@@ -52,17 +53,27 @@ void printPtr(ptr_t p)
     }
     else if (isString(p))
     {
-        printString(p);
+        printString(p, 1);
     }
     else if (isEof(p))
     {
         printf("#!eof");
+    }
+    else if (isSymbol(p))
+    {
+        printSymbol(p);
     }
     else
     {
         printf("<unknown 0x%08x>", p);
     }
     fflush(stdout);
+}
+
+static void printSymbol(ptr_t p)
+{
+    printf("'");
+    printString(stringOfSymbol(p), 0);
 }
 
 static void printPair(ptr_t p)
@@ -102,14 +113,16 @@ static void printVector(ptr_t p)
     printf(")");
 }
 
-static void printString(ptr_t p)
+static void printString(ptr_t p, int printDQuotes)
 {
-    printf("\"");
+    if (printDQuotes) printf("\"");
+
     for (int i = 0; i < stringSize(p); ++i)
     {
         printf("%c", stringRef(p, i));
     }
-    printf("\"");
+
+    if (printDQuotes) printf("\"");
 }
 
 ptr_t s_write(ptr_t fd, ptr_t str, ptr_t len)
