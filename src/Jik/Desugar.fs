@@ -19,7 +19,7 @@ let special = [
     "unless"
 ]
 
-let undefinedExpr = Bool false
+let undefinedExpr = S.VoidValue
 
 let makeIf cond conseq altern =
     exprsToList [Symbol "if"; cond; conseq; altern]

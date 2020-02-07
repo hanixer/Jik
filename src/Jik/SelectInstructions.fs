@@ -129,9 +129,9 @@ let compileForeignCall label blocks foreignName args =
     moveToArgPositions @
     [Sub, [Int spChange; Reg Rsp]
      Call name, []
-     Add, [Int spChange; Reg Rsp]] @
-    setVoid resultVar @
-    [Jmp label, []]
+     Add, [Int spChange; Reg Rsp]
+     Mov, [Reg Rax; Var resultVar]
+     Jmp label, []]
 
 let comparisonInstrs var1 var2 cc dest =
     let instrs =
