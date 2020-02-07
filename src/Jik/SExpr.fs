@@ -119,6 +119,7 @@ type SExpr =
     | Char of char
     | Symbol of string
     | Bool of bool
+    | VoidValue
 and Frame = Map<string, SExpr ref> ref
 
 let (|List|ListImproper|ListWrong|) (e: SExpr) =
@@ -257,6 +258,7 @@ let rec sexprToString expr =
         | Symbol sy -> add sy
         | Bool true -> add "#t"
         | Bool false -> add "#f"
+        | VoidValue -> add "#!void"
         | Char c ->
             add "#\\"
             add <| c.ToString()

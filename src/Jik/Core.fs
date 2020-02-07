@@ -13,6 +13,7 @@ type Expr =
     | Int of int
     | Char of char
     | Bool of bool
+    | Void
     | String of string
     | EmptyList
     | Symbol of string
@@ -55,6 +56,7 @@ let isSimple = function
     | S.Char _
     | S.Number _
     | S.Bool _
+    | S.VoidValue
     | S.String _ -> true
     | _ -> false
 
@@ -62,6 +64,7 @@ let convertSimple = function
     | S.Char c -> Char c
     | S.Number n -> Int n
     | S.Bool n -> Bool n
+    | S.VoidValue -> Void
     | S.String string -> String string
     | S.Nil -> EmptyList
     | _ -> failwith "simple sexpr expected"

@@ -30,9 +30,9 @@
 
 (define list-every?
      (lambda (p l)
-          (display "list-every?: ")
-          (display l)
-          (newline)
+          ; (display "list-every?: ")
+          ; (display l)
+          ; (newline)
           (let loop ((l l))
                (or (empty? l)
                    (and (p (car l))
@@ -51,7 +51,7 @@
 ;; essentially checks for duplicates
 (define col-ok
   (lambda (rows)
-       (dbg "col-ok:" rows)
+     ;   (dbg "col-ok:" rows)
        (or (empty? rows)
            (and (list-every? (lambda (x) (not (= (car rows) x)))
                              (cdr rows))
@@ -68,9 +68,9 @@
 
 (define diag-ok
   (lambda (rows)
-       (dbg "diag-ok:" rows)
-       (list-every? (lambda (x) #t) rows)
-       (dbg "diag-ok:" rows)
+     ;   (dbg "diag-ok:" rows)
+     ;   (list-every? (lambda (x) #t) rows)
+     ;   (dbg "diag-ok:" rows)
        (or (empty? rows)
            (and (list-every? (lambda (pair)
                                   (not (on-diag (car rows)
@@ -84,14 +84,14 @@
 
 (define partial-ok
      (lambda (rows)
-          (dbg "partial-ok: " rows)
+          ; (dbg "partial-ok: " rows)
           (and (col-ok rows)
                (diag-ok rows))))
 
 ;; not actually used in the algorithm below
 (define queens-ok
      (lambda (rows n)
-          (dbg "queens-ok" rows)
+          ; (dbg "queens-ok" rows)
           (and (list-every? (lambda (x) (<= x n)) rows) ; no elt. bigger than n
                (= n (length rows))              ; n queens
                (partial-ok rows))))             ; no conflict
@@ -109,7 +109,7 @@
                         '())))   ;; there's no solution for (cdr partial)
               (%queens
                (lambda (partial n)
-                    (dbg "%queens: " partial)
+                    ; (dbg "%queens: " partial)
                     (if (partial-ok partial)
                         (if (= (length partial) n)
                             partial ;; partial solution with full length: we're done
@@ -166,8 +166,8 @@
 
 (define print-solution
      (lambda (rows)
-          (display "start printing solution")
-          (newline)
+          ; (display "start printing solution")
+          ; (newline)
           (if (= (length rows) 0)
               (begin
                 (display "no solution found!")
@@ -188,6 +188,6 @@
 
 
 ;; "main"
-; (tui)
-(print-solution (queens 10))
+(tui)
+; (print-solution (queens 10))
 ; (print-solution (list 1 3 2 4))

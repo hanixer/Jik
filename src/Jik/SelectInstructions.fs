@@ -212,6 +212,7 @@ let rec declToInstrs (dest, x) =
     | Simple.EmptyList -> moveInt nilLiteral dest
     | Simple.Int n -> moveInt (convertToFixnum n) dest
     | Simple.RawInt n -> moveInt n dest
+    | Simple.Void -> setVoid dest
     | Simple.Char c -> moveInt (((int c) <<< charShift) ||| charTag) dest
     | Simple.Bool true -> moveInt trueLiteral dest
     | Simple.Bool false -> moveInt falseLiteral dest

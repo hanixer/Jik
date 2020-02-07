@@ -24,6 +24,7 @@ type Simple =
     | RawInt of int // Int value as it is, without conversions.
     | Char of char
     | Bool of bool
+    | Void
     | EmptyList
     | Lambda of debugName : string option * Var list * Var list * bool * Block list
 
@@ -120,6 +121,7 @@ let rec showBlock (name, vars, stmts) =
                 | Simple.EmptyList -> iStr "'()"
                 | Simple.Int n -> iNum n
                 | Simple.RawInt n -> iNum n
+                | Simple.Void -> iStr "#!void"
                 | Simple.Char c -> iStr (sprintf "#\\%A" c)
                 | Simple.Bool true -> iStr "#t"
                 | Simple.Bool false -> iStr "#f"
@@ -239,6 +241,7 @@ let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
     | Expr.EmptyList -> convertSimpleDecl "nil" EmptyList cont
     | Expr.Bool b -> convertSimpleDecl "b" (Bool b) cont
     | Expr.Int n -> convertSimpleDecl "n" (Int n) cont
+    | Expr.Void -> convertSimpleDecl "v" Void cont
     | Expr.Char c -> convertSimpleDecl "c" (Char c) cont
     | Expr.If(exprc, exprt, exprf) ->
         let join, fresh = freshLabel "block", freshLabel "v"
@@ -305,6 +308,7 @@ and convertExprJoin expr (contVar : Var) =
     | Expr.EmptyList
     | Expr.Bool _
     | Expr.Int _
+    | Expr.Void
     | Expr.Char _
     | Expr.Ref _
     | Expr.Lambda _ -> convertExpr expr jump2
@@ -344,6 +348,7 @@ and convertExprTail expr =
     | Expr.EmptyList
     | Expr.Bool _
     | Expr.Int _
+    | Expr.Void
     | Expr.Char _
     | Expr.Ref _
     | Expr.ForeignCall _
