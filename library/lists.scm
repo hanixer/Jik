@@ -81,6 +81,10 @@
   (lambda (x)
     (cdr (cdr x))))
 
+(define caar
+  (lambda (x)
+    (car (car x))))
+
 (define list-zip
      (lambda (l1 l2)
           (let loop ((l1 l1) (l2 l2))

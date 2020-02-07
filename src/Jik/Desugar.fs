@@ -67,6 +67,8 @@ let desugarSingle expr =
         desugarCond clauses
     | List (Symbol "do" :: bindings :: test :: body) ->
         desugarDo bindings test body
+    | List (Symbol "let*" :: bindings :: body) ->
+        desugarLetStar bindings body
     // primitive or function application
     | Cons(head, tail) ->
         let head = desugarSingle head
@@ -79,6 +81,18 @@ let desugarSingle expr =
 let desugarLambda args body =
     let body = desugarBody body
     exprsToList (Symbol "lambda" :: args :: body)
+
+let desugarLetStar bindings body =
+    let handleBinding binding body =
+        [desugarLet [binding] body]
+
+    match bindings with
+    | List bindings ->
+        let lst = List.foldBack handleBinding bindings body
+        List.head lst
+    | _ ->
+        failwith "wrong bindings for let*"
+
 
 let parseDoBindings bindings =
     let handleBinding = function
