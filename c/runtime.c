@@ -272,7 +272,7 @@ int main()
     char *stackHigherAddr = stack + stackSize - 2 * wordSize;
     stackTop = stackHigherAddr;
     // int heapSize = 50;
-    int heapSize = 100 * 1024;
+    int heapSize = 1000 * 1024;
     int rootStackSize = stackSize;
     gcInitialize(heapSize, rootStackSize);
     ptr_t result = schemeEntry(stackHigherAddr);

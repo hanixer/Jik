@@ -271,6 +271,14 @@ void *allocate(uint64_t *rootStack, uint64_t size)
 	void *p = freePointer;
 	markInBitmap(fromBitmap, fromSpaceBegin, freePointer);
 	freePointer += sizeAligned;
+
+	if (freePointer >= fromSpaceEnd)
+	{
+		fprintf(stderr, "no more heap space\n");
+		fflush(stderr);
+		exit(1);
+	}
+
 	return p;
 }
 
