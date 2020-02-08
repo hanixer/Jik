@@ -7,11 +7,32 @@ open Intermediate
 open System.IO
 open Codegen
 
+
+let printLabel (out : TextWriter) (label : string) =
+        out.Write(label)
+        out.WriteLine(":")
+
+let printGlobal (out : TextWriter) (glob : string) =
+        out.Write("    .globl ")
+        out.WriteLine(glob)
+
+let printReadOnlySec (out : TextWriter) =
+    out.WriteLine("    .section .rdata,\"dr\"")
+
+let printAlign  (out : TextWriter) (n : int) =
+    out.Write("    .align ")
+    out.WriteLine(n)
+
 let showInstr (out : TextWriter) (op, args) =
-    // let showCc cc =
-    //     match cc with
-    //     | L -> out.Write("l")
-    //     | L -> out.Write("l")
+    let showCc cc =
+        match cc with
+        | L -> out.Write("l")
+        | G -> out.Write("g")
+        | E -> out.Write("e")
+        | Ne -> out.Write("ne")
+        | Le -> out.Write("le")
+        | Ge -> out.Write("ge")
+        | S -> out.Write("s")
 
     let showOp op =
         match op with
@@ -49,13 +70,57 @@ let showInstr (out : TextWriter) (op, args) =
             out.Write("cqto ")
         | IDiv ->
             out.Write("idivq ")
-        | _ ->
-            out.Write(op.ToString().ToLower())
-            out.Write("q ")
+        | Add -> out.Write("addq ")
+        | Sub -> out.Write("subq ")
+        | Neg -> out.Write("negq ")
+        | Mov -> out.Write("movq ")
+        | Movzb -> out.Write("movzbq ")
+        | IMul -> out.Write("imulq ")
+        | Sar -> out.Write("sarq ")
+        | Sal -> out.Write("salq ")
+        | And -> out.Write("andq ")
+        | Or -> out.Write("orq ")
+        | Push -> out.Write("pushq ")
+        | Pop -> out.Write("popq ")
+        | Ret -> out.Write("retq ")
+        | Xor -> out.Write("xorq ")
+        | Cmp -> out.Write("cmpq ")
+        | RestoreStack -> out.Write("restorestack ")
+        | SpliceSlot(_, _) -> out.Write("spliceslot ")
+        | aaa ->
+            failwithf "showOp: this instruction should not be handled here %A" aaa
+        // | _ ->
+            // out.Write(op.ToString().ToLower())
+            // out.Write("q ")
 
     let reg r =
         out.Write("%")
-        out.Write(r.ToString().ToLower())
+        let s =
+            match r with
+            | Rax -> "rax"
+            | Rbx -> "rbx"
+            | Rsp -> "rsp"
+            | Rbp -> "rbp"
+            | Rcx -> "rcx"
+            | Rdx -> "rdx"
+            | Rsi -> "rsi"
+            | Rdi -> "rdi"
+            | R8 -> "r8"
+            | R9 -> "r9"
+            | R10 -> "r10"
+            | R11 -> "r11"
+            | R12 -> "r12"
+            | R13 -> "r13"
+            | R14 -> "r14"
+            | R15 -> "r15"
+            | Al -> "al"
+            | Ah -> "ah"
+            | Bl -> "bl"
+            | Bh -> "bh"
+            | Cl -> "cl"
+            | Ch -> "ch"
+
+        out.Write(s)
 
     let showArg = function
         | Int n ->
@@ -117,28 +182,11 @@ let showInstrs (out : TextWriter) instrs =
 
 let instrsToString instrs =
     let out = new StringWriter()
-    fprintfn out "    .globl %s" schemeEntryLabel
-    out.Write("    .globl ")
-    out.WriteLine(schemeEntryLabel)
+    printGlobal out schemeEntryLabel
     out.Write(schemeEntryLabel)
     out.WriteLine(":")
     showInstrs out instrs
     out.ToString()
-
-let printLabel (out : TextWriter) (label : string) =
-        out.Write(label)
-        out.WriteLine(":")
-
-let printGlobal (out : TextWriter) (glob : string) =
-        out.Write("    .globl ")
-        out.WriteLine(glob)
-
-let printReadOnlySec (out : TextWriter) =
-    out.WriteLine("    .section .rdata,\"dr\"")
-
-let printAlign  (out : TextWriter) (n : int) =
-    out.Write("    .align ")
-    out.WriteLine(n)
 
 let printGlobalOriginals (out : TextWriter) originals globals =
     let printAsciiName i (label, orig : string) =
