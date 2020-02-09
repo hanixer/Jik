@@ -4,6 +4,10 @@ open SExpr
 open RuntimeConstants
 open System.Text
 
+let pairSize = 2 * wordSize
+let carOffset = 0
+let cdrOffset = wordSize
+
 let freshLabel =
     let mutable n = 0
     fun () ->
@@ -44,7 +48,7 @@ let immediateRep e =
 
 let compile s =
     let mainExpr = stringToSExpr s
-    let sb = new StringBuilder()
+    let sb = StringBuilder()
     let emitn s = sb.AppendLine s |> ignore
     let emit (s:string) = sb.Append s |> ignore
     let emitf f = Printf.kprintf emit f

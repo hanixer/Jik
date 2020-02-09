@@ -88,20 +88,6 @@ void markInBitmap(uint8_t *bitmap, uint64_t *spaceBegin, uint64_t *address)
 	bitmap[q] = bitmap[q] | (1 << r);
 }
 
-void copyHelper(ptr_t *p, ptr_t *pFrom, uint64_t quadsCount, uint64_t tag)
-{
-	ptr_t pTo = (ptr_t)copyPtrEnd;
-	memcpy(copyPtrEnd, pFrom, quadsCount * wordSize);
-	*pFrom = pTo | 1; // Add forward bit.
-	copyPtrEnd += quadsCount;
-	*p = pTo | tag;
-	markInBitmap(toBitmap, toSpaceBegin, (uint64_t*) pTo);
-#ifdef DEBUG_LOG_GC
-	printf("Copy object to ToSpace.\n");
-	printf("size = %d, new address = %p\n", quadsCount, pTo);
-#endif
-}
-
 /// Check that address is valid by looking into bitset.
 /// We only check FromSpace case.
 int isAddressValid(uint64_t *p)
@@ -114,150 +100,123 @@ int isAddressValid(uint64_t *p)
 
 		return fromBitmap[q] & (1 << r);
 	}
-	else if (1)
-	{
-		return 0;
-	}
-	else if (p >= toSpaceBegin && p < toSpaceEnd)
-	{
-		uint64_t diff = p - toSpaceBegin;
-		uint64_t q = diff / 8;
-		uint64_t r = diff % 8;
-
-		return toBitmap[q] & (1 << r);
-	}
 	else
 	{
 		return 0;
 	}
 }
 
-void copyVectorOrClosure(ptr_t *p, uint64_t tag)
+void calculateSizeAndSecondaryTag(ptr_t *p, uint64_t firstCell, uint64_t *wordsCount, uint64_t *secondaryTag)
 {
-	ptr_t pHeap = (*p - tag);
-	ptr_t *pFrom = (ptr_t *)pHeap;
-
-	if (!isAddressValid(pFrom)) return;
-
-	uint64_t firstCell = *pFrom; // Value in the first cell of the object.
-	if (firstCell & 1)
+	if (isVector(*p))
 	{
-		// forward pointer.
-		*p = (firstCell - 1) + tag;
-#ifdef DEBUG_LOG_GC
-		printf("Already copied to ToSpace. New address: %p\n", *p);
-#endif
+		*wordsCount = (firstCell >> fixnumShift) + 1;
+		*secondaryTag = vectorTag;
 	}
-	else
+	else if (isClosure(*p))
 	{
-		ptr_t size = (firstCell >> fixnumShift) + 1;
-		copyHelper(p, pFrom, size, tag);
+		*wordsCount = (firstCell >> fixnumShift) + 1;
+		*secondaryTag = closureTag;
 	}
-}
-
-void copyString(ptr_t *p)
-{
-	ptr_t pHeap = (*p - stringTag);
-	ptr_t *pFrom = (ptr_t *)pHeap;
-
-	if (!isAddressValid(pFrom)) return;
-
-	uint64_t firstCell = *pFrom; // Value in the first cell of the object.
-	if (firstCell & 1)
-	{
-		// forward pointer.
-		*p = (firstCell - 1) + stringTag;
-#ifdef DEBUG_LOG_GC
-		printf("Already copied to ToSpace. New address: %p\n", *p);
-#endif
-	}
-	else
+	else if (isString(*p))
 	{
 		uint64_t shifted = firstCell >> fixnumShift;
 		uint64_t rounded = shifted + (wordSize - 1);
-		uint64_t size = (rounded / wordSize) + 1;
-		copyHelper(p, pFrom, size, stringTag);
+		*wordsCount = (rounded / wordSize) + 1;
+		*secondaryTag = stringTag;
+	}
+	else if (isPair(*p))
+	{
+		*wordsCount = 3;
+	}
+	else if (isSymbol(*p))
+	{
+		*wordsCount = 2;
 	}
 }
 
-void copyPair(ptr_t *p)
+void copyHelper2(ptr_t *p, uint64_t primaryTag)
 {
-	ptr_t pHeap = (*p - pairTag);
+	ptr_t pHeap = *p - primaryTag;
 	ptr_t *pFrom = (ptr_t *)pHeap;
 
-	if (!isAddressValid(pFrom)) return;
+	if (!isAddressValid(pFrom))
+		return;
 
 	uint64_t firstCell = *pFrom; // Value in the first cell of the object.
-	if (firstCell & 1)
+	if (firstCell == forwardMarker)
 	{
-		// forward pointer.
-		*p = (firstCell - 1) + pairTag;
+		// Get forward pointer and combine it with the tag.
+		// The assumptions is that all objects have at least two cells.
+		// And we can store forward pointer in the second cell.
+		*p = pFrom[1] + primaryTag;
 #ifdef DEBUG_LOG_GC
 		printf("Already copied to ToSpace. New address: %p\n", *p);
 #endif
 	}
 	else
 	{
-		ptr_t size = 3;
-		copyHelper(p, pFrom, size, pairTag);
-	}
-}
+		// Copy an object from FromSpace to ToSpace.
+		// Calculate amount of words occupied by the object.
+		// Mark a bit in bitmap corresponding to the new address of the object.
 
-void copySymbol(ptr_t *p)
-{
-	ptr_t pHeap = (*p - symbolTag);
-	ptr_t *pFrom = (ptr_t *)pHeap;
+		uint64_t wordsCount = 0;
+		uint64_t secondaryTag = 0;
+		calculateSizeAndSecondaryTag(p, firstCell, &wordsCount, &secondaryTag);
 
-	if (!isAddressValid(pFrom)) return;
+		ptr_t pTo = (ptr_t)copyPtrEnd;
+		memcpy(copyPtrEnd, pFrom, wordsCount * wordSize);
+		copyPtrEnd[0] |= secondaryTag; // Add secondary tag for typed object if needed.
+		copyPtrEnd += wordsCount;
 
-	uint64_t firstCell = *pFrom; // Value in the first cell of the object.
-	if (firstCell & 1)
-	{
-		// forward pointer.
-		*p = (firstCell - 1) + symbolTag;
+		pFrom[0] = forwardMarker;
+		pFrom[1] = pTo;
+
+		*p = pTo | primaryTag;
+
+		markInBitmap(toBitmap, toSpaceBegin, (uint64_t *)pTo);
+
 #ifdef DEBUG_LOG_GC
-		printf("Already copied to ToSpace. New address: %p\n", *p);
+		printf("Copy object to ToSpace.\n");
+		printf("size = %d, new address = %p\n", wordsCount, pTo);
 #endif
 	}
-	else
-	{
-		ptr_t size = 2;
-		copyHelper(p, pFrom, size, symbolTag);
-	}
 }
 
-/// Cheney copying algorithm.
+/// If given object should be copied - copy it.
+/// If object already copied - write new address.
+/// If it is not a valid object or an immediate value - skip it.
 void copyData(ptr_t *p)
 {
 #ifdef DEBUG_LOG_GC
 	printf("copyData: %p\n", *p);
 #endif
-	if (isVector(*p))
+	if (isTypedObject(*p))
 	{
-		copyVectorOrClosure(p, vectorTag);
+		copyHelper2(p, typedObjectTag);
 	}
 	else if (isClosure(*p))
 	{
-		copyVectorOrClosure(p, closureTag);
+		copyHelper2(p, closureTag);
 	}
 	else if (isString(*p))
 	{
-		copyString(p);
+		copyHelper2(p, stringTag);
 	}
 	else if (isPair(*p))
 	{
-		copyPair(p);
+		copyHelper2(p, pairTag);
 	}
 	else if (isSymbol(*p))
 	{
-		copySymbol(p);
+		copyHelper2(p, symbolTag);
 	}
 }
 
 void *allocate(uint64_t *rootStack, uint64_t size)
 {
 	uint64_t sizeAligned = (size + (wordSize - 1)) / wordSize;
-	// printf("allocate: size = %d, aligned = %d, remaining = %d\n", size, sizeAligned, fromSpaceEnd - freePointer);
+// printf("allocate: size = %d, aligned = %d, remaining = %d\n", size, sizeAligned, fromSpaceEnd - freePointer);
 #ifdef DEBUG_LOG_GC
 	printf("allocate: size = %d, aligned = %d\n", size, sizeAligned);
 #endif
@@ -315,10 +274,9 @@ static void finishCollection(uint64_t *rootStack)
 	printf("######################\n");
 	fflush(stdout);
 #endif
-
 }
 
-void collect(uint64_t * const rootStack, int64_t bytesNeeded)
+void collect(uint64_t *const rootStack, int64_t bytesNeeded)
 {
 	// printf("!!!!!! collect: size = %d\n", bytesNeeded);
 	if (rootStack < rootStackBegin)
@@ -336,7 +294,7 @@ void collect(uint64_t * const rootStack, int64_t bytesNeeded)
 	printf("-- size           = %d\n", bytesNeeded);
 	hexDump("root stack", rootStackBegin, (rootStack - rootStackBegin + 1) * wordSize);
 	hexDump("from space", fromSpaceBegin, (freePointer - fromSpaceBegin + 2) * wordSize);
-	// hexDump("to space", toSpaceBegin, (freePointer - fromSpaceBegin + 2) * wordSize);
+// hexDump("to space", toSpaceBegin, (freePointer - fromSpaceBegin + 2) * wordSize);
 #endif
 
 	copyPtrBegin = toSpaceBegin;

@@ -9,7 +9,8 @@
 - [x] Throw an error if a global variable is not initialized.
 - [x] 'do' form
 - [ ] cadr caddr
-- [ ] let*
+- [x] let*
 - [ ] Find a few benchmarks, that could be used for comparison of safe primitives.
 - [ ] floating point number, then we can do ray tracer.
 - [x] garbage collection
+- [ ] Change value representation scheme so that float number could be added.

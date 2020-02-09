@@ -4,6 +4,8 @@
         "windows.h": "c",
         "memory.h": "c",
         "objects.h": "c",
-        "assert.h": "c"
+        "assert.h": "c",
+        "stdio.h": "c",
+        "stdint.h": "c"
     },
 }
