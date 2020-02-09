@@ -255,8 +255,7 @@ let programToString writeGlobals (prog : Program) =
         out.WriteLine(wordSize)
 
     let printStringConst (name, literal : string) =
-        let firstField = literal.Length <<< fixnumShift
-        fprintfn out "    .section .rdata,\"dr\""
+        let firstField = (literal.Length <<< stringSizeShift) ||| stringTag
         printReadOnlySec out
 
         printAlign out wordSize

@@ -10,7 +10,7 @@ static int isObjectOfType(ptr_t obj, int mask, int tag)
     if (isTypedObject)
     {
         ptrptr pp = toPtrptr(obj - typedObjectTag);
-        return (toPtr(pp) & mask) == tag;
+        return (*pp & mask) == tag;
     }
 
     return 0;

@@ -22,7 +22,7 @@ let typedObjectTag = 0x07
 let typedObjectMask = 0x07
 
 let boolTag = 0x06
-let boolMask = 0xFF
+let boolMask = 0xF7
 let falseLiteral = 0x06
 let trueLiteral = 0x0E
 let boolBit = 3
@@ -46,7 +46,7 @@ let voidTag = 0x3E
 let voidMask = 0xFF
 
 let vectorTag = 0x00
-let vectorMask = 0x07
+let vectorMask = 0x03
 
 let stringTag = 0x02
 let stringMask = 0x07

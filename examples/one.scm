@@ -1,1 +1,5 @@
-(number? 1)
+(let ([v (make-vector 3)])
+(vector-set! v 0 1)
+(vector-set! v 1 2)
+(vector-set! v 2 3)
+v)

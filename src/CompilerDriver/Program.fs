@@ -28,5 +28,9 @@ let main argv =
         else
             defaultS
     let useLib = Seq.contains "-nolib" argv |> not
+
+    let useLib = false
+    let sources = [toRoot "examples/one.scm"]
+
     compileFilesToBinary useLib sources defaultOutFile
     0 // return an integer exit code

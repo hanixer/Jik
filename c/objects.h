@@ -27,7 +27,7 @@
 #define typedObjectMask 0x07
 
 #define boolTag 0x06
-#define boolMask 0xFF
+#define boolMask 0xF7
 #define falseLiteral 0x06
 #define trueLiteral 0x0E
 #define boolBit 3
@@ -51,7 +51,7 @@
 #define voidMask 0xFF
 
 #define vectorTag 0x00
-#define vectorMask 0x07
+#define vectorMask 0x03
 
 #define stringTag 0x02
 #define stringMask 0x07

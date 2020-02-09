@@ -170,7 +170,7 @@ let compileIsOfTypeComplex dest var1 mask tag =
      And, [Int typedObjectMask; Reg Rax]
      Cmp, [Int typedObjectTag; Reg Rax]
      JmpIf(Ne, comparEnd), []] @
-    readCell (Var var1) tag (Var dest) @
+    readCell (Var var1) typedObjectTag (Var dest) @
     [And, [Int mask; Var dest]
      Cmp, [Int tag; Var dest]] @
     [Label(comparEnd), []] @
@@ -293,7 +293,7 @@ let rec declToInstrs (dest, x) =
         compileIsOfType dest var1 charMask charTag
     | Simple.Prim(Prim.IsBoolean, [var1]) ->
         [Mov, [Var var1; Reg Rax]
-         And, [Int boolTag; Reg Rax]
+         And, [Int boolMask; Reg Rax]
          Cmp, [Int boolTag; Reg Rax]]
         @ compileSetOnEqual dest
     | Simple.Prim(Prim.CharToNumber, [var1]) ->
@@ -355,7 +355,7 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.StringLength, [var1]) ->
         [Mov, [Var var1; Reg R11]
          Mov, [Deref(-typedObjectTag, R11); Var dest]
-         Sar, [Int stringSizeShift; Var dest]]
+         Sar, [Int (stringSizeShift - fixnumShift); Var dest]]
     | Simple.Prim(Prim.IsString, [var1]) ->
         compileIsOfTypeComplex dest var1 stringMask stringTag
     | Simple.Prim(Prim.StringSet, [instance; index; value]) ->
@@ -378,7 +378,7 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.StringInit, [stringData]) ->
         // TODO: rework this case.
         [Lea stringData, [Var dest]
-         Or, [Int stringTag; Var dest]]
+         Or, [Int typedObjectTag; Var dest]]
     // Closures.
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
         let allocatedSize = (List.length args + 2) * wordSize

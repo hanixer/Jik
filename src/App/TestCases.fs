@@ -21,6 +21,16 @@ let numberTests =
       @"(number? (char->number #\r))", "#t\n"
       @"(number? (number->char 12))", "#f\n" ]
 
+let nullTests =
+    [ @"(null? '())", "#t\n"
+      @"(null? #f)", "#f\n"
+      @"(null? #t)", "#f\n"
+      @"(null? (null? '()))", "#f\n"
+      @"(null? #\a)", "#f\n"
+      @"(null? 0)", "#f\n"
+      @"(null? -10)", "#f\n"
+      @"(null? 10)", "#f\n" ]
+
 // e should be 12
 let e = "
 (let ([a 1]
@@ -197,7 +207,14 @@ let vectorTests =
       "(vector? (make-vector 3))", "#t\n"
       "(vector? #t)", "#f\n"
       e13, "33\n"
-      e14, "#(1 2 3)\n" ]
+      e14, "#(1 2 3)\n"
+      @"(vector? (make-vector 0))", "#t\n"
+      @"(vector-length (make-vector 12))", "12\n"
+      @"(vector? (cons 1 2))", "#f\n"
+      @"(vector? 1287)", "#f\n"
+      @"(vector? '())", "#f\n"
+      @"(vector? #t)", "#f\n"
+      @"(vector? #f)", "#f\n" ]
 
 let assignmentTests =
     [ "(let ((x 0)) (set! x 1) x)", "1\n"

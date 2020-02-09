@@ -409,7 +409,6 @@ let collectComplexConstants (prog : Program) =
         |> Seq.map Assign
         |> Seq.toList
 
-    let stringNames = strings |> Seq.map fst |> Seq.toList
     let names = assignments |> Seq.map fst |> Seq.toList
 
     { prog with Main = assignExprs @ main
