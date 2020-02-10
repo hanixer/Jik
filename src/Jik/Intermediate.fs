@@ -24,6 +24,7 @@ type Simple =
     | RawInt of int // Int value as it is, without conversions.
     | Char of char
     | Bool of bool
+    | Void
     | EmptyList
     | Lambda of debugName : string option * Var list * Var list * bool * Block list
 
@@ -120,6 +121,7 @@ let rec showBlock (name, vars, stmts) =
                 | Simple.EmptyList -> iStr "'()"
                 | Simple.Int n -> iNum n
                 | Simple.RawInt n -> iNum n
+                | Simple.Void -> iStr "#!void"
                 | Simple.Char c -> iStr (sprintf "#\\%A" c)
                 | Simple.Bool true -> iStr "#t"
                 | Simple.Bool false -> iStr "#f"
@@ -239,6 +241,7 @@ let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
     | Expr.EmptyList -> convertSimpleDecl "nil" EmptyList cont
     | Expr.Bool b -> convertSimpleDecl "b" (Bool b) cont
     | Expr.Int n -> convertSimpleDecl "n" (Int n) cont
+    | Expr.Void -> convertSimpleDecl "v" Void cont
     | Expr.Char c -> convertSimpleDecl "c" (Char c) cont
     | Expr.If(exprc, exprt, exprf) ->
         let join, fresh = freshLabel "block", freshLabel "v"
@@ -305,6 +308,7 @@ and convertExprJoin expr (contVar : Var) =
     | Expr.EmptyList
     | Expr.Bool _
     | Expr.Int _
+    | Expr.Void
     | Expr.Char _
     | Expr.Ref _
     | Expr.Lambda _ -> convertExpr expr jump2
@@ -344,6 +348,7 @@ and convertExprTail expr =
     | Expr.EmptyList
     | Expr.Bool _
     | Expr.Int _
+    | Expr.Void
     | Expr.Char _
     | Expr.Ref _
     | Expr.ForeignCall _
@@ -557,92 +562,6 @@ let closureConversion (prog : Program) : Program =
 
 let fromSpaceEnd = "fromSpaceEnd"
 let collectFunction = "collect"
-
-/// Add checks for free space in heap
-/// before allocation and call collect() if needed.
-let exposeAllocations (prog : Program) =
-    let handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts =
-        // TODO: too many jumps are generated here.
-        // This should be optimized somehow.
-        let cmp = freshLabel "cmp"
-        let labCollect = freshLabel "block"
-        let labAlloc = freshLabel "block"
-        let fp = freshLabel "fp"
-        let fp2 = freshLabel "fp"
-        let fe = freshLabel "fe"
-        let v = freshLabel "v"
-        let s = freshLabel "s"
-        let s2 = freshLabel "s"
-        let n = freshLabel "n"
-        let n2 = freshLabel "n"
-        // TODO try to refactor below computation.
-        // Maybe it is better to make a primitive: CompareHeapPointers.
-        // So that conversion between integers not done here.
-        let checkFree =
-           [Decl(cmp, Prim(CheckFreePointer, [sizeVar]))
-            Transfer(If(cmp, labAlloc, labCollect))]
-        let callCollect =
-            [Decl(v, Prim(Collect, [s]))
-             Transfer(Jump(labAlloc, []))]
-        let blockCollect = labCollect, [], callCollect
-        let stmtsPrev = List.rev stmts @ sizeStmts @ checkFree
-        let blockPrev = blockName, blockArgs, stmtsPrev
-        let blocks = blockCollect :: blockPrev :: blocks
-        let blockName = labAlloc
-        let blockArgs = []
-        let stmts = [stmt]
-        blocks, blockName, blockArgs, stmts
-
-    let handleStmt (blocks, blockName, blockArgs, stmts) stmt =
-        match stmt with
-        | Decl(var, Prim(MakeVector, [size])) ->
-            let sizeVar = freshLabel "s"
-            let n = freshLabel "n"
-            let sizeStmts =
-               [Decl(n, Int 1)
-                Decl(sizeVar, Prim(Add, [size; n]))]
-            handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
-        | Decl(var, Prim(MakeString, [size])) ->
-            let sizeVar = freshLabel "s"
-            let n = freshLabel "n"
-            let n2 = freshLabel "n"
-            let n3 = freshLabel "n"
-            let n4 = freshLabel "n"
-            let n5 = freshLabel "n"
-            let sizeStmts =
-               [Decl(n, Int (wordSize - 1))
-                Decl(n2, Prim(Add, [size; n]))
-                Decl(n3, Int wordSize)
-                Decl(n4, Prim(Quotient, [n2; n3]))
-                Decl(n5, Int 1)
-                Decl(sizeVar, Prim(Add, [n4; n5]))]
-            handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
-        | Decl(var, Prim(MakeClosure, free)) ->
-            let sizeVar = freshLabel "s"
-            let size = free.Length + 2 // See SelectInstruction for MakeClosure.
-            let sizeStmts = [Decl(sizeVar, Int size)]
-            handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
-        | Decl(var, Prim(Cons, _)) ->
-            let sizeVar = freshLabel "s"
-            let sizeStmts = [Decl(sizeVar, Int 3)]
-            handleAlloc blocks blockName blockArgs stmts stmt sizeVar sizeStmts
-        | _ ->
-            blocks, blockName, blockArgs, stmt :: stmts
-
-    let handleBlock (block : Block) =
-        let name, args, stmts = block
-        let blocks, blockName, blockArgs, stmts = List.fold handleStmt ([], name, args, []) stmts
-        let lastBlock = blockName, blockArgs, List.rev stmts
-        List.rev (lastBlock :: blocks)
-
-    let handleFunc (func : Function) =
-        let blocks = List.collect handleBlock func.Blocks
-        { func with Blocks = blocks }
-
-    let procs = List.map handleFunc prog.Procedures
-
-    { prog with Procedures = procs
-                Main = handleFunc prog.Main }
 
 let allIntermediateTransformations =
     convertProgram

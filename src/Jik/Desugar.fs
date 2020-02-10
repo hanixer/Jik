@@ -19,7 +19,7 @@ let special = [
     "unless"
 ]
 
-let undefinedExpr = Bool false
+let undefinedExpr = S.VoidValue
 
 let makeIf cond conseq altern =
     exprsToList [Symbol "if"; cond; conseq; altern]
@@ -65,18 +65,63 @@ let desugarSingle expr =
         desugarUnless condition body
     | List (Symbol "cond" :: clauses) ->
         desugarCond clauses
+    | List (Symbol "do" :: bindings :: test :: body) ->
+        desugarDo bindings test body
+    | List (Symbol "let*" :: bindings :: body) ->
+        desugarLetStar bindings body
     // primitive or function application
     | Cons(head, tail) ->
         let head = desugarSingle head
         let tail = desugarSingle tail
         Cons(head, tail)
     // other forms: nil, number, string, char, symbol
-    // just return this expression
+    // just return this expression unchanged
     | _ -> expr
 
 let desugarLambda args body =
     let body = desugarBody body
     exprsToList (Symbol "lambda" :: args :: body)
+
+let desugarLetStar bindings body =
+    let handleBinding binding body =
+        [desugarLet [binding] body]
+
+    match bindings with
+    | List bindings ->
+        let lst = List.foldBack handleBinding bindings body
+        List.head lst
+    | _ ->
+        failwith "wrong bindings for let*"
+
+
+let parseDoBindings bindings =
+    let handleBinding = function
+        | List [Symbol name; expr] ->
+            exprsToList [Symbol name; expr], Symbol name
+        | List [Symbol name; expr; update] ->
+            exprsToList [Symbol name; expr], update
+        | e -> failwithf "wrong binding for do: %s" (sexprToString e)
+
+    match bindings with
+    | List bindings' ->
+        List.map handleBinding bindings'
+        |> List.unzip
+    | _ -> failwithf "wrong bindings for do: %s" (sexprToString bindings)
+
+let parseDoTest test =
+    match test with
+    | List (test :: resList) -> test, resList
+    | _ -> failwithf "wrong test for do"
+
+let desugarDo bindings test body =
+    let bindings, updateExprs = parseDoBindings bindings
+    let test, resList = parseDoTest test
+    let doloop = freshLabel "doloop"
+    let call = exprsToList (Symbol doloop :: updateExprs)
+    let conseq = desugarBegin (resList)
+    let altern = desugarBegin (body @ [call])
+    let ifExpr = makeIf test conseq altern
+    desugarLetLoop doloop bindings [ifExpr]
 
 // else e1 e2 ... => (begin e1 e2 ...)
 // (test) => or test
@@ -125,8 +170,11 @@ let desugarUnless condition body =
     makeIf condition undefinedExpr body
 
 let desugarBegin body =
-    let body = desugarBody body
-    exprsToList (Symbol "begin" :: body)
+    if body.IsEmpty then
+        undefinedExpr
+    else
+        let body = desugarBody body
+        exprsToList (Symbol "begin" :: body)
 
 let desugarAnd exprs =
     let handle expr desugared =

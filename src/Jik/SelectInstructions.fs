@@ -8,6 +8,13 @@ open Primitive
 open Codegen
 open Common
 
+
+let convertToFixnum n = n <<< fixnumShift
+
+let moveInt n var = [Mov, [Operand.Int n; Operand.Var var]]
+
+let setVoid dest = moveInt voidTag dest
+
 let stackArgsCount args = List.length args - List.length registersForArgs
 
 let moveClosureArgs args =
@@ -126,10 +133,6 @@ let compileForeignCall label blocks foreignName args =
      Mov, [Reg Rax; Var resultVar]
      Jmp label, []]
 
-let convertNumber n = n <<< fixnumShift
-
-let moveInt n var = [Mov, [Operand.Int n; Operand.Var var]]
-
 let comparisonInstrs var1 var2 cc dest =
     let instrs =
         [Mov, [Var var1; Reg Rax]
@@ -157,11 +160,27 @@ let compileIsOfType dest var1 mask tag =
      Cmp, [Int tag; Reg Rax]]
     @ compileSetOnEqual dest
 
+let readCell object tag dest =
+    [Mov, [object; Reg R11]
+     Mov, [Deref(-tag, R11); dest]]
+
+let compileIsOfTypeComplex dest var1 mask tag =
+    let comparEnd = freshLabel ".L"
+    [Mov, [Var var1; Reg Rax]
+     And, [Int typedObjectMask; Reg Rax]
+     Cmp, [Int typedObjectTag; Reg Rax]
+     JmpIf(Ne, comparEnd), []] @
+    readCell (Var var1) typedObjectTag (Var dest) @
+    [And, [Int mask; Var dest]
+     Cmp, [Int tag; Var dest]] @
+    [Label(comparEnd), []] @
+    compileSetOnEqual dest
+
 /// Do not work for more than 4 arguments.
 let callRuntime func =
     [Mov, [Reg Rsp; Reg Rbp]] @
     alignStackPointer @
-    [Sub, [Int (4 * wordSize); Reg Rsp]
+    [Sub, [Int stackShadowSpace; Reg Rsp]
      Call(func), []
      Mov, [Reg Rbp; Reg Rsp]]
 
@@ -172,7 +191,7 @@ let callAllocate size dest =
      Mov, [Reg Rsp; Reg Rbp]
      Sub, [Int wordSize; Reg Rsp]] @
     alignStackPointer @
-    [Sub, [Int (4*wordSize); Reg Rsp]
+    [Sub, [Int stackShadowSpace; Reg Rsp]
      Call("allocate"), []
      Mov, [Deref(0, R15); Reg Rsi]
      Mov, [Reg Rbp; Reg Rsp]
@@ -182,11 +201,10 @@ let compileMakeVector size dest =
     [Mov, [size; Reg Rax]
      Sar, [Int fixnumShift; Reg Rax]
      Add, [Int 1; Reg Rax]
-     IMul, [Int wordSize; Reg Rax]
-     Mov, [Reg Rax; Reg Rdx]] @
+     IMul, [Int wordSize; Reg Rax]] @
     callAllocate (Reg Rax) (Reg R11) @
     [Mov, [size; Deref(0, R11)]
-     Or, [Int vectorTag; Reg R11]
+     Or, [Int typedObjectTag; Reg R11]
      Mov, [Reg R11; Var dest]]
 
 let compileMakeString size dest =
@@ -194,11 +212,14 @@ let compileMakeString size dest =
      Sar, [Int fixnumShift; Reg Rax]
      Add, [Int wordSize; Reg Rax]] @
     callAllocate (Reg Rax) (Reg R11) @
-    [Mov, [size; Deref(0, R11)]
-     Or, [Int stringTag; Reg R11]
+    [Mov, [size; Reg Rax]
+     Sal, [Int (stringSizeShift - fixnumShift); Reg Rax]
+     Or, [Int stringTag; Reg Rax]
+     Mov, [Reg Rax; Deref(0, R11)]
+     Or, [Int typedObjectTag; Reg R11]
      Mov, [Reg R11; Var dest]]
 
-let vectorAddress vec index =
+let computeVecElementOffset vec index =
     [Mov, [Var vec; Reg R11]
      Mov, [index; Reg R12]
      Sar, [Int fixnumShift; Reg R12]
@@ -207,8 +228,9 @@ let vectorAddress vec index =
 let rec declToInstrs (dest, x) =
     match x with
     | Simple.EmptyList -> moveInt nilLiteral dest
-    | Simple.Int n -> moveInt (convertNumber n) dest
+    | Simple.Int n -> moveInt (convertToFixnum n) dest
     | Simple.RawInt n -> moveInt n dest
+    | Simple.Void -> setVoid dest
     | Simple.Char c -> moveInt (((int c) <<< charShift) ||| charTag) dest
     | Simple.Bool true -> moveInt trueLiteral dest
     | Simple.Bool false -> moveInt falseLiteral dest
@@ -271,7 +293,7 @@ let rec declToInstrs (dest, x) =
         compileIsOfType dest var1 charMask charTag
     | Simple.Prim(Prim.IsBoolean, [var1]) ->
         [Mov, [Var var1; Reg Rax]
-         And, [Int boolTag; Reg Rax]
+         And, [Int boolMask; Reg Rax]
          Cmp, [Int boolTag; Reg Rax]]
         @ compileSetOnEqual dest
     | Simple.Prim(Prim.CharToNumber, [var1]) ->
@@ -292,7 +314,7 @@ let rec declToInstrs (dest, x) =
         [Mov, [Reg Rsp; Reg Rbp]
          Sub, [Int wordSize; Reg Rsp]] @
         alignStackPointer @
-        [Sub, [Int (4*wordSize); Reg Rsp]] @
+        [Sub, [Int stackShadowSpace; Reg Rsp]] @
         allocateCons (Var var1) (Var var2) (Var dest) restoreStack
     | Simple.Prim(Prim.IsPair, [var1]) ->
         compileIsOfType dest var1 pairMask pairTag
@@ -306,34 +328,36 @@ let rec declToInstrs (dest, x) =
          getCdr R11 (Var dest)]
     | Simple.Prim(Prim.SetCar, [pair; value]) ->
         [Mov, [Var pair; Reg R11]
-         Mov, [Var value; Deref(-pairTag + wordSize, R11)]
-         Mov, [Var value; Var dest]]
+         Mov, [Var value; Deref(-pairTag + wordSize, R11)]] @
+        setVoid dest
     | Simple.Prim(Prim.SetCdr, [pair; value]) ->
         [Mov, [Var pair; Reg R11]
-         Mov, [Var value; Deref(-pairTag + 2 * wordSize, R11)]
-         Mov, [Var value; Var dest]]
+         Mov, [Var value; Deref(-pairTag + 2 * wordSize, R11)]] @
+        setVoid dest
     // Vectors.
     | Simple.Prim(Prim.MakeVector, [var1]) ->
         compileMakeVector (Var var1) dest
     | Simple.Prim(Prim.VectorLength, [var1]) ->
         [Mov, [Var var1; Reg R11]
-         Mov, [Deref(-vectorTag, R11); Var dest]]
+         Mov, [Deref(-typedObjectTag, R11); Var dest]]
     | Simple.Prim(Prim.IsVector, [var1]) ->
-        compileIsOfType dest var1 vectorMask vectorTag
+        compileIsOfTypeComplex dest var1 vectorMask vectorTag
     | Simple.Prim(Prim.VectorSet, [vec; index; value]) ->
-        vectorAddress vec (Var index) @
-        [Mov, [Var value; Deref4(-vectorTag, R11, R12, wordSize)]]
+        computeVecElementOffset vec (Var index) @
+        [Mov, [Var value; Deref4(-typedObjectTag, R11, R12, wordSize)]] @
+        setVoid dest
     | Simple.Prim(Prim.VectorRef, [vec; index]) ->
-        vectorAddress vec (Var index) @
-        [Mov, [Deref4(-vectorTag, R11, R12, wordSize); Var dest]]
+        computeVecElementOffset vec (Var index) @
+        [Mov, [Deref4(-typedObjectTag, R11, R12, wordSize); Var dest]]
     // Strings.
     | Simple.Prim(Prim.MakeString, [var1]) ->
         compileMakeString (Var var1) dest
     | Simple.Prim(Prim.StringLength, [var1]) ->
         [Mov, [Var var1; Reg R11]
-         Mov, [Deref(-stringTag, R11); Var dest]]
+         Mov, [Deref(-typedObjectTag, R11); Var dest]
+         Sar, [Int (stringSizeShift - fixnumShift); Var dest]]
     | Simple.Prim(Prim.IsString, [var1]) ->
-        compileIsOfType dest var1 stringMask stringTag
+        compileIsOfTypeComplex dest var1 stringMask stringTag
     | Simple.Prim(Prim.StringSet, [instance; index; value]) ->
         [Mov, [Var instance; Reg R11]
          Mov, [Var index; Reg R12]
@@ -341,29 +365,30 @@ let rec declToInstrs (dest, x) =
          Add, [Int wordSize; Reg R12]
          Mov, [Var value; Reg Rax]
          Sar, [Int charShift; Reg Rax]
-         Movb, [Reg Al; Deref4(-stringTag, R11, R12, 1)]]
+         Movb, [Reg Al; Deref4(-typedObjectMask, R11, R12, 1)]] @
+        setVoid dest
     | Simple.Prim(Prim.StringRef, [instance; index]) ->
         [Mov, [Var instance; Reg R11]
          Mov, [Var index; Reg R12]
          Sar, [Int fixnumShift; Reg R12]
          Add, [Int wordSize; Reg R12]
-         Movzb, [Deref4(-stringTag, R11, R12, 1); Var dest]
+         Movzb, [Deref4(-typedObjectMask, R11, R12, 1); Var dest]
          Sal, [Int charShift; Var dest]
          Or, [Int charTag; Var dest]]
     | Simple.Prim(Prim.StringInit, [stringData]) ->
+        // TODO: rework this case.
         [Lea stringData, [Var dest]
-         Or, [Int stringTag; Var dest]]
+         Or, [Int typedObjectTag; Var dest]]
     // Closures.
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
-        let offset = (List.length args + 2) * wordSize
-        let size = (List.length args + 1) <<< fixnumShift
-        callAllocate (Int offset) (Reg R11) @
-        [Mov, [Int size; Deref(0, R11)] // The first cell is for size and forwarding bit.
+        let allocatedSize = (List.length args + 2) * wordSize
+        let savedSize = convertToFixnum (List.length args + 1)
+        callAllocate (Int allocatedSize) (Reg R11) @
+        [Mov, [Int savedSize; Deref(0, R11)] // The first cell is for size and forwarding bit.
          Lea(label), [Deref(wordSize, R11)]] @ // The second is for label.
         moveClosureArgs args @ // Remaining cells are for free variables.
         [Or, [Int closureTag; Reg R11]
          Mov, [Reg R11; Var dest]]
-
     | Simple.Prim(Prim.ClosureRef, [var1]) ->
         [Mov, [Var var1; Reg Rax]
          Sar, [Int fixnumShift; Reg Rax]
@@ -372,11 +397,12 @@ let rec declToInstrs (dest, x) =
         compileIsOfType dest var1 closureMask closureTag
     // Globals.
     | Simple.Prim(Prim.GlobalSet, [glob; value]) ->
-        [Mov, [Var value; GlobalValue(glob)]]
+        [Mov, [Var value; GlobalValue(glob)]] @
+        setVoid dest
     | Simple.Prim(Prim.GlobalRef, [glob]) ->
         // Save address of global var in rcx for C error handler.
         [Mov, [GlobalValue(glob); Reg Rax]
-         Cmp, [Int undefinedLiteral; Reg Rax]
+         Cmp, [Int unboundLiteral; Reg Rax]
          Lea(glob), [Reg Rcx]
          JmpIf(E, globVarErrorHandler), []
          Mov, [GlobalValue(glob); Var dest]]
@@ -384,38 +410,24 @@ let rec declToInstrs (dest, x) =
          [Mov, [GlobalValue(glob); Var dest]]
     // Symbols.
     | Simple.Prim(Prim.MakeSymbol, [var1]) ->
-        [Mov, [Var var1; Var dest]
-         Sub, [Int stringTag; Var dest]
-         Or, [Int symbolTag; Var dest]]
+        let allocatedSize = 2 * wordSize
+        let savedSize = convertToFixnum 1
+        callAllocate (Int allocatedSize) (Reg R11) @
+        [Mov, [Int savedSize; Deref(0, R11)] // The first cell is for size and forwarding bit.
+         Mov, [Var var1; Deref(wordSize, R11)]] @ // The second is for string.
+        [Or, [Int symbolTag; Reg R11]
+         Mov, [Reg R11; Var dest]]
     | Simple.Prim(Prim.SymbolString, [var1]) ->
-        [Mov, [Var var1; Var dest]
-         Sub, [Int symbolTag; Var dest]
-         Or, [Int stringTag; Var dest]]
+        // String lives in the second cell of the object.
+        [Mov, [Var var1; Reg R11]
+         Mov, [Deref(-symbolTag + wordSize, R11); Var dest]]
     | Simple.Prim(Prim.IsSymbol, [var1]) ->
         compileIsOfType dest var1 symbolMask symbolTag
 
-    | Simple.Prim(Prim.EofObject, []) -> moveInt eofTag dest
+    | Simple.Prim(Prim.EofObject, []) -> moveInt eofLiteral dest
     | Simple.Prim(Prim.IsEofObject, [var1]) ->
-        compileIsOfType dest var1 eofMask eofTag
+        compileIsOfType dest var1 eofMask eofLiteral
 
-    | Simple.Prim(Prim.CheckFreePointer, [size]) ->
-        [Mov, [Var size; Reg Rax]
-         Sar, [Int fixnumShift; Reg Rax]
-         IMul, [Int wordSize; Reg Rax]
-         Add, [GlobalValue freePointer; Reg Rax]
-         Cmp, [GlobalValue fromSpaceEnd; Reg Rax]
-         Set L, [Reg Al]
-         Movzb, [Reg Al; Reg Rax]
-         Sal, [Operand.Int boolBit; Reg Rax]
-         Or, [Operand.Int falseLiteral; Reg Rax]
-         Mov, [Reg Rax; Var dest]]
-    | Simple.Prim(Prim.Collect, [size]) ->
-        [Mov, [Var size; Reg Rdx]
-         Sar, [Int 2; Reg Rdx]
-         Mov, [Reg R15; Reg Rcx]
-         Mov, [Reg Rsi; Deref(0, R15)]
-         Call(collectFunction), []
-         Mov, [Deref(0, R15); Reg Rsi]]
     | e -> failwithf "declToInstrs: %s %A" dest e
 
 let transferToInstrs procName blocks = function
@@ -480,10 +492,6 @@ let doPrimitiveUseHeap (_, simple) =
 let selectInstructions (prog : Intermediate.Program) : Program =
     let mutable rootStackSlots = 0
     let rootStackVars = System.Collections.Generic.HashSet<string>()
-
-    let moveBlockArgToRootStack arg =
-        rootStackSlots <- rootStackSlots + 1
-        Mov, [Var arg; RootStackSlot(rootStackSlots - 1)]
 
     let handleStmt procName blocks = function
         | Decl decl ->

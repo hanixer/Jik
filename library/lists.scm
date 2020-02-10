@@ -81,6 +81,10 @@
   (lambda (x)
     (cdr (cdr x))))
 
+(define caar
+  (lambda (x)
+    (car (car x))))
+
 (define list-zip
      (lambda (l1 l2)
           (let loop ((l1 l1) (l2 l2))
@@ -89,3 +93,10 @@
                    (cons
                     (cons (car l1) (car l2))
                     (loop (cdr l1) (cdr l2)))))))
+
+(define (assq k m)
+  (if (null? m)
+      #f
+      (if (eq? k (car (car m)))
+          (car m)
+          (assq k (cdr m)))))

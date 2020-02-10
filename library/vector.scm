@@ -23,3 +23,12 @@
                      (let ((j (+ i (abs (remainder rand (- l i))))))
                        (vector-swap! v i j)
                        (loop (+ i 1) (rand-next rand))))))))
+
+(define (vector->list s)
+  (let loop ((i 0))
+    (if (>= i (vector-length s))
+        '()
+        (cons (vector-ref s i) (loop (+ i 1))))))
+
+(define (list->vector l)
+  (apply vector l))

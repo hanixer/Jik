@@ -136,8 +136,10 @@ let isArithm = function
 
 let isRegister = function | Reg _ -> true | _ -> false
 
+let stackShadowSpace = 4 * wordSize
+
 let alignStackPointer = [And, [Int -16; Reg Rsp]]
-let allocShadowSpace = [Sub, [Int (4 * wordSize); Reg Rsp]]
+let allocShadowSpace = [Sub, [Int stackShadowSpace; Reg Rsp]]
 
 let getCar reg dest = Mov, [Deref(-pairTag + wordSize, reg); dest]
 let getCdr reg dest = Mov, [Deref(-pairTag + 2 * wordSize, reg); dest]
@@ -508,7 +510,7 @@ let convertGlobalRefs (prog : Program) =
 
 let createMainModule constants globals globOriginal entryPoints =
     let initGlobal name =
-        [Mov, [Int undefinedLiteral; GlobalValue name]]
+        [Mov, [Int unboundLiteral; GlobalValue name]]
 
     let callEntryPoint entryPoint =
         [Mov, [Int 0; Reg Rcx]

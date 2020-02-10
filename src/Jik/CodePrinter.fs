@@ -7,121 +7,229 @@ open Intermediate
 open System.IO
 open Codegen
 
-let showInstr out (op, args) =
+
+let printLabel (out : TextWriter) (label : string) =
+        out.Write(label)
+        out.WriteLine(":")
+
+let printGlobal (out : TextWriter) (glob : string) =
+        out.Write("    .globl ")
+        out.WriteLine(glob)
+
+let printReadOnlySec (out : TextWriter) =
+    out.WriteLine("    .section .rdata,\"dr\"")
+
+let printAlign  (out : TextWriter) (n : int) =
+    out.Write("    .align ")
+    out.WriteLine(n)
+
+let showInstr (out : TextWriter) (op, args) =
+    let showCc cc =
+        match cc with
+        | L -> out.Write("l")
+        | G -> out.Write("g")
+        | E -> out.Write("e")
+        | Ne -> out.Write("ne")
+        | Le -> out.Write("le")
+        | Ge -> out.Write("ge")
+        | S -> out.Write("s")
+
     let showOp op =
         match op with
         | Set cc ->
-            fprintf out "set%s " ((sprintf "%A" cc).ToLower())
+            out.Write("set")
+            out.Write(cc.ToString().ToLower())
+            out.Write(" ")
+            // out
+            // fprintf out "set%s " ((sprintf "%A" cc).ToLower())
         | Label label ->
-            fprintf out "%s:" label
+            out.Write(label)
+            out.Write(":")
+            // fprintf out "%s:" label
         | JmpIf (E, label) ->
-            fprintf out "je %s" label
+            out.Write("je ")
+            out.Write(label)
         | JmpIf (Ne, label) ->
-            fprintf out "jne %s" label
+            out.Write("jne ")
+            out.Write(label)
         | JmpIf (S, label) ->
-            fprintf out "js %s" label
+            out.Write("js ")
+            out.Write(label)
         | JmpIf (L, label) ->
-            fprintf out "jl %s" label
+            out.Write("jl ")
+            out.Write(label)
         | Jmp label ->
-            fprintf out "jmp %s" label
+            out.Write("jmp ")
+            out.Write(label)
         | Call label ->
-            fprintf out "call %s" label
+            out.Write("call ")
+            out.Write(label)
         | Movb ->
-            fprintf out "movb "
+            out.Write("movb ")
         | Cqto ->
-            fprintf out "cqto "
+            out.Write("cqto ")
         | IDiv ->
-            fprintf out "idivq "
-        | _ ->
-            let s = sprintf "%A" op
-            fprintf out "%s" (s.ToLower() + "q ")
+            out.Write("idivq ")
+        | Add -> out.Write("addq ")
+        | Sub -> out.Write("subq ")
+        | Neg -> out.Write("negq ")
+        | Mov -> out.Write("movq ")
+        | Movzb -> out.Write("movzbq ")
+        | IMul -> out.Write("imulq ")
+        | Sar -> out.Write("sarq ")
+        | Sal -> out.Write("salq ")
+        | And -> out.Write("andq ")
+        | Or -> out.Write("orq ")
+        | Push -> out.Write("pushq ")
+        | Pop -> out.Write("popq ")
+        | Ret -> out.Write("retq ")
+        | Xor -> out.Write("xorq ")
+        | Cmp -> out.Write("cmpq ")
+        | RestoreStack -> out.Write("restorestack ")
+        | SpliceSlot(_, _) -> out.Write("spliceslot ")
+        | aaa ->
+            failwithf "showOp: this instruction should not be handled here %A" aaa
+        // | _ ->
+            // out.Write(op.ToString().ToLower())
+            // out.Write("q ")
 
     let reg r =
-        let s = sprintf "%%%A" r
-        s.ToLower()
+        out.Write("%")
+        let s =
+            match r with
+            | Rax -> "rax"
+            | Rbx -> "rbx"
+            | Rsp -> "rsp"
+            | Rbp -> "rbp"
+            | Rcx -> "rcx"
+            | Rdx -> "rdx"
+            | Rsi -> "rsi"
+            | Rdi -> "rdi"
+            | R8 -> "r8"
+            | R9 -> "r9"
+            | R10 -> "r10"
+            | R11 -> "r11"
+            | R12 -> "r12"
+            | R13 -> "r13"
+            | R14 -> "r14"
+            | R15 -> "r15"
+            | Al -> "al"
+            | Ah -> "ah"
+            | Bl -> "bl"
+            | Bh -> "bh"
+            | Cl -> "cl"
+            | Ch -> "ch"
+
+        out.Write(s)
 
     let showArg = function
-        | Int n -> fprintf out "$%d" n
-        | Reg(r) -> fprintf out "%s" (reg r)
-        | Deref(n, r) -> fprintf out "%d(%s)" n (reg r)
-        | Deref4(n, r1, r2, m) -> fprintf out "%d(%s, %s, %d)" n (reg r1) (reg r2) m
-        | Var(v) -> fprintf out "[var %s]" v
-        | ByteReg(r) -> fprintf out "%s" (reg r)
-        | Slot(n) -> fprintfn out "{slot %d}" n
-        | RootStackSlot(n) -> fprintfn out "{root stack slot %d}" n
-        | GlobalValue(v) -> fprintf out "%s(%%rip)" v
+        | Int n ->
+            out.Write("$")
+            out.Write(n)
+        | Reg(r) -> reg r
+        | Deref(n, r) ->
+            out.Write(n)
+            out.Write("(")
+            reg r
+            out.Write(")")
+        | Deref4(n, r1, r2, m) ->
+            out.Write(n)
+            out.Write("(")
+            reg r1
+            out.Write(", ")
+            reg r2
+            out.Write(", ")
+            out.Write(m)
+            out.Write(")")
+        | Var(v) ->
+            out.Write("[var " + v + "]")
+        | ByteReg(r) -> reg r
+        | Slot(n) ->
+            out.Write("{slot " + n.ToString() + "}")
+        | RootStackSlot(n) ->
+            out.Write("{root slot " + n.ToString() + "}")
+        | GlobalValue(v) ->
+            out.Write(v)
+            out.Write("(%rip)")
 
     let showArgs args =
         List.iteri (fun i arg ->
             showArg arg
             if i <> List.length args - 1 then
-                fprintf out ", ") args
+                out.Write(", ")) args
 
     match op, args with
     | CallIndirect, [arg] ->
-        fprintf out "call *"
+        out.Write("call *")
         showArg arg
     | JmpIndirect, [arg] ->
-        fprintf out "jmp *"
+        out.Write("jmp *")
         showArg arg
     | Lea label, [arg] ->
-        fprintf out "leaq %s(%%rip), " label
+        out.Write("leaq ")
+        out.Write(label)
+        out.Write("(%rip), ")
         showArg arg
     | _ ->
         showOp op
         showArgs args
 
-let showInstrs out instrs =
+let showInstrs (out : TextWriter) instrs =
     List.iter (fun instr ->
-        fprintf out "    "
+        out.Write("    ")
         showInstr out instr
-        fprintfn out "") instrs
+        out.WriteLine()) instrs
 
 let instrsToString instrs =
     let out = new StringWriter()
-    fprintfn out "    .globl %s" schemeEntryLabel
-    fprintfn out "%s:" schemeEntryLabel
+    printGlobal out schemeEntryLabel
+    out.Write(schemeEntryLabel)
+    out.WriteLine(":")
     showInstrs out instrs
     out.ToString()
 
-let printGlobalOriginals out originals globals =
-    let printAsciiName i (label, orig) =
-        fprintfn out "%s:" label
-        fprintfn out "    .ascii \"%s\\0\"" orig
+let printGlobalOriginals (out : TextWriter) originals globals =
+    let printAsciiName i (label, orig : string) =
+        printLabel out label
+        out.Write("    .ascii \"")
+        out.Write(orig)
+        out.WriteLine("\\0\"")
 
-    let printTableEntry (label, glob) =
+    let printTableEntry (label : string, glob : string) =
         // Entry consists of global address and ascci label
-        fprintfn out "    .quad %s" glob
-        fprintfn out "    .quad %s" label
+        out.Write("    .quad ")
+        out.WriteLine(glob)
+        out.Write("    .quad ")
+        out.WriteLine(label)
 
     let labels = List.map (fun _ -> freshLabel ".LC") originals
 
-    fprintfn out "    .globl %s" globVarNameTable
-    fprintfn out "    .section .rdata,\"dr\""
+    printGlobal out globVarNameTable
+    printReadOnlySec out
     Seq.iteri printAsciiName (Seq.zip labels originals)
-    fprintfn out "    .data"
-    fprintfn out "    .align 16"
-    fprintfn out "%s:" globVarNameTable
+    out.WriteLine("    .data")
+    printAlign out 16
+    printLabel out globVarNameTable
     Seq.iter printTableEntry (Seq.zip labels globals)
-    fprintfn out "    .quad 0" // Put zeros to know where table ends.
-    fprintfn out "    .quad 0"
+    out.WriteLine("    .quad 0") // Put zeros to know where table ends.
+    out.WriteLine("    .quad 0")
 
-let printGlobalRoots out constants globals =
-    let printEntry thing =
-        fprintfn out "    .quad %s" thing
+let printGlobalRoots (out : TextWriter) constants globals =
+    let printEntry (thing : string) =
+        out.Write("    .quad ")
+        out.WriteLine(thing)
+
     let label = freshLabel ".LC"
-    fprintfn out "########################"
-    fprintfn out "### Global roots for GC"
-    fprintfn out "    .globl %s" globRootsTable
-    fprintfn out "    .section .rdata,\"dr\""
-    fprintfn out "%s:" label
+    printGlobal out globRootsTable
+    printReadOnlySec out
+    printLabel out label
 
     List.iter printEntry constants
     List.iter printEntry globals
-    fprintfn out "    .quad 0" // Put zeros to know where table ends.
-    fprintfn out "%s:" globRootsTable
-    fprintfn out "    .quad %s" label
-    fprintfn out "###"
+    out.WriteLine("    .quad 0") // Put zeros to know where table ends.
+    printLabel out globRootsTable
+    out.Write("    .quad ")
+    out.WriteLine(label)
 
 
 let escapeString chars =
@@ -138,42 +246,38 @@ let escapeString chars =
 let programToString writeGlobals (prog : Program) =
     let out = new StringWriter()
 
-    let printGlobal globl =
-        fprintfn out "    .globl %s" globl
-        fprintfn out "    .bss"
-        fprintfn out "    .align %d" wordSize
-        fprintfn out "%s:" globl
-        fprintfn out "    .space %d" wordSize
-
-    let printConstant globl =
-        fprintfn out "    .globl %s" globl
-        fprintfn out "    .bss"
-        fprintfn out "    .align %d" wordSize
-        fprintfn out "%s:" globl
-        fprintfn out "    .space %d" wordSize
+    let printGlobal1 globl =
+        printGlobal out globl
+        out.WriteLine("    .bss")
+        printAlign out wordSize
+        printLabel out globl
+        out.Write("    .space ")
+        out.WriteLine(wordSize)
 
     let printStringConst (name, literal : string) =
-        let firstField = literal.Length <<< fixnumShift
-        fprintfn out "    .section .rdata,\"dr\""
-        fprintfn out "    .align %d" wordSize
+        let firstField = (literal.Length <<< stringSizeShift) ||| stringTag
+        printReadOnlySec out
+
+        printAlign out wordSize
         fprintfn out "%s:" name
         fprintfn out "    .quad %d" firstField
         fprintfn out "    .ascii \"%s\"" (escapeString literal)
 
     let handleDef def =
-        fprintfn out "    .text"
-        fprintfn out "    .globl %s" def.Name
-        fprintfn out "%s:" def.Name
+        out.WriteLine("    .text")
+        printGlobal out def.Name
+        printLabel out def.Name
         showInstrs out def.Instrs
-        fprintfn out "\n\n"
+        out.WriteLine()
+        out.WriteLine()
 
     List.iter printStringConst prog.Strings
 
     if writeGlobals then
         printGlobalRoots out prog.ConstantsNames prog.Globals
         printGlobalOriginals out prog.GlobalsOriginal prog.Globals
-        List.iter printGlobal prog.Globals
-        List.iter printGlobal prog.ConstantsNames
+        List.iter printGlobal1 prog.Globals
+        List.iter printGlobal1 prog.ConstantsNames
 
     List.iter handleDef prog.Procedures
 

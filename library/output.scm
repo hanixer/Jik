@@ -24,9 +24,10 @@
     (%write-positive-int (abs n) p)))
 
 (define newline
-    (lambda ()
-        (write-char (number->char 10) (current-output-port))
-        (flush-output-port (current-output-port))))
+    (lambda args
+      (let ([p (if (null? args) (current-output-port) (car args))])
+        (write-char (number->char 10) p)
+        (flush-output-port p))))
 
 (define write #f)
 (define display #f)

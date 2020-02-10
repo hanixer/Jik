@@ -1,8 +1,35 @@
 module TestCases
+
 open System.Text
 open System.IO
 
+let numberTests =
+    [ @"(number? 0)", "#t\n"
+      @"(number? 1)", "#t\n"
+      @"(number? -1)", "#t\n"
+      @"(number? 37287)", "#t\n"
+      @"(number? -23873)", "#t\n"
+      @"(number? 536870911)", "#t\n"
+      @"(number? -536870912)", "#t\n"
+      @"(number? #t)", "#f\n"
+      @"(number? #f)", "#f\n"
+      @"(number? '())", "#f\n"
+      @"(number? #\Q)", "#f\n"
+      @"(number? (number? 12))", "#f\n"
+      @"(number? (number? #f))", "#f\n"
+      @"(number? (number? #\A))", "#f\n"
+      @"(number? (char->number #\r))", "#t\n"
+      @"(number? (number->char 12))", "#f\n" ]
 
+let nullTests =
+    [ @"(null? '())", "#t\n"
+      @"(null? #f)", "#f\n"
+      @"(null? #t)", "#f\n"
+      @"(null? (null? '()))", "#f\n"
+      @"(null? #\a)", "#f\n"
+      @"(null? 0)", "#f\n"
+      @"(null? -10)", "#f\n"
+      @"(null? 10)", "#f\n" ]
 
 // e should be 12
 let e = "
@@ -152,9 +179,7 @@ let basicTests =
           [e 5])
       (+ c (+ d e)))
     (let ([f 6])
-      (+ a (+ c f)))))", "12\n"
-
-       ]
+      (+ a (+ c f)))))", "12\n" ]
 
 let defineTests =
     [ e2, "2\n"
@@ -182,7 +207,14 @@ let vectorTests =
       "(vector? (make-vector 3))", "#t\n"
       "(vector? #t)", "#f\n"
       e13, "33\n"
-      e14, "#(1 2 3)\n" ]
+      e14, "#(1 2 3)\n"
+      @"(vector? (make-vector 0))", "#t\n"
+      @"(vector-length (make-vector 12))", "12\n"
+      @"(vector? (cons 1 2))", "#f\n"
+      @"(vector? 1287)", "#f\n"
+      @"(vector? '())", "#f\n"
+      @"(vector? #t)", "#f\n"
+      @"(vector? #f)", "#f\n" ]
 
 let assignmentTests =
     [ "(let ((x 0)) (set! x 1) x)", "1\n"
@@ -210,8 +242,7 @@ let assignmentTests =
         (cons (c0) (c1))))", "(1 . 0)\n"
       @"(let ((fact #f)) (set! fact (lambda (n) (if (zero? n) 1 (* n (fact (- n 1)))))) (fact 5))", "120\n"
 
-      @"(let ((fact #f)) ((begin (set! fact (lambda (n) (if (zero? n) 1 (* n (fact (- n 1)))))) fact) 5))",
-      "120\n" ]
+      @"(let ((fact #f)) ((begin (set! fact (lambda (n) (if (zero? n) 1 (* n (fact (- n 1)))))) fact) 5))", "120\n" ]
 
 let andOrTests =
     [ @"(and)", "#t\n"
@@ -282,8 +313,7 @@ let condTests =
       @"(cond (else 17))", "17\n"
       @"(cond (#f) (#f 12) (12 13))", "13\n"
       @"(cond ((cons 1 2) => (lambda (x) (cdr x))))", "2\n"
-      @"(cond [(and #f 2)] [(or #f 123)])", "123\n"
-      ]
+      @"(cond [(and #f 2)] [(or #f 123)])", "123\n" ]
 
 let lambdaTests =
     [ "(procedure? (lambda (x) x))", "#t\n"
@@ -315,8 +345,7 @@ let letrecTests =
       @"(letrec ((f 12) (g (lambda (n) (set! f n)))) (g 130) f)", "130\n"
       @"(letrec ((f (lambda (g) (set! f g) (f)))) (f (lambda () 12)))", "12\n"
 
-      @"(letrec ((f (cons (lambda () f) (lambda (x) (set! f x))))) (let ((g (car f))) ((cdr f) 100) (g)))",
-      "100\n"
+      @"(letrec ((f (cons (lambda () f) (lambda (x) (set! f x))))) (let ((g (car f))) ((cdr f) 100) (g)))", "100\n"
       @"(letrec ((f (letrec ((g (lambda (x) (* x 2)))) (lambda (n) (g (* n 2)))))) (f 12))", "48\n"
       @"(letrec ((f (lambda (f n) (if (zero? n) 1 (* n (f f (- n 1))))))) (f f 5))", "120\n"
       @"(let ((f (lambda (f)
@@ -334,8 +363,7 @@ let applyNonTail =
         (+ (apply f 12 '(7 2)) 1))", "27\n"
       "(cons (apply vector '(1 2 3 4 5 6 7 8)) '())", "(#(1 2 3 4 5 6 7 8))\n"
       "(cons (apply vector 1 2 3 4 '(5 6 7 8)) '())", "(#(1 2 3 4 5 6 7 8))\n"
-      "(cons (apply vector 1 2 3 4 5 6 7 8 '()) '())", "(#(1 2 3 4 5 6 7 8))\n"
-    ]
+      "(cons (apply vector 1 2 3 4 5 6 7 8 '()) '())", "(#(1 2 3 4 5 6 7 8))\n" ]
 
 let applyTail =
     [ "(let ([f (lambda (x y z) (+ x (* y z)))])
@@ -344,8 +372,7 @@ let applyTail =
       (apply f 13 '()))", "25\n"
       "(apply vector '(1 2 3 4 5 6 7 8))", "#(1 2 3 4 5 6 7 8)\n"
       "(apply vector 1 2 3 4 '(5 6 7 8))", "#(1 2 3 4 5 6 7 8)\n"
-      "(apply vector 1 2 3 4 5 6 7 8 '())", "#(1 2 3 4 5 6 7 8)\n"
-    ]
+      "(apply vector 1 2 3 4 5 6 7 8 '())", "#(1 2 3 4 5 6 7 8)\n" ]
 
 let letLoop =
     [ "(let f () 12)", "12\n"
@@ -353,8 +380,7 @@ let letLoop =
       "(let sum ([n 10000] [ac 0])
           (if (zero? n)
                       ac
-                      (sum (- n 1) (+ n ac))))", "50005000\n"
-     ]
+                      (sum (- n 1) (+ n ac))))", "50005000\n" ]
 
 let deeplyProcedureTests =
     [ @"(letrec ((sum (lambda (n ac)
@@ -362,7 +388,8 @@ let deeplyProcedureTests =
                       ac
                       (sum (- n 1) (fx+ n ac))))))
           (sum 10000 0))", "50005000\n"
-      @"(letrec ((e (lambda (x) (if (fxzero? x) #t (o (- x 1))))) (o (lambda (x) (if (fxzero? x) #f (e (- x 1)))))) (e 5000000))", "#t\n" ]
+      @"(letrec ((e (lambda (x) (if (fxzero? x) #t (o (- x 1))))) (o (lambda (x) (if (fxzero? x) #f (e (- x 1)))))) (e 5000000))",
+      "#t\n" ]
 
 let listTests =
     [ "(define length
@@ -417,7 +444,8 @@ let stringTests =
           (cons (string-ref s 0)
                 (string-ref s 1)))", "(#\\a . #\\b)\n"
       @"(let ((i 0)) (let ((s (make-string 1))) (string-set! s i #\a) (string-ref s i)))", "#\\a\n"
-      @"(let ((i 0) (j 1)) (let ((s (make-string 2))) (string-set! s i #\a) (string-set! s j #\b) (cons (string-ref s i) (string-ref s j))))", "(#\\a . #\\b)\n"
+      @"(let ((i 0) (j 1)) (let ((s (make-string 2))) (string-set! s i #\a) (string-set! s j #\b) (cons (string-ref s i) (string-ref s j))))",
+      "(#\\a . #\\b)\n"
       @"(let ((i 0) (c #\a)) (let ((s (make-string 1))) (string-set! s i c) (string-ref s i)))", "#\\a\n"
       @"(string-length (make-string 12))", "12\n"
       @"(string? (make-vector 12))", "#f\n"
@@ -436,11 +464,15 @@ let stringTests =
           (string-set! v 0 #\x)
           (string-set! v 1 #\x)
           (eq? (string-ref v 0) (string-ref v 1)))", "#t\n"
-      @"(let ((v0 (make-string 3))) (let ((v1 (make-string 3))) (string-set! v0 0 #\a) (string-set! v0 1 #\b) (string-set! v0 2 #\c) (string-set! v1 0 #\d) (string-set! v1 1 #\e) (string-set! v1 2 #\f) (cons v0 v1)))", "(\"abc\" . \"def\")\n"
-      @"(let ((n 2)) (let ((v0 (make-string n))) (let ((v1 (make-string n))) (string-set! v0 0 #\a) (string-set! v0 1 #\b) (string-set! v1 0 #\c) (string-set! v1 1 #\d) (cons v0 v1))))", "(\"ab\" . \"cd\")\n"
-      @"(let ((n 3)) (let ((v0 (make-string n))) (let ((v1 (make-string (string-length v0)))) (string-set! v0 (fx- (string-length v0) 3) #\a) (string-set! v0 (fx- (string-length v1) 2) #\b) (string-set! v0 (fx- (string-length v0) 1) #\c) (string-set! v1 (fx- (string-length v1) 3) #\Z) (string-set! v1 (fx- (string-length v0) 2) #\Y) (string-set! v1 (fx- (string-length v1) 1) #\X) (cons v0 v1))))", "(\"abc\" . \"ZYX\")\n"
+      @"(let ((v0 (make-string 3))) (let ((v1 (make-string 3))) (string-set! v0 0 #\a) (string-set! v0 1 #\b) (string-set! v0 2 #\c) (string-set! v1 0 #\d) (string-set! v1 1 #\e) (string-set! v1 2 #\f) (cons v0 v1)))",
+      "(\"abc\" . \"def\")\n"
+      @"(let ((n 2)) (let ((v0 (make-string n))) (let ((v1 (make-string n))) (string-set! v0 0 #\a) (string-set! v0 1 #\b) (string-set! v1 0 #\c) (string-set! v1 1 #\d) (cons v0 v1))))",
+      "(\"ab\" . \"cd\")\n"
+      @"(let ((n 3)) (let ((v0 (make-string n))) (let ((v1 (make-string (string-length v0)))) (string-set! v0 (fx- (string-length v0) 3) #\a) (string-set! v0 (fx- (string-length v1) 2) #\b) (string-set! v0 (fx- (string-length v0) 1) #\c) (string-set! v1 (fx- (string-length v1) 3) #\Z) (string-set! v1 (fx- (string-length v0) 2) #\Y) (string-set! v1 (fx- (string-length v1) 1) #\X) (cons v0 v1))))",
+      "(\"abc\" . \"ZYX\")\n"
       @"(let ((n 1)) (string-set! (make-string n) (- n 1) (fixnum->char 34)) n)", "1\n"
-      @"(let ((n 1)) (let ((v (make-string 1))) (string-set! v (- n 1) (fixnum->char n)) (char->fixnum (string-ref v (- n 1)))))", "1\n"
+      @"(let ((n 1)) (let ((v (make-string 1))) (string-set! v (- n 1) (fixnum->char n)) (char->fixnum (string-ref v (- n 1)))))",
+      "1\n"
       @"(let ((v0 (make-string 1)))
           (string-set! v0 0 #\a)
           (let ((v1 (make-string 1)))
@@ -474,50 +506,50 @@ let callFailure =
   (f 1 2))", "error\n" ]
 
 let variableArity =
-  [ "(let ([f (lambda args 12)])
+    [ "(let ([f (lambda args 12)])
       (f))", "12\n"
-    "(let ([f (lambda args 12)])
+      "(let ([f (lambda args 12)])
       (f 10))", "12\n"
-    "(let ([f (lambda args 12)])
+      "(let ([f (lambda args 12)])
       (f 10 20))", "12\n"
-    "(let ([f (lambda args 12)])
+      "(let ([f (lambda args 12)])
       (f 10 20 30))", "12\n"
-    "(let ([f (lambda args 12)])
+      "(let ([f (lambda args 12)])
       (f 10 20 30 40))", "12\n"
-    "(let ([f (lambda args 12)])
+      "(let ([f (lambda args 12)])
       (f 10 20 30 40 50))", "12\n"
-    "(let ([f (lambda args 12)])
+      "(let ([f (lambda args 12)])
       (f 10 20 30 40 50 60 70 80 90))", "12\n"
-    "(let ([f (lambda (a0 . args) 12)])
+      "(let ([f (lambda (a0 . args) 12)])
       (f 10))", "12\n"
-    "(let ([f (lambda (a0 . args) a0)])
+      "(let ([f (lambda (a0 . args) a0)])
       (f 10))", "10\n"
-    "(let ([f (lambda (a0 . args) 12)])
+      "(let ([f (lambda (a0 . args) 12)])
       (f 10 20))", "12\n"
-    "(let ([f (lambda (a0 . args) a0)])
+      "(let ([f (lambda (a0 . args) a0)])
       (f 10 20))", "10\n"
-    "(let ([f (lambda (a0 a1 . args) (cons a0 a1))])
+      "(let ([f (lambda (a0 a1 . args) (cons a0 a1))])
       (f 10 20 30 40 50 60 70 80 90 100))", "(10 . 20)\n"
-    "(let ([f (lambda (a0 a1 a3 a4 . args) (cons a0 (cons a1 (cons a3 (cons a4 '())))))])
+      "(let ([f (lambda (a0 a1 a3 a4 . args) (cons a0 (cons a1 (cons a3 (cons a4 '())))))])
       (f 10 20 30 40 50 60 70 80 90 100))", "(10 20 30 40)\n" ]
 
 let variableArityUsingRest =
-  [ "(let ([f (lambda args args)])
+    [ "(let ([f (lambda args args)])
       (f))", "()\n"
-    "(let ([f (lambda args args)])
+      "(let ([f (lambda args args)])
       (f 10))", "(10)\n"
-    "(let ([f (lambda args args)])
+      "(let ([f (lambda args args)])
       (f 10 20))", "(10 20)\n"
-    "(let ([f (lambda args args)])
+      "(let ([f (lambda args args)])
       (f 10 20 30 40 50 60 70 80 90))", "(10 20 30 40 50 60 70 80 90)\n"
-    "(let ([f (lambda (a0 . args) 12)])
+      "(let ([f (lambda (a0 . args) 12)])
       (f 10))", "12\n"
-    "(let ([f (lambda (a0 . args) a0)])
+      "(let ([f (lambda (a0 . args) a0)])
       (f 10))", "10\n"
-    "(let ([f (lambda (a0 . args) (cons a0 args))])
+      "(let ([f (lambda (a0 . args) (cons a0 args))])
       (f 10 20))", "(10 20)\n"
-    "(let ([f (lambda (a0 a1 . args) (cons a0 (cons a1 args)))])
-      (f 10 20 30 40 50 60 70 80 90 100))", "(10 20 30 40 50 60 70 80 90 100)\n"  ]
+      "(let ([f (lambda (a0 a1 . args) (cons a0 (cons a1 args)))])
+      (f 10 20 30 40 50 60 70 80 90 100))", "(10 20 30 40 50 60 70 80 90 100)\n" ]
 
 let complexConstants =
     [ "\"Hello World\"", "\"Hello World\"\n"
@@ -530,8 +562,7 @@ let complexConstants =
       "(let ([f (lambda () '(1 2 3))])
         (eq? (f) (f)))", "#t\n"
       "(let ([f (lambda () (lambda ()'(1 2 3)))])
-        ((f)))", "(1 2 3)\n"
-      ]
+        ((f)))", "(1 2 3)\n" ]
 
 let tak =
     [ "(define (tak x y z)
@@ -540,20 +571,20 @@ let tak =
          (tak (tak (- x 1) y z)
               (tak (- y 1) z x)
               (tak (- z 1) x y))))
-     (tak 32 16 8)", "9\n";
+     (tak 32 16 8)", "9\n"
       "(cons 1 2)", "3\n" ]
 
 let stringsLib =
     [ "(string=? \"one\")", "#t\n"
       "(string=? \"one\" \"one\" \"one\")", "#t\n" ]
 
-let symbols =
+let symbolsTests =
     [ "(let ([s1 (string->symbol \"look\")]
             [s2 (string->symbol \"look\")])
-        (eq? s1 s2))", "#t\n" ]
+        (eq? s1 s2))", "#t\n"
+      "'abc", "'abc\n" ]
 
-let exitTest =
-    [ "(foreign-call \"exit\" 0)", "" ]
+let exitTest = [ "(foreign-call \"exit\" 0)", "" ]
 
 let eofTests =
     [ "(eof-object? (eof-object))", "#t\n"
@@ -573,8 +604,7 @@ let eofTests =
       "(eof-object? '(1 2 3))", "#f\n"
       "(eof-object? '())", "#f\n"
       "(eof-object? (lambda (x) x))", "#f\n"
-      "(eof-object? 'baz)", "#f\n"
-     ]
+      "(eof-object? 'baz)", "#f\n" ]
 
 let quotientRemainderTests =
     [ "(quotient 16 4)", "4\n"
@@ -608,3 +638,23 @@ let localDefine =
     (define a 2)
     a)
   a)", "(2 . 1)\n" ]
+
+let doTests =
+    [ "
+(define factorial
+  (lambda (n)
+    (do ((i n (- i 1)) (a 1 (* a i)))
+        ((zero? i) a))))
+(factorial 10)", "3628800\n"
+      "(do ((i 0 (+ i 1))) ((= i 10) i))", "10\n"
+      "
+(define scale-vector!
+  (lambda (v k)
+    (let ((n (vector-length v)))
+      (do ((i 0 (+ i 1)))
+          ((= i n))
+        (vector-set! v i (* (vector-ref v i) k))))))
+
+(define vec (vector 1 2 3 4 5))
+(scale-vector! vec 2)
+vec ", "#(2 4 6 8 10)\n" ]

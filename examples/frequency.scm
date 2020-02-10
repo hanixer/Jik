@@ -1,7 +1,9 @@
 ;;; taken from https://www.scheme.com/tspl4/examples.html
 
-(define get-char read-char*)
+(define get-char read-char)
 (define put-char (lambda (p c) (write-char c p)))
+(define put-datum (lambda (p c) (write c p)))
+(define put-string (lambda (p s) (write s p)))
 
  ;;; If the next character on p is a letter, get-word reads a word
 ;;; from p and returns it in a string.  If the character is not a
@@ -14,7 +16,7 @@
             (let loop ([c c])
               (cons
                 c
-                (if (memq (char-type (lookahead-char p))
+                (if (memq (char-type (peek-char p))
                           '(letter digit))
                     (loop (get-char p))
                     '()))))
@@ -40,7 +42,11 @@
 (define make-tnode
     (lambda (word)
         (let ([tnode (make-vector 4)])
-            (vector-set! tnode 0 word))))
+            (vector-set! tnode 0 word)
+            (vector-set! tnode 1 '())
+            (vector-set! tnode 2 '())
+            (vector-set! tnode 3 1)
+            tnode)))
 
 (define (tnode-word t) (vector-ref t 0))
 (define (tnode-left t) (vector-ref t 1))
@@ -57,6 +63,9 @@
 ;;; tree.  In any case, the new or modified tree is returned.
 (define tree
   (lambda (node word)
+
+    (display "tree")
+    (newline)
     (cond
       [(null? node) (make-tnode word)]
       [(string=? word (tnode-word node))
@@ -74,6 +83,8 @@
 ;;; word are printed on a single line.
 (define tree-print
   (lambda (node p)
+    (display "tree-print")
+    (newline)
     (unless (null? node)
       (tree-print (tnode-left node) p)
       (put-datum p (tnode-count node))
@@ -98,7 +109,7 @@
       (close-port ip)
       (close-port op))))
 
-(define ifn "input.txt")
-(define ofn "output.txt")
+(define ifn "misc/input.txt")
+(define ofn "misc/output.txt")
 
 (frequency ifn ofn)

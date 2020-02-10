@@ -28,5 +28,6 @@ let main argv =
         else
             defaultS
     let useLib = Seq.contains "-nolib" argv |> not
+
     compileFilesToBinary useLib sources defaultOutFile
     0 // return an integer exit code
