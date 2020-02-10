@@ -4,7 +4,7 @@
 #include <assert.h>
 
 // #define DEBUG_LOG_GC
-#define DEBUG_FORCE_GC
+// #define DEBUG_FORCE_GC
 
 extern ptr_t **globRootsTable;
 
@@ -120,7 +120,7 @@ void calculateSizeAndSecondaryTag(ptr_t *p, uint64_t firstCell, uint64_t *wordsC
 	}
 	else if (isString(*p))
 	{
-		uint64_t shifted = firstCell >> fixnumShift;
+		uint64_t shifted = firstCell >> stringSizeShift;
 		uint64_t rounded = shifted + (wordSize - 1);
 		*wordsCount = (rounded / wordSize) + 1;
 		*secondaryTag = stringTag;
