@@ -115,18 +115,21 @@ static void printVector(ptr_t p)
 
 static void printString(ptr_t p, int printDQuotes)
 {
-    if (printDQuotes) printf("\"");
+    if (printDQuotes)
+        printf("\"");
 
     for (int i = 0; i < stringSize(p); ++i)
     {
         printf("%c", stringRef(p, i));
     }
 
-    if (printDQuotes) printf("\"");
+    if (printDQuotes)
+        printf("\"");
 }
 
 ptr_t s_write(ptr_t fd, ptr_t str, ptr_t len)
 {
+    // printf("fd %p, str %p, len %p\n", fd, str, len);
     int cfd = fixnumToInt(fd);
     char *cstr = stringData(str);
     int clen = fixnumToInt(len);
@@ -161,7 +164,7 @@ void asmError()
     exit(1);
 }
 
-void procError(void* caller)
+void procError(void *caller)
 {
     fprintf(stderr, "error, closure is expected for call, but wrong object is given, caller = 0x%p", caller);
     exit(1);
@@ -235,8 +238,10 @@ ptr_t s_openFileR(ptr_t filename)
 
 ptr_t s_closeFile(ptr_t fd)
 {
+    int err = errno;
     int cfd = fixnumToInt(fd);
-    int ret = close(fd);
+    int ret = close(cfd);
+    char *estr = strerror(err);
     return intToFixnum(ret);
 }
 

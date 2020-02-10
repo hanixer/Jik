@@ -26,30 +26,30 @@
       (%strings=? s s*)))
 
 
-  (define ($string<? s1 s2)
-    (let ([n1 (string-length s1)]
-          [n2 (string-length s2)])
-      (if (< n1 n2)
-          (let f ([i 0] [n n1] [s1 s1] [s2 s2])
-            (if (= i n)
-                #t
-                (let ([c1 (string-ref s1 i)]
-                      [c2 (string-ref s2 i)])
-                  (if (< c1 c2)
-                      #t
-                      (if (= c1 c2)
-                          (f (+ i 1) n s1 s2)
-                          #f)))))
-          (let f ([i 0] [n n2] [s1 s1] [s2 s2])
-            (if (= i n)
-                #f
-                (let ([c1 (string-ref s1 i)]
-                      [c2 (string-ref s2 i)])
-                  (if (< c1 c2)
-                      #t
-                      (if (= c1 c2)
-                          (f (+ i 1) n s1 s2)
-                          #f))))))))
+(define ($string<? s1 s2)
+  (let ([n1 (string-length s1)]
+        [n2 (string-length s2)])
+    (if (< n1 n2)
+        (let f ([i 0] [n n1] [s1 s1] [s2 s2])
+          (if (= i n)
+              #t
+              (let ([c1 (string-ref s1 i)]
+                    [c2 (string-ref s2 i)])
+                (if (< c1 c2)
+                    #t
+                    (if (= c1 c2)
+                        (f (+ i 1) n s1 s2)
+                        #f)))))
+        (let f ([i 0] [n n2] [s1 s1] [s2 s2])
+          (if (= i n)
+              #f
+              (let ([c1 (string-ref s1 i)]
+                    [c2 (string-ref s2 i)])
+                (if (< c1 c2)
+                    #t
+                    (if (= c1 c2)
+                        (f (+ i 1) n s1 s2)
+                        #f))))))))
 
 (define string<? $string<?)
 

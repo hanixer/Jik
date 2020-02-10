@@ -64,8 +64,8 @@
 (define tree
   (lambda (node word)
 
-    (display "tree")
-    (newline)
+    ; (display "tree")
+    ; (newline)
     (cond
       [(null? node) (make-tnode word)]
       [(string=? word (tnode-word node))
@@ -83,13 +83,15 @@
 ;;; word are printed on a single line.
 (define tree-print
   (lambda (node p)
-    (display "tree-print")
-    (newline)
+    ; (display "tree-print  ")
+    ; (display node)
+    ; (newline)
     (unless (null? node)
       (tree-print (tnode-left node) p)
       (put-datum p (tnode-count node))
       (put-char p (number->char 32))
       (put-string p (tnode-word node))
+    ; (display (tnode-word node))
       (newline p)
       (tree-print (tnode-right node) p))))
 
@@ -99,7 +101,7 @@
 (define frequency
   (lambda (infn outfn)
     (let ([ip (open-input-file infn)]
-          [op (open-output-file ofn)])
+          [op (open-output-file outfn)])
       (let loop ([root '()])
         (let ([w (get-word ip)])
           (cond
