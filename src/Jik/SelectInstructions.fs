@@ -428,6 +428,10 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.IsEofObject, [var1]) ->
         compileIsOfType dest var1 eofMask eofLiteral
 
+    | Simple.Prim(Prim.FlonumToFixnum, [var]) ->
+        [Movsd, [Var var; Reg Xmm0]
+         ConvertFloatToInt, [Reg Xmm0; Var dest]]
+
     | e -> failwithf "declToInstrs: %s %A" dest e
 
 let transferToInstrs procName blocks = function
@@ -565,4 +569,4 @@ let selectInstructions (prog : Intermediate.Program) : Program =
       ConstantsNames = prog.ConstantsNames
       ErrorHandler = errorHandler
       Entry = entryPointLabel
-      Strings = prog.Strings }
+      Constants = prog.Constants }

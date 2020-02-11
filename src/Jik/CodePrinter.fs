@@ -6,6 +6,7 @@ open RuntimeConstants
 open Intermediate
 open System.IO
 open Codegen
+open System
 
 
 let printLabel (out : TextWriter) (label : string) =
@@ -85,6 +86,8 @@ let showInstr (out : TextWriter) (op, args) =
         | Ret -> out.Write("retq ")
         | Xor -> out.Write("xorq ")
         | Cmp -> out.Write("cmpq ")
+        | ConvertFloatToInt -> out.Write("cvttsd2siq ")
+        | Movsd -> out.Write("movsd ")
         | RestoreStack -> out.Write("restorestack ")
         | SpliceSlot(_, _) -> out.Write("spliceslot ")
         | aaa ->
@@ -119,6 +122,10 @@ let showInstr (out : TextWriter) (op, args) =
             | Bh -> "bh"
             | Cl -> "cl"
             | Ch -> "ch"
+            | Xmm0 -> "xmm0"
+            | Xmm1 -> "xmm1"
+            | Xmm2 -> "xmm2"
+            | Xmm3 -> "xmm3"
 
         out.Write(s)
 
@@ -151,6 +158,8 @@ let showInstr (out : TextWriter) (op, args) =
         | GlobalValue(v) ->
             out.Write(v)
             out.Write("(%rip)")
+        | FloatNumber n ->
+            out.Write("[float " + n.ToString() + "]")
 
     let showArgs args =
         List.iteri (fun i arg ->
@@ -254,14 +263,21 @@ let programToString writeGlobals (prog : Program) =
         out.Write("    .space ")
         out.WriteLine(wordSize)
 
-    let printStringConst (name, literal : string) =
-        let firstField = (literal.Length <<< stringSizeShift) ||| stringTag
+    let printStringConst (name, constant) =
         printReadOnlySec out
-
         printAlign out wordSize
-        fprintfn out "%s:" name
-        fprintfn out "    .quad %d" firstField
-        fprintfn out "    .ascii \"%s\"" (escapeString literal)
+        printLabel out name
+        match constant with
+        | StringConst literal ->
+            let firstField = (literal.Length <<< stringSizeShift) ||| stringTag
+            fprintfn out "    .quad %d" firstField
+            fprintfn out "    .ascii \"%s\"" (escapeString literal)
+        | FloatConst value ->
+            let i64 = BitConverter.DoubleToInt64Bits(value)
+            let hi = (i64 >>> 62) &&& (int64 0x03)
+            let lo = (i64 <<< 2) ||| (int64 flonumTag)
+            // fprintfn out "    .quad %d" hi
+            fprintfn out "    .quad %d" lo
 
     let handleDef def =
         out.WriteLine("    .text")
@@ -271,7 +287,7 @@ let programToString writeGlobals (prog : Program) =
         out.WriteLine()
         out.WriteLine()
 
-    List.iter printStringConst prog.Strings
+    List.iter printStringConst prog.Constants
 
     if writeGlobals then
         printGlobalRoots out prog.ConstantsNames prog.Globals

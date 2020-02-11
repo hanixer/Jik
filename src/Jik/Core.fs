@@ -11,6 +11,7 @@ open Library
 
 type Expr =
     | Int of int
+    | FloatNumber of float
     | Char of char
     | Bool of bool
     | Void
@@ -35,7 +36,7 @@ type Program =
       GlobalsOriginal : string list // Contains original scheme names, for error reporting.
                                     // Must correspond by index to Globals list.
       ConstantsNames : string list
-      Strings : (string * string) list }
+      Constants : (string * Constant) list }
 
 type S = SExpr
 
@@ -55,6 +56,7 @@ let parseArgs args =
 let isSimple = function
     | S.Char _
     | S.Number _
+    | S.FloatNumber _
     | S.Bool _
     | S.VoidValue
     | S.String _ -> true
@@ -63,6 +65,7 @@ let isSimple = function
 let convertSimple = function
     | S.Char c -> Char c
     | S.Number n -> Int n
+    | S.FloatNumber n -> FloatNumber n
     | S.Bool n -> Bool n
     | S.VoidValue -> Void
     | S.String string -> String string
@@ -136,7 +139,7 @@ let stringToProgram str : Program =
         { Main = exprList |> List.rev
           Globals = List.rev globals
           GlobalsOriginal = []
-          Strings = []
+          Constants = []
           ConstantsNames = [] }
     | _ -> failwith "stringToProgram: parsing failed"
 
@@ -354,7 +357,7 @@ let makeAndInitStringExprs literal =
 let collectComplexConstants (prog : Program) =
     let exprToName = System.Collections.Generic.Dictionary<Expr, string>()
     let assignments = System.Collections.Generic.List<string * Expr>()
-    let strings = System.Collections.Generic.List<string * string>()
+    let constants = System.Collections.Generic.List<string * Constant>()
 
     let rec add expr =
         match expr with
@@ -378,6 +381,11 @@ let collectComplexConstants (prog : Program) =
                 let app = App(Ref "string->symbol", [sname])
                 assignments.Add(thisName, app)
                 Ref thisName
+        | FloatNumber n ->
+            let thisName = freshLabel ".cconst" // This label will hold an address of above label.
+            exprToName.Add(expr, thisName)
+            constants.Add(thisName, FloatConst n)
+            Ref thisName
         | String s ->
             if exprToName.ContainsKey(expr) then
                 Ref exprToName.[expr]
@@ -385,13 +393,14 @@ let collectComplexConstants (prog : Program) =
                 let stringName = freshLabel ".string" // This label will hold actual string data.
                 let thisName = freshLabel ".cconst" // This label will hold an address of above label.
                 exprToName.Add(expr, thisName)
-                strings.Add(stringName, s)
+                constants.Add(stringName, StringConst s)
                 assignments.Add(thisName, PrimApp(StringInit, [Ref stringName]))
                 Ref thisName
         | _ -> expr
 
     let convertHelper propagate transform expr =
         match expr with
+        | FloatNumber n -> add expr
         | Quote(Symbol _ as symb) -> add symb
         | Symbol _ | String _ -> add expr
         | Quote((PrimApp(Cons(_), _)) as subExpr) -> add subExpr
@@ -413,7 +422,7 @@ let collectComplexConstants (prog : Program) =
 
     { prog with Main = assignExprs @ main
                 ConstantsNames = names
-                Strings = strings |> Seq.toList }
+                Constants = constants |> Seq.toList }
 
 let rec fixArithmeticPrims (prog : Program) : Program =
     let ops = [Add; Mul;]

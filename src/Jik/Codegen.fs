@@ -25,9 +25,11 @@ type Register =
     | Rsp | Rbp | Rax | Rbx | Rcx | Rdx | Rsi | Rdi
     | R8 | R9 | R10 | R11 | R12 | R13 | R14 | R15
     | Al | Ah | Bl | Bh | Cl | Ch
+    | Xmm0 | Xmm1 | Xmm2 | Xmm3
 
 type Operand =
     | Int of int
+    | FloatNumber of float
     | Reg of Register
     | ByteReg of Register
     | Deref of int * Register
@@ -74,6 +76,8 @@ type InstrName =
     | JmpIf of Cc * string
     | Label of string
     | Lea of string
+    | ConvertFloatToInt
+    | Movsd
     // intermediate
     | RestoreStack
     | SpliceSlot of slot : int * argsCount : int
@@ -101,7 +105,7 @@ type Program =
       ConstantsNames : string list
       ErrorHandler : Instr list
       Entry : string
-      Strings : (string * string) list }
+      Constants : (string * Constant) list }
 
 let emptyFuncDef =
     { Name = ""
@@ -400,6 +404,9 @@ let rec patchInstr (prog : Program) =
 
     let transform (op, args) =
         match op, args with
+        | ConvertFloatToInt, [Reg reg; arg] when isRegister arg |> not ->
+            [ConvertFloatToInt, [Reg reg; Reg Rax]
+             Mov, [Reg Rax; arg]]
         | Lea _, [Reg _] -> [op, args]
         | Lea s, [arg] ->
             [Lea s, [Reg Rax]
@@ -560,6 +567,6 @@ let createMainModule constants globals globOriginal entryPoints =
           ConstantsNames = constants
           ErrorHandler = []
           Entry = schemeEntryLabel
-          Strings = [] }
+          Constants = [] }
 
     patchInstr p

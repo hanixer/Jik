@@ -49,6 +49,7 @@ type Prim =
     | IsSymbol
     | EofObject
     | IsEofObject
+    | FlonumToFixnum
 
 let stringPrimop = [
     "+", Add
@@ -98,7 +99,7 @@ let stringPrimop = [
     "make-symbol", MakeSymbol
     "symbol-string", SymbolString
     "symbol?", IsSymbol
-    // "error", Error
     "eof-object", EofObject
     "eof-object?", IsEofObject
+    "flonum->fixnum", FlonumToFixnum
 ]

@@ -7,6 +7,7 @@ type Token =
     | Open | Close
     | OpenBr | CloseBr
     | Number of string
+    | FloatNum of string
     | String of string
     | Symbol of string
     | Bool of bool
@@ -20,6 +21,49 @@ let specialChars = [
     "newline", '\n'
     "return", '\n'
 ]
+
+let charsToString rev cs =
+    let cs : seq<char> = if rev then Seq.rev cs else cs
+    cs |> Seq.toArray |> System.String.Concat
+
+let rec readInt acc cs =
+    match cs with
+    | c :: cs' when Char.IsDigit(c) ->
+        readInt (c :: acc) cs'
+    | _ -> acc, cs
+
+let readExponent acc cs =
+    match cs with
+    | 'e' :: cs | 'E' :: cs ->
+        match cs with
+        | c :: cs when c = '+' || c = '-' ->
+            readInt (c :: 'e' :: acc) cs
+        | _ ->
+            readInt ('e' :: acc) cs
+    | _ -> acc, cs
+
+let readNumber sign cs =
+    let acc = Option.toList sign
+    match cs with
+    | c :: _ when Char.IsDigit(c) ->
+        let acc, cs = readInt acc cs
+        match cs with
+        | '.' :: cs ->
+            let acc = '.' :: acc
+            let acc, cs = readInt acc cs
+            let acc, cs = readExponent acc cs
+            FloatNum(charsToString true acc), cs
+        | 'e' :: _ | 'E' :: _ ->
+            let acc, cs = readExponent acc cs
+            FloatNum(charsToString true acc), cs
+        | _ ->
+            Number(charsToString true acc), cs
+    | '.' :: cs ->
+        let acc = '.' :: acc
+        let acc, cs = readInt acc cs
+        let acc, cs = readExponent acc cs
+        FloatNum(charsToString true acc), cs
+    | _ -> failwith "Not a number"
 
 let tokenize source =
     let isSymbolChar c =
@@ -73,8 +117,8 @@ let tokenize source =
         | _ :: cs -> skipUntilNewline cs
         | [] -> []
 
-
-    let rec loop acc = function
+    let rec loop acc cs =
+        match cs with
         | w :: cs when System.Char.IsWhiteSpace(w) -> loop acc cs
         | ';' :: cs -> loop acc (skipUntilNewline cs)
         | '(' :: cs -> loop (Open :: acc) cs
@@ -85,11 +129,11 @@ let tokenize source =
             let s, cs' = eatString (StringBuilder()) cs
             loop (String s :: acc) cs'
         | '-' :: d ::cs when Char.IsDigit(d) ->
-            let n, cs' = number "-" (d::cs)
-            loop (Number n :: acc) cs'
+            let n, cs = readNumber (Some '-') (d :: cs)
+            loop (n :: acc) cs
         | '+' :: d ::cs when Char.IsDigit(d) ->
-            let n, cs' = number "" (d::cs)
-            loop (Number n :: acc) cs
+            let n, cs = readNumber (Some '+') (d :: cs)
+            loop (n :: acc) cs
         | '#' :: 't' :: cs | '#' :: 'T' :: cs ->
             loop (Bool true :: acc) cs
         | '#' :: 'f' :: cs | '#' :: 'F' :: cs ->
@@ -97,12 +141,15 @@ let tokenize source =
         | '#' :: '\\' :: cs ->
             let c, cs' = character cs
             loop (c :: acc) cs'
+        | '.' :: d :: _ when Char.IsDigit(d) ->
+            let n, cs = readNumber None cs
+            loop (n :: acc) cs
         | '.' :: cs -> loop (Dot :: acc) cs
         | '\'' :: cs -> loop (Quote :: acc) cs
         | ',' :: cs -> loop (Unquote :: acc) cs
-        | d ::cs when Char.IsDigit(d) ->
-            let n, cs' = number "" (d::cs)
-            loop (Number n :: acc) cs'
+        | d :: _ when Char.IsDigit(d) ->
+            let n, cs = readNumber None cs
+            loop (n :: acc) cs
         | [] -> acc
         | cs ->
             let s, cs' = symbol "" cs
@@ -115,6 +162,7 @@ type SExpr =
     | Cons of SExpr * SExpr
     | Nil
     | Number of int
+    | FloatNumber of float
     | String of string
     | Char of char
     | Symbol of string
@@ -220,6 +268,8 @@ let rec parse ts : SExpr =
         match ts with
         | Token.Number n :: ts ->
             (Number (int n)), ts
+        | Token.FloatNum n :: ts ->
+            (FloatNumber (float n)), ts
         | Token.Symbol n :: ts ->
             (Symbol (n.ToLower())), ts
         | Token.String n :: ts ->
@@ -251,6 +301,7 @@ let rec sexprToString expr =
     let add (str:string) = s.Append(str) |> ignore
     let rec loop = function
         | Number n -> n.ToString() |> add
+        | FloatNumber n -> n.ToString() |> add
         | String str ->
             add "\""
             str.Replace("\"", "\\\"") |> add

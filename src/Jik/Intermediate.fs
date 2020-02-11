@@ -21,6 +21,7 @@ type CallCont =
 type Simple =
     | Prim of Prim * Var list
     | Int of int
+    | FloatNumber of float
     | RawInt of int // Int value as it is, without conversions.
     | Char of char
     | Bool of bool
@@ -57,7 +58,7 @@ type Program =
       Globals : string list
       GlobalsOriginal : string list // Contains original scheme names, for error reporting.
       ConstantsNames : string list
-      Strings : (string * string) list }
+      Constants : (string * Constant) list }
 
 let schemeEntryLabel = "schemeEntry"
 let constructDottedLabel = "constructDotted"
@@ -120,6 +121,7 @@ let rec showBlock (name, vars, stmts) =
                 match s with
                 | Simple.EmptyList -> iStr "'()"
                 | Simple.Int n -> iNum n
+                | Simple.FloatNumber n -> n.ToString() |> iStr
                 | Simple.RawInt n -> iNum n
                 | Simple.Void -> iStr "#!void"
                 | Simple.Char c -> iStr (sprintf "#\\%A" c)
@@ -241,6 +243,7 @@ let rec convertExpr expr (cont : Var -> (Block list * Stmt list)) =
     | Expr.EmptyList -> convertSimpleDecl "nil" EmptyList cont
     | Expr.Bool b -> convertSimpleDecl "b" (Bool b) cont
     | Expr.Int n -> convertSimpleDecl "n" (Int n) cont
+    | Expr.FloatNumber n -> convertSimpleDecl "n" (FloatNumber n) cont
     | Expr.Void -> convertSimpleDecl "v" Void cont
     | Expr.Char c -> convertSimpleDecl "c" (Char c) cont
     | Expr.If(exprc, exprt, exprf) ->
@@ -308,6 +311,7 @@ and convertExprJoin expr (contVar : Var) =
     | Expr.EmptyList
     | Expr.Bool _
     | Expr.Int _
+    | Expr.FloatNumber _
     | Expr.Void
     | Expr.Char _
     | Expr.Ref _
@@ -348,6 +352,7 @@ and convertExprTail expr =
     | Expr.EmptyList
     | Expr.Bool _
     | Expr.Int _
+    | Expr.FloatNumber _
     | Expr.Void
     | Expr.Char _
     | Expr.Ref _
@@ -424,11 +429,11 @@ let convertProgram (prog : Core.Program) : Program =
       Globals = prog.Globals
       GlobalsOriginal = prog.GlobalsOriginal
       ConstantsNames = prog.ConstantsNames
-      Strings = prog.Strings }
+      Constants = prog.Constants }
 
 let analyzeFreeVars (prog : Program) : Program =
-    let stringNames = List.map fst prog.Strings
-    let globals = Set.ofList (prog.Globals @ prog.ConstantsNames @ stringNames)
+    let constantNames = List.map fst prog.Constants
+    let globals = Set.ofList (prog.Globals @ prog.ConstantsNames @ constantNames)
 
     let rec transformStmt stmt =
         match stmt with

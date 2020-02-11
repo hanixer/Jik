@@ -1,6 +1,10 @@
 module Common
 open System.Collections.Generic
 
+type Constant =
+    | StringConst of string
+    | FloatConst of float
+
 let private dict = Dictionary<string, int>()
 let freshLabel =
     fun prefix ->
