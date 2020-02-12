@@ -381,11 +381,11 @@ let collectComplexConstants (prog : Program) =
                 let app = App(Ref "string->symbol", [sname])
                 assignments.Add(thisName, app)
                 Ref thisName
-        | FloatNumber n ->
-            let thisName = freshLabel ".cconst" // This label will hold an address of above label.
-            exprToName.Add(expr, thisName)
-            constants.Add(thisName, FloatConst n)
-            Ref thisName
+        // | FloatNumber n ->
+            // let thisName = freshLabel ".cconst" // This label will hold an address of above label.
+            // exprToName.Add(expr, thisName)
+            // constants.Add(thisName, FloatConst n)
+            // Ref thisName
         | String s ->
             if exprToName.ContainsKey(expr) then
                 Ref exprToName.[expr]
@@ -400,7 +400,7 @@ let collectComplexConstants (prog : Program) =
 
     let convertHelper propagate transform expr =
         match expr with
-        | FloatNumber n -> add expr
+        // | FloatNumber n -> add expr
         | Quote(Symbol _ as symb) -> add symb
         | Symbol _ | String _ -> add expr
         | Quote((PrimApp(Cons(_), _)) as subExpr) -> add subExpr

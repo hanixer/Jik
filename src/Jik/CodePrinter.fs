@@ -133,6 +133,9 @@ let showInstr (out : TextWriter) (op, args) =
         | Int n ->
             out.Write("$")
             out.Write(n)
+        | Int64 n ->
+            out.Write("$")
+            out.Write(n)
         | Reg(r) -> reg r
         | Deref(n, r) ->
             out.Write(n)

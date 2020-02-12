@@ -29,6 +29,7 @@ type Register =
 
 type Operand =
     | Int of int
+    | Int64 of int64
     | FloatNumber of float
     | Reg of Register
     | ByteReg of Register

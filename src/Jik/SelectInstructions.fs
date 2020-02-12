@@ -7,7 +7,7 @@ open RuntimeConstants
 open Primitive
 open Codegen
 open Common
-
+open System
 
 let convertToFixnum n = n <<< fixnumShift
 
@@ -207,6 +207,7 @@ let compileMakeVector size dest =
      Or, [Int typedObjectTag; Reg R11]
      Mov, [Reg R11; Var dest]]
 
+/// Very strange: why do we move size to RAX after allocation?
 let compileMakeString size dest =
     [Mov, [size; Reg Rax]
      Sar, [Int fixnumShift; Reg Rax]
@@ -225,11 +226,29 @@ let computeVecElementOffset vec index =
      Sar, [Int fixnumShift; Reg R12]
      Add, [Int 1; Reg R12]]
 
+let floatNumberSize = 16
+
+let compileMakeFloat dest =
+    [Mov, [Int floatNumberSize; Reg Rax]] @
+    callAllocate (Reg Rax) (Reg R11) @
+    [Mov, [Int 0; Deref(0, R11)]
+     Mov, [Int 0; Deref(wordSize, R11)]
+     Or, [Int flonumTag; Reg R11]
+     Mov, [Reg R11; dest]
+     ]
+
+let floatConstant n dest =
+    let i64 = BitConverter.DoubleToInt64Bits n
+    compileMakeFloat (Reg R11) @
+    [Mov, [Operand.Int64 i64; Deref(-flonumTag + wordSize, R11)]
+     Mov, [Reg R11; Var dest]]
+
 let rec declToInstrs (dest, x) =
     match x with
     | Simple.EmptyList -> moveInt nilLiteral dest
     | Simple.Int n -> moveInt (convertToFixnum n) dest
     | Simple.RawInt n -> moveInt n dest
+    | Simple.FloatNumber n -> floatConstant n dest
     | Simple.Void -> setVoid dest
     | Simple.Char c -> moveInt (((int c) <<< charShift) ||| charTag) dest
     | Simple.Bool true -> moveInt trueLiteral dest
@@ -429,8 +448,10 @@ let rec declToInstrs (dest, x) =
         compileIsOfType dest var1 eofMask eofLiteral
 
     | Simple.Prim(Prim.FlonumToFixnum, [var]) ->
-        [Movsd, [Var var; Reg Xmm0]
-         ConvertFloatToInt, [Reg Xmm0; Var dest]]
+        [Mov, [Var var; Reg R11]
+         Movsd, [Deref(-flonumTag + wordSize, R11); Reg Xmm0]
+         ConvertFloatToInt, [Reg Xmm0; Var dest]
+         Sal, [Int fixnumShift; Var dest]]
 
     | e -> failwithf "declToInstrs: %s %A" dest e
 
