@@ -466,6 +466,12 @@ let rec declToInstrs (dest, x) =
          Movsd, [Deref(-flonumTag + wordSize, R11); Reg Xmm0]
          ConvertFloatToInt, [Reg Xmm0; Var dest]
          Sal, [Int fixnumShift; Var dest]]
+    | Simple.Prim(Prim.FixnumToFlonum, [var]) ->
+        [Mov, [Var var; Reg Rax]
+         Sar, [Int fixnumShift; Reg Rax]
+         Pxor, [Reg Xmm0; Reg Xmm0]
+         ConvertIntToFloat, [Reg Rax; Reg Xmm0]] @
+        compileMakeFloat Movsd (Reg Xmm0) (Var dest)
     | Simple.Prim(Prim.FlonumEq, [var1; var2]) ->
         [Mov, [Var var1; Reg R11]
          Mov, [Deref(-flonumTag + wordSize, R11); Reg R11]
@@ -548,7 +554,8 @@ let doesVarAllocatedOnHeap (_, simple) =
           FlonumAdd
           FlonumSub
           FlonumMul
-          FlonumDiv ]
+          FlonumDiv
+          FixnumToFlonum ]
 
 
     match simple with

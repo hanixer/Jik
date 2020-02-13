@@ -659,8 +659,11 @@ let doTests =
 (scale-vector! vec 2)
 vec ", "#(2 4 6 8 10)\n" ]
 
-let flonumToFixnumTests =
-    [ "(flonum->fixnum 3.0)", "3\n"
+let flonumAndFixnumTests =
+    [ "(fixnum->flonum 3)", "3.000000\n"
+      "(fixnum->flonum -3)", "-3.000000\n"
+      "(fixnum->flonum 0)", "0.000000\n"
+      "(flonum->fixnum 3.0)", "3\n"
       "(flonum->fixnum -3.0)", "-3\n"
       "(flonum->fixnum 0.0)", "0\n"
       "(flonum->fixnum 4.5)", "4\n"

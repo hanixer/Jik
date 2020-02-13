@@ -1,1 +1,1 @@
-(let ([a (fl+ 1.0 2.0)]) (cons (fl= a 3.0) a))
+(fixnum->flonum 3)

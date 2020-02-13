@@ -81,7 +81,9 @@ type InstrName =
     | JmpIf of Cc * string
     | Label of string
     | Lea of string
+    | Pxor
     | ConvertFloatToInt
+    | ConvertIntToFloat
     | FloatCompare
     | Movsd
     | Addsd
