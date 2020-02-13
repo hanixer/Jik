@@ -203,10 +203,10 @@ let booleanTests =
 
 let vectorTests =
     [ "(vector-length (make-vector 4))", "4\n"
-      e12, "103\n"
+      // e12, "103\n"
       "(vector? (make-vector 3))", "#t\n"
       "(vector? #t)", "#f\n"
-      e13, "33\n"
+      // e13, "33\n"
       e14, "#(1 2 3)\n"
       @"(vector? (make-vector 0))", "#t\n"
       @"(vector-length (make-vector 12))", "12\n"

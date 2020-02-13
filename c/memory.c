@@ -4,7 +4,7 @@
 #include <assert.h>
 
 // #define DEBUG_LOG_GC
-// #define DEBUG_FORCE_GC
+#define DEBUG_FORCE_GC
 
 extern ptr_t **globRootsTable;
 
@@ -78,6 +78,7 @@ void gcInitialize(uint64_t heapSize, uint64_t rootStackSize)
 	pointer = allocateProtectedSpace(rootStackSize);
 	rootStackBegin = (uint64_t *)pointer;
 	rootStackBegin[0] = 0;
+	rootStackCurr = rootStackBegin;
 }
 
 void markInBitmap(uint8_t *bitmap, uint64_t *spaceBegin, uint64_t *address)
@@ -117,7 +118,6 @@ void calculateSizeAndSecondaryTag(ptr_t *p, uint64_t firstCell, uint64_t *wordsC
 	else if (isClosure(*p))
 	{
 		*wordsCount = (firstCell >> fixnumShift) + 1;
-		*secondaryTag = closureTag;
 	}
 	else if (isString(*p))
 	{
@@ -140,7 +140,19 @@ void calculateSizeAndSecondaryTag(ptr_t *p, uint64_t firstCell, uint64_t *wordsC
 	}
 }
 
-void copyHelper2(ptr_t *p, uint64_t primaryTag)
+void copyError()
+{
+	printf("error during copy");
+	fflush(stdout);
+	exit(1);
+}
+
+static int isForwardPointer(uint64_t firstCell)
+{
+	return (firstCell & 1) != 0;
+}
+
+void copyHelper(ptr_t *p, uint64_t primaryTag)
 {
 	ptr_t pHeap = *p - primaryTag;
 	ptr_t *pFrom = (ptr_t *)pHeap;
@@ -149,12 +161,12 @@ void copyHelper2(ptr_t *p, uint64_t primaryTag)
 		return;
 
 	uint64_t firstCell = *pFrom; // Value in the first cell of the object.
-	if (firstCell == forwardMarker)
+	if (isForwardPointer(firstCell))
 	{
 		// Get forward pointer and combine it with the tag.
 		// The assumptions is that all objects have at least two cells.
 		// And we can store forward pointer in the second cell.
-		*p = pFrom[1] + primaryTag;
+		*p = (firstCell - 1) + primaryTag;
 #ifdef DEBUG_LOG_GC
 		printf("Already copied to ToSpace. New address: %p\n", *p);
 #endif
@@ -169,13 +181,18 @@ void copyHelper2(ptr_t *p, uint64_t primaryTag)
 		uint64_t secondaryTag = 0;
 		calculateSizeAndSecondaryTag(p, firstCell, &wordsCount, &secondaryTag);
 
+		if (wordsCount == 1)
+		{
+			copyError();
+		}
+
 		ptr_t pTo = (ptr_t)copyPtrEnd;
 		memcpy(copyPtrEnd, pFrom, wordsCount * wordSize);
-		copyPtrEnd[0] |= secondaryTag; // Add secondary tag for typed object if needed.
+		// TODO: secondary tag
+		// copyPtrEnd[0] |= secondaryTag; // Add secondary tag for typed object if needed.
 		copyPtrEnd += wordsCount;
 
-		pFrom[0] = forwardMarker;
-		pFrom[1] = pTo;
+		pFrom[0] = pTo | 1; // Add forward marker.
 
 		*p = pTo | primaryTag;
 
@@ -198,32 +215,33 @@ void copyData(ptr_t *p)
 #endif
 	if (isTypedObject(*p))
 	{
-		copyHelper2(p, typedObjectTag);
+		copyHelper(p, typedObjectTag);
 	}
 	else if (isClosure(*p))
 	{
-		copyHelper2(p, closureTag);
+		copyHelper(p, closureTag);
 	}
 	else if (isString(*p))
 	{
-		copyHelper2(p, stringTag);
+		copyHelper(p, stringTag);
 	}
 	else if (isPair(*p))
 	{
-		copyHelper2(p, pairTag);
+		copyHelper(p, pairTag);
 	}
 	else if (isSymbol(*p))
 	{
-		copyHelper2(p, symbolTag);
+		copyHelper(p, symbolTag);
 	}
 	else if (isFlonum(*p))
 	{
-		copyHelper2(p, flonumTag);
+		copyHelper(p, flonumTag);
 	}
 }
 
 void *allocate(uint64_t *rootStack, uint64_t size)
 {
+
 	uint64_t sizeAligned = (size + (wordSize - 1)) / wordSize;
 // printf("allocate: size = %d, aligned = %d, remaining = %d\n", size, sizeAligned, fromSpaceEnd - freePointer);
 #ifdef DEBUG_LOG_GC
@@ -335,6 +353,18 @@ void collect(uint64_t *const rootStack, int64_t bytesNeeded)
 	}
 
 	finishCollection(rootStack);
+}
+
+//////////////////////////////////////
+// Allocations.
+
+ptr_t allocateVector(ptr_t s)
+{
+	uint64_t size = fixnumToInt(s);
+	uint64_t cells = size + 1;
+	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
+	p[0] = size << vectorSizeShift;
+	return ((ptr_t)p) | typedObjectTag;
 }
 
 void hexDump(const char *desc, const void *addr, int len)

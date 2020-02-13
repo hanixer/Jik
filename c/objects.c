@@ -31,7 +31,7 @@ int isSymbol(ptr_t p) { return (p & symbolMask) == symbolTag; }
 int isEof(ptr_t p) { return p == eofLiteral; }
 int isNil(ptr_t p) { return p == nilLiteral; }
 
-int vectorSize(ptr_t p) { return fixnumToInt(*(toPtrptr(p - typedObjectTag))); }
+int vectorSize(ptr_t p) { return (*(toPtrptr(p - typedObjectTag))) >> vectorSizeShift; }
 ptr_t vectorRef(ptr_t p, int i) { return *(toPtrptr(p - typedObjectTag + (i + 1) * wordSize)); }
 
 int stringSize(ptr_t p) { return *(toPtrptr(p - typedObjectTag)) >> stringSizeShift; }

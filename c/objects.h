@@ -52,6 +52,7 @@
 
 #define vectorTag 0x00
 #define vectorMask 0x03
+#define vectorSizeShift 32
 
 #define stringTag 0x02
 #define stringMask 0x07

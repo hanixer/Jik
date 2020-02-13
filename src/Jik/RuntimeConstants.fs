@@ -47,6 +47,7 @@ let voidMask = 0xFF
 
 let vectorTag = 0x00
 let vectorMask = 0x03
+let vectorSizeShift = 32
 
 let stringTag = 0x02
 let stringMask = 0x07

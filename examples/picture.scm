@@ -71,6 +71,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Rays
+(define (ray? r)
+  (and (vector? r) (eq? (vector-length r) 2)))
+
 (define (make-ray a b)
   (let ([r (make-vector 2)])
     (vector-set! r 0 a)
@@ -84,6 +87,7 @@
   (vector-ref r 1))
 
 (define (point-at r t)
+  (unless (ray? r) (error "not a ray" 'point-at r))
   (vec-v+ (ray-origin r)
 	  (vec-s* (ray-direction r) t)))
 
@@ -95,18 +99,26 @@
          [b (fl* 2.0 (vec-dot oc (ray-direction r)))]
          [c (fl- (vec-dot oc oc) (fl* radius radius))]
          [discriminant (fl- (fl* b b) (fl* 4.0 (fl* a c)))])
-    (fl> discriminant 0.0)))
+    (if (fl< discriminant 0.0)
+      -1.0
+      (fl/ (fl- (fl- 0.0 b) (sqrt discriminant))
+           (fl* 2.0 a)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
 (define (color r)
-  (if (hit-sphere (vec 0.0 0.0 -1.0) 0.5 r)
-    (vec 1.0 0.0 0.0)
+  (let ([t (hit-sphere (vec 0.0 0.0 -1.0) 0.5 r)])
+    (if (fl> t 0.0)
+      (let ([N (unit-vector (vec-v- (point-at r t) (vec 0.0 0.0 -1.0)))])
+        (vec-s* (vec (fl+ (vec-x N) 1.0)
+                     (fl+ (vec-y N) 1.0)
+                     (fl+ (vec-z N) 1.0))
+                0.5))
     (let* ([dir (unit-vector (ray-direction r))]
            [t (fl* 0.5 (fl+ (vec-y dir) 1.0))])
       (vec-v+ (vec-s* (vec 1.0 1.0 1.0)
 		                  (fl- 1.0 t))
-	            (vec-s* (vec 0.5 0.7 1.0) t)))))
+	            (vec-s* (vec 0.5 0.7 1.0) t))))))
 
 (define lower-left-corner (vec -2.0 -1.0 -1.0))
 (define horizontal (vec 4.0 0.0 0.0))
@@ -114,7 +126,8 @@
 (define origin (vec 0.0 0.0 0.0))
 
 (define (main)
-  (let* ([out (open-output-file "misc/out.ppm")]
+  (let* (;[out (open-output-file "misc/out.ppm")]
+         [out (current-output-port)]
          [nx 200]
          [ny 100])
     (display "P3" out)

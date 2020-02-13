@@ -197,14 +197,9 @@ let callAllocate size dest =
      Mov, [Reg Rax; dest]]
 
 let compileMakeVector size dest =
-    [Mov, [size; Reg Rax]
-     Sar, [Int fixnumShift; Reg Rax]
-     Add, [Int 1; Reg Rax]
-     IMul, [Int wordSize; Reg Rax]] @
-    callAllocate (Reg Rax) (Reg R11) @
-    [Mov, [size; Deref(0, R11)]
-     Or, [Int typedObjectTag; Reg R11]
-     Mov, [Reg R11; Var dest]]
+    [Mov, [size; Reg Rcx]] @
+    callRuntime "allocateVector" @
+    [Mov, [Reg Rax; Var dest]]
 
 /// Very strange: why do we move size to RAX after allocation?
 let compileMakeString size dest =
@@ -373,7 +368,8 @@ let rec declToInstrs (dest, x) =
         compileMakeVector (Var var1) dest
     | Simple.Prim(Prim.VectorLength, [var1]) ->
         [Mov, [Var var1; Reg R11]
-         Mov, [Deref(-typedObjectTag, R11); Var dest]]
+         Mov, [Deref(-typedObjectTag, R11); Var dest]
+         Sar, [Int (vectorSizeShift - fixnumShift); Var dest]]
     | Simple.Prim(Prim.IsVector, [var1]) ->
         compileIsOfTypeComplex dest var1 vectorMask vectorTag
     | Simple.Prim(Prim.VectorSet, [vec; index; value]) ->
@@ -415,10 +411,10 @@ let rec declToInstrs (dest, x) =
          Or, [Int typedObjectTag; Var dest]]
     // Closures.
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
-        let allocatedSize = (List.length args + 2) * wordSize
-        let savedSize = convertToFixnum (List.length args + 1)
-        callAllocate (Int allocatedSize) (Reg R11) @
-        [Mov, [Int savedSize; Deref(0, R11)] // The first cell is for size and forwarding bit.
+        let bytes = (List.length args + 2) * wordSize
+        let cellsCount = convertToFixnum (List.length args + 1)
+        callAllocate (Int bytes) (Reg R11) @
+        [Mov, [Int cellsCount; Deref(0, R11)] // The first cell is for size and forwarding bit.
          Lea(label), [Deref(wordSize, R11)]] @ // The second is for label.
         moveClosureArgs args @ // Remaining cells are for free variables.
         [Or, [Int closureTag; Reg R11]
