@@ -1,1 +1,1 @@
-(sqrt 9.0)
+(let ((f (lambda (g) (+ (g 10) (g 100))))) (f (lambda (x) (* x x))))

@@ -22,6 +22,7 @@
 
 #define closureTag 0x05
 #define closureMask 0x07
+#define closureSizeShift 32
 
 #define typedObjectTag 0x07
 #define typedObjectMask 0x07

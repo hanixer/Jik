@@ -17,6 +17,7 @@ let symbolMask = 0x07
 
 let closureTag = 0x05
 let closureMask = 0x07
+let closureSizeShift = 32
 
 let typedObjectTag = 0x07
 let typedObjectMask = 0x07

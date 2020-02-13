@@ -117,7 +117,7 @@ void calculateSizeAndSecondaryTag(ptr_t *p, uint64_t firstCell, uint64_t *wordsC
 	}
 	else if (isClosure(*p))
 	{
-		*wordsCount = (firstCell >> fixnumShift) + 1;
+		*wordsCount = (firstCell >> closureSizeShift) + 1;
 	}
 	else if (isString(*p))
 	{
@@ -358,6 +358,8 @@ void collect(uint64_t *const rootStack, int64_t bytesNeeded)
 //////////////////////////////////////
 // Allocations.
 
+/// Argument - is the number of vector elements.
+/// Should be converted from scheme representation.
 ptr_t allocateVector(ptr_t s)
 {
 	uint64_t size = fixnumToInt(s);
@@ -365,6 +367,17 @@ ptr_t allocateVector(ptr_t s)
 	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
 	p[0] = size << vectorSizeShift;
 	return ((ptr_t)p) | typedObjectTag;
+}
+
+/// free - number of free arguments
+/// procAddr - address of procedure
+ptr_t allocateClosure(int free, uint64_t procAddr)
+{
+	uint64_t cells = free + 2;
+	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
+	p[0] = (cells - 1) << closureSizeShift; // Store count of free args + cell for proc.
+	p[1] = procAddr;
+	return ((ptr_t)p) | closureTag;
 }
 
 void hexDump(const char *desc, const void *addr, int len)

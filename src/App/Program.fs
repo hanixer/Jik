@@ -37,7 +37,8 @@ let main argv =
     // printf "result: %s" (sexprToString desug)
 
 
-    runTestGroup false "vector" vectorTests
+    runTestGroup false "lambda" lambdaTests
+    // runTestGroup false "vector" vectorTests
     // runTestGroupWithLib "symbols" symbolsTests
     // runTestGroupWithLib "apply nontail" applyNonTail
     // runTestGroupWithLib "apply tail" applyTail
@@ -52,7 +53,6 @@ let main argv =
     // runTestGroup false "variable arity without rest arguments" variableArity
     // runTestGroup false "variable arity using rest arguments" variableArityUsingRest
     // runTestGroup false "deep procs" deeplyProcedureTests
-    // runTestGroup false "lambda" lambdaTests
     // runTestGroup false "boolean" booleanTests
     // runTestGroup false "assignment" assignmentTests
     // runTestGroup false "pair" pairTests

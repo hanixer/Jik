@@ -22,7 +22,7 @@ let moveClosureArgs args =
         // Start at offset 2 * wordsize:
         // One word for forward bit,
         // other word for label - procedure address.
-        Mov, [Var arg; Deref((i + 2) * wordSize, R11)]) args
+        Mov, [Var arg; Deref((i + 2) * wordSize - closureTag, R11)]) args
 
 let argumentToLocation (siStart, siMult) reg args =
     let handleArg index arg =
@@ -175,11 +175,12 @@ let compileIsOfTypeComplex dest var1 mask tag =
     [Label(comparEnd), []] @
     compileSetOnEqual dest
 
-/// Do not work for more than 4 arguments.
+/// This does not work for more than 4 arguments.
 let callRuntime func =
     [Mov, [Reg Rsp; Reg Rbp]] @
     alignStackPointer @
     [Sub, [Int stackShadowSpace; Reg Rsp]
+     Mov, [Reg R15; GlobalValue("rootStackCurr")]
      Call(func), []
      Mov, [Reg Rbp; Reg Rsp]]
 
@@ -413,12 +414,12 @@ let rec declToInstrs (dest, x) =
     | Simple.Prim(Prim.MakeClosure, label :: args) ->
         let bytes = (List.length args + 2) * wordSize
         let cellsCount = convertToFixnum (List.length args + 1)
-        callAllocate (Int bytes) (Reg R11) @
-        [Mov, [Int cellsCount; Deref(0, R11)] // The first cell is for size and forwarding bit.
-         Lea(label), [Deref(wordSize, R11)]] @ // The second is for label.
+        [Mov, [Int (List.length args); Reg Rcx]
+         Lea(label), [Reg Rdx]] @
+        callRuntime "allocateClosure" @
+        [Mov, [Reg Rax; Reg R11]] @
         moveClosureArgs args @ // Remaining cells are for free variables.
-        [Or, [Int closureTag; Reg R11]
-         Mov, [Reg R11; Var dest]]
+        [Mov, [Reg R11; Var dest]]
     | Simple.Prim(Prim.ClosureRef, [var1]) ->
         [Mov, [Var var1; Reg Rax]
          Sar, [Int fixnumShift; Reg Rax]
