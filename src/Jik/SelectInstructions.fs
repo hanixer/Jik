@@ -133,19 +133,17 @@ let compileForeignCall label blocks foreignName args =
      Mov, [Reg Rax; Var resultVar]
      Jmp label, []]
 
+let convertConditionFlagToBool cc dest =
+    [Set cc, [Reg Al]
+     Movzb, [Reg Al; Reg Rax]
+     Sal, [Operand.Int boolBit; Reg Rax]
+     Or, [Operand.Int falseLiteral; Reg Rax]
+     Mov, [Reg Rax; dest]]
+
 let comparisonInstrs var1 var2 cc dest =
-    let instrs =
-        [Mov, [Var var1; Reg Rax]
-         Cmp, [Var var2; Reg Rax]
-         Set cc, [Reg Al]
-         Movzb, [Reg Al; Reg Rax]
-         Sal, [Operand.Int boolBit; Reg Rax]
-         Or, [Operand.Int falseLiteral; Reg Rax]]
-    match dest with
-    | None ->
-        instrs
-    | Some dest ->
-        instrs @ [Mov, [Reg Rax; dest]]
+    [Mov, [Var var1; Reg Rax]
+     Cmp, [Var var2; Reg Rax]] @
+    convertConditionFlagToBool cc dest
 
 let compileSetOnEqual dest =
     [Set E, [Reg Al]
@@ -234,14 +232,24 @@ let compileMakeFloat dest =
     [Mov, [Int 0; Deref(0, R11)]
      Mov, [Int 0; Deref(wordSize, R11)]
      Or, [Int flonumTag; Reg R11]
-     Mov, [Reg R11; dest]
-     ]
+     Mov, [Reg R11; dest]]
 
 let floatConstant n dest =
     let i64 = BitConverter.DoubleToInt64Bits n
     compileMakeFloat (Reg R11) @
     [Mov, [Operand.Int64 i64; Deref(-flonumTag + wordSize, R11)]
      Mov, [Reg R11; Var dest]]
+
+let getFlonumData var dest =
+    [Mov, [Var var; Reg R11]
+     Mov, [Deref(-flonumTag + wordSize, R11); dest]]
+
+let compileFlonumComparison cc var1 var2 dest =
+    [Mov, [Var var1; Reg R11]
+     Movsd, [Deref(-flonumTag + wordSize, R11); Reg Xmm0]
+     Mov, [Var var2; Reg R11]
+     FloatCompare, [Deref(-flonumTag + wordSize, R11); Reg Xmm0]] @
+    convertConditionFlagToBool cc dest
 
 let rec declToInstrs (dest, x) =
     match x with
@@ -287,13 +295,13 @@ let rec declToInstrs (dest, x) =
          Neg, [Reg Rax]
          Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Lt, [var1; var2]) ->
-        comparisonInstrs var1 var2 Cc.L (Some(Var dest))
+        comparisonInstrs var1 var2 Cc.L (Var dest)
     | Simple.Prim(Prim.Le, [var1; var2]) ->
-        comparisonInstrs var1 var2 Cc.Le (Some(Var dest))
+        comparisonInstrs var1 var2 Cc.Le (Var dest)
     | Simple.Prim(Prim.Ge, [var1; var2]) ->
-        comparisonInstrs var1 var2 Cc.Ge (Some(Var dest))
+        comparisonInstrs var1 var2 Cc.Ge (Var dest)
     | Simple.Prim(Prim.Gt, [var1; var2]) ->
-        comparisonInstrs var1 var2 Cc.G (Some(Var dest))
+        comparisonInstrs var1 var2 Cc.G (Var dest)
     | Simple.Prim(Prim.Not, [var1]) ->
         [Cmp, [Operand.Int falseLiteral; Var var1]] @
         compileSetOnEqual dest
@@ -452,7 +460,15 @@ let rec declToInstrs (dest, x) =
          Movsd, [Deref(-flonumTag + wordSize, R11); Reg Xmm0]
          ConvertFloatToInt, [Reg Xmm0; Var dest]
          Sal, [Int fixnumShift; Var dest]]
-
+    | Simple.Prim(Prim.FlonumEq, [var1; var2]) ->
+        [Mov, [Var var1; Reg R11]
+         Mov, [Deref(-flonumTag + wordSize, R11); Reg R11]
+         Mov, [Var var2; Reg R12]
+         Mov, [Deref(-flonumTag + wordSize, R12); Reg R12]
+         Cmp, [Reg R11; Reg R12]] @
+         compileSetOnEqual dest
+    | Simple.Prim(Prim.FlonumLt, [var1; var2]) ->
+        compileFlonumComparison B var1 var2 (Var dest)
     | e -> failwithf "declToInstrs: %s %A" dest e
 
 let transferToInstrs procName blocks = function
@@ -496,7 +512,7 @@ let saveArgs args instrs =
 let saveToRootIfNeeded rootsCount decl =
     ()
 
-let doPrimitiveUseHeap (_, simple) =
+let doesVarAllocatedOnHeap (_, simple) =
     let primitives =
         [ Cons
           Car
@@ -512,6 +528,7 @@ let doPrimitiveUseHeap (_, simple) =
 
     match simple with
     | Simple.Prim(p, _) -> List.contains p primitives
+    | Simple.FloatNumber _ -> true
     | _ -> false
 
 let selectInstructions (prog : Intermediate.Program) : Program =
@@ -523,7 +540,7 @@ let selectInstructions (prog : Intermediate.Program) : Program =
             // check type of primitive.
             // if primitive allocates heap memory, copy to root stack.
             let instrs = declToInstrs decl
-            if doPrimitiveUseHeap decl then
+            if doesVarAllocatedOnHeap decl then
                 let dest, _ = decl
                 rootStackVars.Add(dest) |> ignore
             instrs

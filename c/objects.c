@@ -20,6 +20,7 @@ int fixnumToInt(ptr_t p) { return p >> fixnumShift; }
 ptr_t intToFixnum(int n) { return n << fixnumShift; }
 ptr_t charToPtr(char c) { return (((ptr_t)c << charShift) | charTag); }
 int isFixnum(ptr_t p) { return (p & fixnumMask) == fixnumTag; }
+int isFlonum(ptr_t p) { return (p & flonumMask) == flonumTag; }
 int isPair(ptr_t p) { return (p & pairMask) == pairTag; }
 int isTypedObject(ptr_t p) { return (p & typedObjectMask) == typedObjectTag; }
 int isVector(ptr_t p) { return isObjectOfType(p, vectorMask, vectorTag); }

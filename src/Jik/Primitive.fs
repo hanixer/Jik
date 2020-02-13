@@ -50,6 +50,11 @@ type Prim =
     | EofObject
     | IsEofObject
     | FlonumToFixnum
+    | FlonumEq
+    | FlonumLt
+    | FlonumLe
+    | FlonumGt
+    | FlonumGe
 
 let stringPrimop = [
     "+", Add
@@ -102,4 +107,9 @@ let stringPrimop = [
     "eof-object", EofObject
     "eof-object?", IsEofObject
     "flonum->fixnum", FlonumToFixnum
+    "fl=", FlonumEq
+    "fl<", FlonumLt
+    "fl<=", FlonumLe
+    "fl>", FlonumGt
+    "fl>=", FlonumGe
 ]

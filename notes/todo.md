@@ -13,4 +13,5 @@
 - [ ] Find a few benchmarks, that could be used for comparison of safe primitives.
 - [ ] floating point number, then we can do ray tracer.
 - [x] garbage collection
-- [ ] Change value representation scheme so that float number could be added.
+- [x] Change value representation scheme so that float number could be added.
+- [x] update garbage collection to handle flonums.

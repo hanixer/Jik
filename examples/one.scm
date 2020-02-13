@@ -1,2 +1,1 @@
-(flonum->fixnum 3.0)
-; "hello worlds"
+(fl< -3.0 3.0)

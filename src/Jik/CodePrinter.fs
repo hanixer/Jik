@@ -34,6 +34,10 @@ let showInstr (out : TextWriter) (op, args) =
         | Le -> out.Write("le")
         | Ge -> out.Write("ge")
         | S -> out.Write("s")
+        | A -> out.Write("a")
+        | Ae -> out.Write("ae")
+        | B -> out.Write("b")
+        | Be -> out.Write("be")
 
     let showOp op =
         match op with
@@ -87,6 +91,7 @@ let showInstr (out : TextWriter) (op, args) =
         | Xor -> out.Write("xorq ")
         | Cmp -> out.Write("cmpq ")
         | ConvertFloatToInt -> out.Write("cvttsd2siq ")
+        | FloatCompare -> out.Write("ucomisd ")
         | Movsd -> out.Write("movsd ")
         | RestoreStack -> out.Write("restorestack ")
         | SpliceSlot(_, _) -> out.Write("spliceslot ")

@@ -667,3 +667,10 @@ let flonumToFixnumTests =
       "(flonum->fixnum -4.5)", "-4\n"
       "(flonum->fixnum -4.8)", "-4\n"
       "(flonum->fixnum -0.5)", "0\n" ]
+
+let flonumComparison =
+    [ "(fl= 3.0 3.0)", "#t\n"
+      "(fl= -3.0 3.0)", "#f\n"
+      "(fl< -3.0 3.0)", "#t\n"
+      "(fl< -3.0 -3.0)", "#f\n"
+      "(fl< -3.0 -3e10)", "#f\n" ]

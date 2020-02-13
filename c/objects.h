@@ -65,6 +65,7 @@ ptr_t intToFixnum(int n);
 ptrptr toPtrptr(ptr_t p);
 ptr_t charToPtr(char c);
 int isFixnum(ptr_t p);
+int isFlonum(ptr_t p);
 int isPair(ptr_t p);
 int isTypedObject(ptr_t p);
 int isVector(ptr_t p);

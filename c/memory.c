@@ -4,7 +4,7 @@
 #include <assert.h>
 
 // #define DEBUG_LOG_GC
-// #define DEBUG_FORCE_GC
+#define DEBUG_FORCE_GC
 
 extern ptr_t **globRootsTable;
 
@@ -133,6 +133,10 @@ void calculateSizeAndSecondaryTag(ptr_t *p, uint64_t firstCell, uint64_t *wordsC
 	{
 		*wordsCount = 2;
 	}
+	else if (isFlonum(*p))
+	{
+		*wordsCount = 2;
+	}
 }
 
 void copyHelper2(ptr_t *p, uint64_t primaryTag)
@@ -210,6 +214,10 @@ void copyData(ptr_t *p)
 	else if (isSymbol(*p))
 	{
 		copyHelper2(p, symbolTag);
+	}
+	else if (isFlonum(*p))
+	{
+		copyHelper2(p, flonumTag);
 	}
 }
 

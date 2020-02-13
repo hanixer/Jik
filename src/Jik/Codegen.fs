@@ -48,6 +48,10 @@ type Cc =
     | Le
     | G
     | Ge
+    | A
+    | Ae
+    | B
+    | Be
     | S // if sign
 
 type InstrName =
@@ -78,6 +82,7 @@ type InstrName =
     | Label of string
     | Lea of string
     | ConvertFloatToInt
+    | FloatCompare
     | Movsd
     // intermediate
     | RestoreStack
