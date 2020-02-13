@@ -118,7 +118,7 @@ void calculateSizeAndSecondaryTag(ptr_t *p, uint64_t firstCell, uint64_t *wordsC
 {
 	if (isVector(*p))
 	{
-		*wordsCount = (firstCell >> fixnumShift) + 1;
+		*wordsCount = (firstCell >> vectorSizeShift) + 1;
 		*secondaryTag = vectorTag;
 	}
 	else if (isClosure(*p))
@@ -403,6 +403,13 @@ ptr_t allocatePair()
 	return ((ptr_t)p) | pairTag;
 }
 
+ptr_t allocateSymbol()
+{
+	uint64_t cells = 2;
+	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
+	p[0] = 0;
+	return ((ptr_t)p) | symbolTag;
+}
 
 void hexDump(const char *desc, const void *addr, int len)
 {

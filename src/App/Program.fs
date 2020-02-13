@@ -37,13 +37,13 @@ let main argv =
     // printf "result: %s" (sexprToString desug)
 
 
-    runTestGroup false "string" stringTests
+    runTestGroupWithLib "symbols" symbolsTests
+    // runTestGroup false "string" stringTests
     // runTestGroup false "variable arity without rest arguments" variableArity
     // runTestGroup false "variable arity using rest arguments" variableArityUsingRest
     // runTestGroup false "pair" pairTests
     // runTestGroup false "lambda" lambdaTests
     // runTestGroup false "vector" vectorTests
-    // runTestGroupWithLib "symbols" symbolsTests
     // runTestGroupWithLib "apply nontail" applyNonTail
     // runTestGroupWithLib "apply tail" applyTail
     // runTestGroup true "eofTests" eofTests
