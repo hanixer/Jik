@@ -19,7 +19,7 @@
 
 (define (check-vec v who)
   (unless (vec? v)
-    (error "not a vector" who)))
+    (error "not a vector" who v)))
 
 (define (vec-x v) (vector-ref v 0))
 (define (vec-y v) (vector-ref v 1))
@@ -32,12 +32,25 @@
         [z (vec-z v)])
     (sqrt (fl+ (fl* x x) (fl+ (fl* y y) (fl* z z))))))
 
+(define (vec-dot u v)
+  (check-vec u 'vec-dot-1)
+  (check-vec v 'vec-dot-2)
+  (fl+ (fl* (vec-x u) (vec-x v))
+       (fl+ (fl* (vec-y u) (vec-y v))
+            (fl* (vec-z u) (vec-z v)))))
+
 ;;; Vector-vector arithmetic operations.
 (define (vec-v+ u v)
   (check-vec v 'vec-v+)
   (vec (fl+ (vec-x u) (vec-x v))
        (fl+ (vec-y u) (vec-y v))
        (fl+ (vec-z u) (vec-z v))))
+
+(define (vec-v- u v)
+  (check-vec v 'vec-v-)
+  (vec (fl- (vec-x u) (vec-x v))
+       (fl- (vec-y u) (vec-y v))
+       (fl- (vec-z u) (vec-z v))))
 
 ;;; Vector-scalar arithmetic operations.
 (define (vec-s* v s)
@@ -72,16 +85,28 @@
 
 (define (point-at r t)
   (vec-v+ (ray-origin r)
-       (vec-s* (ray-direction r) t)))
+	  (vec-s* (ray-direction r) t)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Sphere.
+(define (hit-sphere center radius r)
+  (let* ([oc (vec-v- (ray-origin r) center)]
+         [a (vec-dot (ray-direction r) (ray-direction r))]
+         [b (fl* 2.0 (vec-dot oc (ray-direction r)))]
+         [c (fl- (vec-dot oc oc) (fl* radius radius))]
+         [discriminant (fl- (fl* b b) (fl* 4.0 (fl* a c)))])
+    (fl> discriminant 0.0)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
 (define (color r)
-  (let* ([dir (unit-vector (ray-direction r))]
-         [t (fl* 0.5 (fl+ (vec-y dir) 1.0))])
-    (vec-v+ (vec-s* (vec 1.0 1.0 1.0)
-		        (fl- 1.0 t))
-	    (vec-s* (vec 0.5 0.7 1.0) t))))
+  (if (hit-sphere (vec 0.0 0.0 -1.0) 0.5 r)
+    (vec 1.0 0.0 0.0)
+    (let* ([dir (unit-vector (ray-direction r))]
+           [t (fl* 0.5 (fl+ (vec-y dir) 1.0))])
+      (vec-v+ (vec-s* (vec 1.0 1.0 1.0)
+		                  (fl- 1.0 t))
+	            (vec-s* (vec 0.5 0.7 1.0) t)))))
 
 (define lower-left-corner (vec -2.0 -1.0 -1.0))
 (define horizontal (vec 4.0 0.0 0.0))

@@ -344,3 +344,5 @@ references.fsx
 *.stackdump
 gdb.txt
 .gdb_history
+.#*
+\#*
