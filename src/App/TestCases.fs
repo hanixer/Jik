@@ -659,6 +659,26 @@ let doTests =
 (scale-vector! vec 2)
 vec ", "#(2 4 6 8 10)\n" ]
 
+let flonumTests =
+    [ @"(flonum? 0.0)", "#t\n"
+      @"(flonum? 1.0)", "#t\n"
+      @"(flonum? -1.0)", "#t\n"
+      @"(flonum? 37.287)", "#t\n"
+      @"(flonum? -23.873)", "#t\n"
+      @"(flonum? 53687.0911)", "#t\n"
+      @"(flonum? -53687.0912)", "#t\n"
+      @"(flonum? 1)", "#f\n"
+      @"(flonum? 536870911)", "#f\n"
+      @"(flonum? #t)", "#f\n"
+      @"(flonum? #f)", "#f\n"
+      @"(flonum? '())", "#f\n"
+      @"(flonum? #\Q)", "#f\n"
+      @"(flonum? (flonum? 12))", "#f\n"
+      @"(flonum? (flonum? #f))", "#f\n"
+      @"(flonum? (flonum? #\A))", "#f\n"
+      @"(flonum? (fixnum->flonum 33))", "#t\n"
+      @"(flonum? (number->char 12))", "#f\n" ]
+
 let flonumAndFixnumTests =
     [ "(fixnum->flonum 3)", "3.000000\n"
       "(fixnum->flonum -3)", "-3.000000\n"

@@ -60,6 +60,7 @@ type Prim =
     | FlonumSub
     | FlonumMul
     | FlonumDiv
+    | IsFlonum
 
 let stringPrimop = [
     "+", Add
@@ -122,4 +123,5 @@ let stringPrimop = [
     "fl-", FlonumSub
     "fl*", FlonumMul
     "fl/", FlonumDiv
+    "flonum?", IsFlonum
 ]

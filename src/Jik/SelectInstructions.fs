@@ -495,6 +495,8 @@ let rec declToInstrs (dest, x) =
         compileFlonumArithmetic Mulsd var1 var2 dest
     | Simple.Prim(Prim.FlonumDiv, [var1; var2]) ->
         compileFlonumArithmetic Divsd var1 var2 dest
+    | Simple.Prim(Prim.IsFlonum, [var1]) ->
+        compileIsOfType dest var1 flonumMask flonumTag
 
     | e -> failwithf "declToInstrs: %s %A" dest e
 
