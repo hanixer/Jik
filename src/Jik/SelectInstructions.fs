@@ -216,7 +216,7 @@ let floatNumberSize = 16
 
 let compileMakeFlonum initOp initVal dest =
     [initOp, [initVal; Var dest]
-     Mov, [Var dest; Reg Rcx]] @
+     Movsd, [Var dest; Reg Xmm0]] @
     callRuntime "allocateFlonum" @
     [Mov, [Reg Rax; Reg R11]
      initOp, [initVal; Var dest]

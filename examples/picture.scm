@@ -33,6 +33,13 @@
     (sqrt (fl+ (fl* x x) (fl+ (fl* y y) (fl* z z))))))
 
 (define (vec-dot u v)
+  (display "vector-dot ")
+  (display (vector? u))
+  (display (flonum? u))
+  (display (fixnum? u))
+  (display u)
+  (display v)
+  (newline)
   (check-vec u 'vec-dot-1)
   (check-vec v 'vec-dot-2)
   (fl+ (fl* (vec-x u) (vec-x v))
@@ -47,6 +54,8 @@
        (fl+ (vec-z u) (vec-z v))))
 
 (define (vec-v- u v)
+  (display "vec-v-")
+  (newline)
   (check-vec v 'vec-v-)
   (vec (fl- (vec-x u) (vec-x v))
        (fl- (vec-y u) (vec-y v))
@@ -75,6 +84,10 @@
   (and (vector? r) (eq? (vector-length r) 2)))
 
 (define (make-ray a b)
+  (display "make-ray")
+  (display a)
+  (display b)
+  (newline)
   (let ([r (make-vector 2)])
     (vector-set! r 0 a)
     (vector-set! r 1 b)
@@ -94,6 +107,9 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sphere.
 (define (hit-sphere center radius r)
+  (display "hit-sphere")
+  (display r)
+  (newline)
   (let* ([oc (vec-v- (ray-origin r) center)]
          [a (vec-dot (ray-direction r) (ray-direction r))]
          [b (fl* 2.0 (vec-dot oc (ray-direction r)))]

@@ -48,6 +48,7 @@
         ((string? x) (if d? (write-string x p) (wrstring x p)))
         ((vector? x) (wrvector x d? p))
         ((procedure? x) (write-string "#<procedure>" p))
+        ((flonum? x) (write-string "#<flonum>" p))
         (else (write-string "#<unknown>" p)))))
 
 ;   ;; write-string writes each character of s to p

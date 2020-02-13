@@ -186,11 +186,6 @@ void copyHelper(ptr_t *p, uint64_t primaryTag)
 		uint64_t secondaryTag = 0;
 		calculateSizeAndSecondaryTag(p, firstCell, &wordsCount, &secondaryTag);
 
-		if (wordsCount == 1)
-		{
-			copyError();
-		}
-
 		ptr_t pTo = (ptr_t)copyPtrEnd;
 		memcpy(copyPtrEnd, pFrom, wordsCount * wordSize);
 		copyPtrEnd[0] |= secondaryTag; // Add secondary tag for typed object if needed.
@@ -362,11 +357,22 @@ void collect(uint64_t *const rootStack, int64_t bytesNeeded)
 //////////////////////////////////////
 // Allocations.
 
+void vectorAllocError()
+{
+	printf("allocate vector error");
+	fflush(stdout);
+	exit(1);
+}
+
 /// Argument - is the number of vector elements.
 /// Should be converted from scheme representation.
 ptr_t allocateVector(ptr_t s)
 {
 	uint64_t size = fixnumToInt(s);
+	printf("alloc vector = %d\n", size);
+	if (size == 0)
+		vectorAllocError();
+
 	uint64_t cells = size + 1;
 	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
 	p[0] = size << vectorSizeShift;
@@ -377,6 +383,7 @@ ptr_t allocateVector(ptr_t s)
 ptr_t allocateString(ptr_t s)
 {
 	uint64_t charsCount = fixnumToInt(s);
+	printf("alloc String = %d\n", charsCount);
 	uint64_t cells = stringSizeHelper(charsCount);
 	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
 	p[0] = charsCount << stringSizeShift;
@@ -389,6 +396,7 @@ ptr_t allocateString(ptr_t s)
 ptr_t allocateClosure(int free, uint64_t procAddr)
 {
 	uint64_t cells = free + 2;
+	printf("alloc Closure free = %d\n", free);
 	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
 	p[0] = (cells - 1) << closureSizeShift; // Store count of free args + cell for proc.
 	p[1] = procAddr;
@@ -398,6 +406,7 @@ ptr_t allocateClosure(int free, uint64_t procAddr)
 ptr_t allocatePair()
 {
 	uint64_t cells = 3;
+	printf("alloc Pair \n");
 	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
 	p[0] = 0;
 	return ((ptr_t)p) | pairTag;
@@ -406,6 +415,7 @@ ptr_t allocatePair()
 ptr_t allocateSymbol()
 {
 	uint64_t cells = 2;
+	printf("allocateSymbol \n");
 	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
 	p[0] = 0;
 	return ((ptr_t)p) | symbolTag;
@@ -414,6 +424,7 @@ ptr_t allocateSymbol()
 ptr_t allocateFlonum(double value)
 {
     double *d = (double*)allocateC(2 * wordSize);
+	printf("allocateFlonum %f \n", value);
 	d[0] = 0;
     d[1] = value;
     ptr_t p = (ptr_t)d;
