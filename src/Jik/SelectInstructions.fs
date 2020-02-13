@@ -469,6 +469,13 @@ let rec declToInstrs (dest, x) =
          compileSetOnEqual dest
     | Simple.Prim(Prim.FlonumLt, [var1; var2]) ->
         compileFlonumComparison B var1 var2 (Var dest)
+    | Simple.Prim(Prim.FlonumLe, [var1; var2]) ->
+        compileFlonumComparison Be var1 var2 (Var dest)
+    | Simple.Prim(Prim.FlonumGt, [var1; var2]) ->
+        compileFlonumComparison A var1 var2 (Var dest)
+    | Simple.Prim(Prim.FlonumGe, [var1; var2]) ->
+        compileFlonumComparison Ae var1 var2 (Var dest)
+
     | e -> failwithf "declToInstrs: %s %A" dest e
 
 let transferToInstrs procName blocks = function
