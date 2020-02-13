@@ -226,19 +226,18 @@ let computeVecElementOffset vec index =
 
 let floatNumberSize = 16
 
-let compileMakeFloat dest =
+let compileMakeFloat initOp initVal dest =
     [Mov, [Int floatNumberSize; Reg Rax]] @
     callAllocate (Reg Rax) (Reg R11) @
     [Mov, [Int 0; Deref(0, R11)]
-     Mov, [Int 0; Deref(wordSize, R11)]
+     initOp, [initVal; Deref(wordSize, R11)]
      Or, [Int flonumTag; Reg R11]
      Mov, [Reg R11; dest]]
 
 let floatConstant n dest =
     let i64 = BitConverter.DoubleToInt64Bits n
-    compileMakeFloat (Reg R11) @
-    [Mov, [Operand.Int64 i64; Deref(-flonumTag + wordSize, R11)]
-     Mov, [Reg R11; Var dest]]
+    compileMakeFloat Mov (Operand.Int64 i64) (Reg R11) @
+    [Mov, [Reg R11; Var dest]]
 
 let getFlonumData var dest =
     [Mov, [Var var; Reg R11]
@@ -250,6 +249,13 @@ let compileFlonumComparison cc var1 var2 dest =
      Mov, [Var var2; Reg R11]
      FloatCompare, [Deref(-flonumTag + wordSize, R11); Reg Xmm0]] @
     convertConditionFlagToBool cc dest
+
+let compileFlonumArithmetic op var1 var2 dest=
+    [Mov, [Var var1; Reg R11]
+     Movsd, [Deref(-flonumTag + wordSize, R11); Reg Xmm0]
+     Mov, [Var var2; Reg R11]
+     op, [Deref(-flonumTag + wordSize, R11); Reg Xmm0]] @
+    compileMakeFloat Movsd (Reg Xmm0) (Var dest)
 
 let rec declToInstrs (dest, x) =
     match x with
@@ -475,6 +481,14 @@ let rec declToInstrs (dest, x) =
         compileFlonumComparison A var1 var2 (Var dest)
     | Simple.Prim(Prim.FlonumGe, [var1; var2]) ->
         compileFlonumComparison Ae var1 var2 (Var dest)
+    | Simple.Prim(Prim.FlonumAdd, [var1; var2]) ->
+        compileFlonumArithmetic Addsd var1 var2 dest
+    | Simple.Prim(Prim.FlonumSub, [var1; var2]) ->
+        compileFlonumArithmetic Subsd var1 var2 dest
+    | Simple.Prim(Prim.FlonumMul, [var1; var2]) ->
+        compileFlonumArithmetic Mulsd var1 var2 dest
+    | Simple.Prim(Prim.FlonumDiv, [var1; var2]) ->
+        compileFlonumArithmetic Divsd var1 var2 dest
 
     | e -> failwithf "declToInstrs: %s %A" dest e
 
@@ -530,7 +544,11 @@ let doesVarAllocatedOnHeap (_, simple) =
           StringInit
           MakeClosure
           ClosureRef
-          MakeSymbol ]
+          MakeSymbol
+          FlonumAdd
+          FlonumSub
+          FlonumMul
+          FlonumDiv ]
 
 
     match simple with

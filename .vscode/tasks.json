@@ -25,7 +25,7 @@
                 "kind": "build",
                 "isDefault": true
             },
-            "args": ["run", "-p", "src/CompilerDriver"],
+            "args": ["run", "-p", "src/CompilerDriver", "examples/one.scm", "-nolib"],
             "presentation": {
                 "reveal": "silent"
             },

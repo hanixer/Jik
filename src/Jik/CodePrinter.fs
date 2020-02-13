@@ -93,6 +93,10 @@ let showInstr (out : TextWriter) (op, args) =
         | ConvertFloatToInt -> out.Write("cvttsd2siq ")
         | FloatCompare -> out.Write("ucomisd ")
         | Movsd -> out.Write("movsd ")
+        | Addsd -> out.Write("addsd ")
+        | Subsd -> out.Write("subsd ")
+        | Mulsd -> out.Write("mulsd ")
+        | Divsd -> out.Write("divsd ")
         | RestoreStack -> out.Write("restorestack ")
         | SpliceSlot(_, _) -> out.Write("spliceslot ")
         | aaa ->

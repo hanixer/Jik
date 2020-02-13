@@ -57,3 +57,8 @@ ptr_t cdr(ptr_t p)
     // printf("cdr: p = %p, val = %p\n", p, v);
     return v;
 }
+
+double flonumData(ptr_t p)
+{
+    return *((double*)(p - flonumTag + wordSize));
+}

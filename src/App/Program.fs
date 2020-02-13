@@ -70,8 +70,9 @@ let main argv =
     // runTestGroup false "number?" numberTests
     // runTestGroup false "boolean?" booleanTests
     // runTestGroup false "null?" nullTests
-    runTestGroup false "flonum->fixnum" flonumToFixnumTests
-    runTestGroup false "fl comparison" flonumComparison
+    // runTestGroup false "flonum->fixnum" flonumToFixnumTests
+    // runTestGroup false "flonum comparison" flonumComparison
+    runTestGroup false "flonum arithmetic" flonumArithmetic
     // runTest false e2 "2"
 
 

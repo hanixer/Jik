@@ -82,5 +82,6 @@ ptr_t vectorRef(ptr_t p, int i);
 int stringSize(ptr_t p);
 char* stringData(ptr_t p);
 char stringRef(ptr_t p, int i);
+double flonumData(ptr_t p);
 
 #endif

@@ -16,6 +16,7 @@ static void printSymbol(ptr_t p);
 static void printPair(ptr_t p);
 static void printVector(ptr_t p);
 static void printString(ptr_t p, int);
+static void printFlonum(ptr_t p);
 char *allocAndCopyString(ptr_t p);
 
 void printPtr(ptr_t p)
@@ -63,11 +64,20 @@ void printPtr(ptr_t p)
     {
         printSymbol(p);
     }
+    else if (isFlonum(p))
+    {
+        printFlonum(p);
+    }
     else
     {
         printf("<unknown 0x%08x>", p);
     }
     fflush(stdout);
+}
+
+static void printFlonum(ptr_t p)
+{
+    printf("%f", flonumData(p));
 }
 
 static void printSymbol(ptr_t p)

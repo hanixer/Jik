@@ -84,6 +84,10 @@ type InstrName =
     | ConvertFloatToInt
     | FloatCompare
     | Movsd
+    | Addsd
+    | Subsd
+    | Mulsd
+    | Divsd
     // intermediate
     | RestoreStack
     | SpliceSlot of slot : int * argsCount : int

@@ -55,6 +55,10 @@ type Prim =
     | FlonumLe
     | FlonumGt
     | FlonumGe
+    | FlonumAdd
+    | FlonumSub
+    | FlonumMul
+    | FlonumDiv
 
 let stringPrimop = [
     "+", Add
@@ -112,4 +116,8 @@ let stringPrimop = [
     "fl<=", FlonumLe
     "fl>", FlonumGt
     "fl>=", FlonumGe
+    "fl+", FlonumAdd
+    "fl-", FlonumSub
+    "fl*", FlonumMul
+    "fl/", FlonumDiv
 ]
