@@ -37,7 +37,11 @@ let main argv =
     // printf "result: %s" (sexprToString desug)
 
 
-    runTestGroupWithLib "symbols" symbolsTests
+    runTestGroup false "flonum?" flonumTests
+    runTestGroup false "flonum<->fixnum" flonumAndFixnumTests
+    runTestGroup false "flonum comparison" flonumComparison
+    runTestGroup false "flonum arithmetic" flonumArithmetic
+    // runTestGroupWithLib "symbols" symbolsTests
     // runTestGroup false "string" stringTests
     // runTestGroup false "variable arity without rest arguments" variableArity
     // runTestGroup false "variable arity using rest arguments" variableArityUsingRest
@@ -70,10 +74,6 @@ let main argv =
     // runTestGroup false "number?" numberTests
     // runTestGroup false "boolean?" booleanTests
     // runTestGroup false "null?" nullTests
-    // runTestGroup false "flonum?" flonumTests
-    // runTestGroup false "flonum<->fixnum" flonumAndFixnumTests
-    // runTestGroup false "flonum comparison" flonumComparison
-    // runTestGroup false "flonum arithmetic" flonumArithmetic
     // // runTest false e2 "2"
 
 

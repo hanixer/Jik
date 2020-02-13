@@ -411,6 +411,15 @@ ptr_t allocateSymbol()
 	return ((ptr_t)p) | symbolTag;
 }
 
+ptr_t allocateFlonum(double value)
+{
+    double *d = (double*)allocateC(2 * wordSize);
+	d[0] = 0;
+    d[1] = value;
+    ptr_t p = (ptr_t)d;
+    return p | flonumTag;
+}
+
 void hexDump(const char *desc, const void *addr, int len)
 {
 	if (desc)

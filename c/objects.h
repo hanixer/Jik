@@ -85,6 +85,5 @@ int stringSize(ptr_t p);
 char* stringData(ptr_t p);
 char stringRef(ptr_t p, int i);
 double flonumData(ptr_t p);
-ptr_t createFlonum(double value);
 
 #endif

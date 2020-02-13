@@ -63,11 +63,3 @@ double flonumData(ptr_t p)
 {
     return *((double*)(p - flonumTag + wordSize));
 }
-
-ptr_t createFlonum(double value)
-{
-    double *d = (double*)allocateC(2 * wordSize);
-    d[1] = value;
-    ptr_t p = (ptr_t)d;
-    return p | flonumTag;
-}

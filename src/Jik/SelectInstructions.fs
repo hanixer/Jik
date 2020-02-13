@@ -214,18 +214,18 @@ let computeVecElementOffset vec index =
 
 let floatNumberSize = 16
 
-let compileMakeFloat initOp initVal dest =
-    [Mov, [Int floatNumberSize; Reg Rax]] @
-    callAllocate (Reg Rax) (Reg R11) @
-    [Mov, [Int 0; Deref(0, R11)]
-     initOp, [initVal; Deref(wordSize, R11)]
-     Or, [Int flonumTag; Reg R11]
-     Mov, [Reg R11; dest]]
+let compileMakeFlonum initOp initVal dest =
+    [initOp, [initVal; Var dest]
+     Mov, [Var dest; Reg Rcx]] @
+    callRuntime "allocateFlonum" @
+    [Mov, [Reg Rax; Reg R11]
+     initOp, [initVal; Var dest]
+     Mov, [Var dest; Deref(-flonumTag + wordSize, R11)]
+     Mov, [Reg R11; Var dest]]
 
 let floatConstant n dest =
     let i64 = BitConverter.DoubleToInt64Bits n
-    compileMakeFloat Mov (Operand.Int64 i64) (Reg R11) @
-    [Mov, [Reg R11; Var dest]]
+    compileMakeFlonum Mov (Operand.Int64 i64) dest
 
 let getFlonumData var dest =
     [Mov, [Var var; Reg R11]
@@ -243,7 +243,7 @@ let compileFlonumArithmetic op var1 var2 dest=
      Movsd, [Deref(-flonumTag + wordSize, R11); Reg Xmm0]
      Mov, [Var var2; Reg R11]
      op, [Deref(-flonumTag + wordSize, R11); Reg Xmm0]] @
-    compileMakeFloat Movsd (Reg Xmm0) (Var dest)
+    compileMakeFlonum Movsd (Reg Xmm0) dest
 
 let rec declToInstrs (dest, x) =
     match x with
@@ -452,7 +452,7 @@ let rec declToInstrs (dest, x) =
          Sar, [Int fixnumShift; Reg Rax]
          Pxor, [Reg Xmm0; Reg Xmm0]
          ConvertIntToFloat, [Reg Rax; Reg Xmm0]] @
-        compileMakeFloat Movsd (Reg Xmm0) (Var dest)
+        compileMakeFlonum Movsd (Reg Xmm0) dest
     | Simple.Prim(Prim.FlonumEq, [var1; var2]) ->
         [Mov, [Var var1; Reg R11]
          Mov, [Deref(-flonumTag + wordSize, R11); Reg R11]

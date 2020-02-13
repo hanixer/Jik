@@ -279,7 +279,7 @@ ptr_t s_expt(ptr_t x, ptr_t y)
     double xx = flonumData(x);
     double yy = flonumData(y);
     double z = pow(xx, yy);
-    return createFlonum(z);
+    return allocateFlonum(z);
 }
 
 char *stackTop;

@@ -30,3 +30,5 @@ void *allocateC(uint64_t size);
 char* allocateProtectedSpace(int size);
 
 void deallocateProtectedSpace(char* ptr, int size);
+
+ptr_t allocateFlonum(double value);

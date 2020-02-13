@@ -1,2 +1,1 @@
-(let ([s (make-symbol "thi")])
-    s)
+3.0
