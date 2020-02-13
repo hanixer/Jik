@@ -24,6 +24,9 @@ void gcInitialize(uint64_t heapSize, uint64_t rootStackSize);
 
 void collect(uint64_t* rootStack, int64_t size);
 
+/// Should be called from C.
+void *allocateC(uint64_t size);
+
 char* allocateProtectedSpace(int size);
 
 void deallocateProtectedSpace(char* ptr, int size);

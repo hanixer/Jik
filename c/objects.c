@@ -1,4 +1,5 @@
 #include "objects.h"
+#include "memory.h"
 #include <stdio.h>
 
 ptrptr toPtrptr(ptr_t p) { return (ptrptr)p; }
@@ -61,4 +62,12 @@ ptr_t cdr(ptr_t p)
 double flonumData(ptr_t p)
 {
     return *((double*)(p - flonumTag + wordSize));
+}
+
+ptr_t createFlonum(double value)
+{
+    double *d = (double*)allocateC(2 * wordSize);
+    d[1] = value;
+    ptr_t p = (ptr_t)d;
+    return p | flonumTag;
 }

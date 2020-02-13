@@ -128,6 +128,7 @@ let compileForeignCall label blocks foreignName args =
     let spChange = (stackArgsCount + 4) * wordSize // 4 is 'shadow space' which caller must allocate
     moveToArgPositions @
     [Sub, [Int spChange; Reg Rsp]
+     Mov, [Reg R15; GlobalValue("rootStackCurr")]
      Call name, []
      Add, [Int spChange; Reg Rsp]
      Mov, [Reg Rax; Var resultVar]

@@ -20,3 +20,9 @@
     (if (< n 0)
         (list->string (cons #\- (iter (- 0 n) '())))
         (list->string (iter n '()))))
+
+(define (expt x y)
+    (foreign-call "s_expt" x y))
+
+(define (sqrt x)
+    (expt x 0.5))

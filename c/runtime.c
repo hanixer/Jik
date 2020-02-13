@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 #include "memory.h"
 #include "objects.h"
 
@@ -273,9 +274,12 @@ void s_exit(ptr_t p)
     ExitProcess((UINT)fixnumToInt(p));
 }
 
-void checkHeapSpaceAvailable(int which)
+ptr_t s_expt(ptr_t x, ptr_t y)
 {
-    allocations[which]++;
+    double xx = flonumData(x);
+    double yy = flonumData(y);
+    double z = pow(xx, yy);
+    return createFlonum(z);
 }
 
 char *stackTop;

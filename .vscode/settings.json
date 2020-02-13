@@ -6,6 +6,7 @@
         "objects.h": "c",
         "assert.h": "c",
         "stdio.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "cmath": "c"
     },
 }

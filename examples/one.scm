@@ -1,1 +1,1 @@
-(fixnum->flonum 3)
+(sqrt 9.0)

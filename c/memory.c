@@ -32,6 +32,7 @@ static uint64_t *copyPtrBegin;
 static uint64_t *copyPtrEnd;
 
 uint64_t *rootStackBegin;
+uint64_t *rootStackCurr;
 
 void hexDump(const char *desc, const void *addr, const int len);
 
@@ -247,6 +248,11 @@ void *allocate(uint64_t *rootStack, uint64_t size)
 	}
 
 	return p;
+}
+
+void *allocateC(uint64_t size)
+{
+	return allocate(rootStackCurr, size);
 }
 
 static void finishCollection(uint64_t *rootStack)

@@ -169,6 +169,9 @@ let convertSchemeIdentifToAsm name =
         "open"
         "close"
         "exit"
+        "main"
+        "pow"
+        "sqrt"
     ]
 
     let name =
