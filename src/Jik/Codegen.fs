@@ -266,25 +266,25 @@ let convertSlots (prog : Program) =
     { prog with Procedures = List.map handleDef prog.Procedures
                 Main = handleDef prog.Main }
 
-let allocateCons car cdr dest restoreStack =
-    [Mov, [Int (3 * wordSize); Reg Rdx]
-     Mov, [Reg Rsi; Deref(0, R15)]
-     Mov, [Reg R15; Reg Rcx]
-     Call("allocate"), []] @
-    restoreStack @
-    [Mov, [Deref(0, R15); Reg Rsi]
-     Mov, [Reg Rax; Reg R11]
-     Mov, [Int 0; Deref(0, R11)]
-     Mov, [car; Deref(wordSize, R11)]
-     Mov, [cdr; Deref(2 * wordSize, R11)]
-     Or, [Int pairTag; Reg R11]
-     Mov, [Reg R11; dest]]
-
 let temporarySaveArgsOnRootStack args rootSlots =
     let save i _ =
         let slot = rootSlots - i - 1
         Mov, [Deref(-(i + 1) * wordSize, Rsp); Deref(-slot * wordSize, R15)]
     List.mapi save args
+
+let callRuntimeHelper func =
+    [Mov, [Reg Rsi; Deref(0, R15)]
+     Mov, [Reg R15; GlobalValue("rootStackCurr")]
+     Call(func), []
+     Mov, [Deref(0, R15); Reg Rsi]]
+
+/// This does not work for more than 4 arguments.
+let callRuntime func =
+    [Mov, [Reg Rsp; Reg Rbp]] @
+    alignStackPointer @
+    [Sub, [Int stackShadowSpace; Reg Rsp]] @
+    callRuntimeHelper func @
+    [Mov, [Reg Rbp; Reg Rsp]]
 
 let copyArgsToRootStack =
     let loopStart = freshLabel "loopStart"
@@ -328,20 +328,15 @@ let constructDotted =
 
      Label(loopStart), []
      Cmp, [Int 0; Reg Rbx]
-     JmpIf(E, loopEnd), []
+     JmpIf(E, loopEnd), []] @
 
     // Call allocate().
-     Mov, [Int (3 * wordSize); Reg Rdx]
-     Mov, [Reg Rsi; Deref(0, R15)]
-     Mov, [Reg R15; Reg Rcx]
-     Call("allocate"), []
-     Mov, [Deref(0, R15); Reg Rsi]
 
-     Mov, [Reg Rax; Reg R11]
-     Mov, [Int 0; Deref(0, R11)] // First cell of block.
-     Mov, [Deref(-2 * wordSize, R15); Deref(wordSize, R11)] // car
-     Mov, [Deref(-wordSize, R15); Deref(2 * wordSize, R11)] // cdr
-     Or, [Int pairTag; Reg R11]
+    callRuntimeHelper "allocatePair" @
+
+    [Mov, [Reg Rax; Reg R11]
+     Mov, [Deref(-2 * wordSize, R15); Deref(-pairTag + wordSize, R11)] // car
+     Mov, [Deref(-wordSize, R15); Deref(-pairTag + 2 * wordSize, R11)] // cdr
 
      Sub, [Int wordSize; Reg R15]
      Mov, [Reg R11; Deref(-wordSize, R15)]

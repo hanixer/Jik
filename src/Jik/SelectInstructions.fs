@@ -175,15 +175,6 @@ let compileIsOfTypeComplex dest var1 mask tag =
     [Label(comparEnd), []] @
     compileSetOnEqual dest
 
-/// This does not work for more than 4 arguments.
-let callRuntime func =
-    [Mov, [Reg Rsp; Reg Rbp]] @
-    alignStackPointer @
-    [Sub, [Int stackShadowSpace; Reg Rsp]
-     Mov, [Reg R15; GlobalValue("rootStackCurr")]
-     Call(func), []
-     Mov, [Reg Rbp; Reg Rsp]]
-
 let callAllocate size dest =
     [Mov, [size; Reg Rdx] // Size to allocate.
      Mov, [Reg Rsi; Deref(0, R15)]
@@ -214,6 +205,13 @@ let compileMakeString size dest =
      Mov, [Reg Rax; Deref(0, R11)]
      Or, [Int typedObjectTag; Reg R11]
      Mov, [Reg R11; Var dest]]
+
+let compileMakePair car cdr dest =
+    callRuntime "allocatePair" @
+    [Mov, [Reg Rax; Reg R11]
+     Mov, [car; Deref(-pairTag + wordSize, R11)]
+     Mov, [cdr; Deref(-pairTag + 2 * wordSize, R11)]
+     Mov, [Reg R11; dest]]
 
 let computeVecElementOffset vec index =
     [Mov, [Var vec; Reg R11]
@@ -340,12 +338,7 @@ let rec declToInstrs (dest, x) =
          Or, [Int charTag; Reg Rax]
          Mov, [Reg Rax; Var dest]]
     | Simple.Prim(Prim.Cons, [var1; var2]) ->
-        let restoreStack = [Mov, [Reg Rbp; Reg Rsp]]
-        [Mov, [Reg Rsp; Reg Rbp]
-         Sub, [Int wordSize; Reg Rsp]] @
-        alignStackPointer @
-        [Sub, [Int stackShadowSpace; Reg Rsp]] @
-        allocateCons (Var var1) (Var var2) (Var dest) restoreStack
+        compileMakePair (Var var1) (Var var2) (Var dest)
     | Simple.Prim(Prim.IsPair, [var1]) ->
         compileIsOfType dest var1 pairMask pairTag
     | Simple.Prim(Prim.IsNull, [var1]) ->

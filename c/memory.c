@@ -380,6 +380,15 @@ ptr_t allocateClosure(int free, uint64_t procAddr)
 	return ((ptr_t)p) | closureTag;
 }
 
+ptr_t allocatePair()
+{
+	uint64_t cells = 3;
+	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
+	p[0] = 0;
+	return ((ptr_t)p) | pairTag;
+}
+
+
 void hexDump(const char *desc, const void *addr, int len)
 {
 	if (desc)

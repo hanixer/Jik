@@ -37,7 +37,10 @@ let main argv =
     // printf "result: %s" (sexprToString desug)
 
 
-    runTestGroup false "lambda" lambdaTests
+    runTestGroup false "variable arity without rest arguments" variableArity
+    runTestGroup false "variable arity using rest arguments" variableArityUsingRest
+    // runTestGroup false "pair" pairTests
+    // runTestGroup false "lambda" lambdaTests
     // runTestGroup false "vector" vectorTests
     // runTestGroupWithLib "symbols" symbolsTests
     // runTestGroupWithLib "apply nontail" applyNonTail
@@ -50,12 +53,9 @@ let main argv =
     // runTestGroup false "quotientTests" quotientRemainderTests
     // runTestGroup false "complexConstants" complexConstants
     // runTestGroup false "cond" condTests
-    // runTestGroup false "variable arity without rest arguments" variableArity
-    // runTestGroup false "variable arity using rest arguments" variableArityUsingRest
     // runTestGroup false "deep procs" deeplyProcedureTests
     // runTestGroup false "boolean" booleanTests
     // runTestGroup false "assignment" assignmentTests
-    // runTestGroup false "pair" pairTests
     // runTestGroup false "setCarCdr" setCarCdrTests
     // runTestGroup false "list" listTests
     // runTestGroup false "num -> char" numcharTests

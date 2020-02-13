@@ -1,1 +1,1 @@
-(let ((f (lambda (g) (+ (g 10) (g 100))))) (f (lambda (x) (* x x))))
+(cons 1 (cons 2 3))
