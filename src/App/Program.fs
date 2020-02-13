@@ -37,8 +37,9 @@ let main argv =
     // printf "result: %s" (sexprToString desug)
 
 
-    runTestGroup false "variable arity without rest arguments" variableArity
-    runTestGroup false "variable arity using rest arguments" variableArityUsingRest
+    runTestGroup false "string" stringTests
+    // runTestGroup false "variable arity without rest arguments" variableArity
+    // runTestGroup false "variable arity using rest arguments" variableArityUsingRest
     // runTestGroup false "pair" pairTests
     // runTestGroup false "lambda" lambdaTests
     // runTestGroup false "vector" vectorTests
@@ -60,7 +61,6 @@ let main argv =
     // runTestGroup false "list" listTests
     // runTestGroup false "num -> char" numcharTests
     // runTestGroup false "char?" isCharTests
-    // runTestGroup false "string" stringTests
     // runTestGroup false "foreign-call" foreignCallTests
     // runTestGroup false "letLoop" letLoop
     // runTestGroup false "whenUnless" whenUnlessTests

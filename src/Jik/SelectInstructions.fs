@@ -195,16 +195,9 @@ let compileMakeVector size dest =
 
 /// Very strange: why do we move size to RAX after allocation?
 let compileMakeString size dest =
-    [Mov, [size; Reg Rax]
-     Sar, [Int fixnumShift; Reg Rax]
-     Add, [Int wordSize; Reg Rax]] @
-    callAllocate (Reg Rax) (Reg R11) @
-    [Mov, [size; Reg Rax]
-     Sal, [Int (stringSizeShift - fixnumShift); Reg Rax]
-     Or, [Int stringTag; Reg Rax]
-     Mov, [Reg Rax; Deref(0, R11)]
-     Or, [Int typedObjectTag; Reg R11]
-     Mov, [Reg R11; Var dest]]
+    [Mov, [size; Reg Rcx]] @
+    callRuntime "allocateString" @
+    [Mov, [Reg Rax; Var dest]]
 
 let compileMakePair car cdr dest =
     callRuntime "allocatePair" @

@@ -108,6 +108,12 @@ int isAddressValid(uint64_t *p)
 	}
 }
 
+static uint64_t stringSizeHelper(uint64_t charsCount)
+{
+	uint64_t rounded = charsCount + (wordSize - 1);
+	return (rounded / wordSize) + 1;
+}
+
 void calculateSizeAndSecondaryTag(ptr_t *p, uint64_t firstCell, uint64_t *wordsCount, uint64_t *secondaryTag)
 {
 	if (isVector(*p))
@@ -122,8 +128,7 @@ void calculateSizeAndSecondaryTag(ptr_t *p, uint64_t firstCell, uint64_t *wordsC
 	else if (isString(*p))
 	{
 		uint64_t shifted = firstCell >> stringSizeShift;
-		uint64_t rounded = shifted + (wordSize - 1);
-		*wordsCount = (rounded / wordSize) + 1;
+		*wordsCount = stringSizeHelper(shifted);
 		*secondaryTag = stringTag;
 	}
 	else if (isPair(*p))
@@ -188,8 +193,7 @@ void copyHelper(ptr_t *p, uint64_t primaryTag)
 
 		ptr_t pTo = (ptr_t)copyPtrEnd;
 		memcpy(copyPtrEnd, pFrom, wordsCount * wordSize);
-		// TODO: secondary tag
-		// copyPtrEnd[0] |= secondaryTag; // Add secondary tag for typed object if needed.
+		copyPtrEnd[0] |= secondaryTag; // Add secondary tag for typed object if needed.
 		copyPtrEnd += wordsCount;
 
 		pFrom[0] = pTo | 1; // Add forward marker.
@@ -366,6 +370,17 @@ ptr_t allocateVector(ptr_t s)
 	uint64_t cells = size + 1;
 	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
 	p[0] = size << vectorSizeShift;
+	return ((ptr_t)p) | typedObjectTag;
+}
+/// s - is the number of string elements.
+/// Should be converted from scheme representation.
+ptr_t allocateString(ptr_t s)
+{
+	uint64_t charsCount = fixnumToInt(s);
+	uint64_t cells = stringSizeHelper(charsCount);
+	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
+	p[0] = charsCount << stringSizeShift;
+	p[0] = p[0] | stringTag;
 	return ((ptr_t)p) | typedObjectTag;
 }
 
