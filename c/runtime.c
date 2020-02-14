@@ -230,7 +230,7 @@ char *allocAndCopyString(ptr_t p)
 ptr_t s_openFileW(ptr_t filename)
 {
     char *str = allocAndCopyString(filename);
-    int fd = _open(str, O_CREAT | O_TRUNC | O_WRONLY, _S_IREAD | _S_IWRITE);
+    int fd = open(str, O_CREAT | O_WRONLY | O_TRUNC);
     int err = errno;
     char *estr = strerror(err);
     free(str);
@@ -240,7 +240,7 @@ ptr_t s_openFileW(ptr_t filename)
 ptr_t s_openFileR(ptr_t filename)
 {
     char *str = allocAndCopyString(filename);
-    int fd = _open(str, O_RDONLY);
+    int fd = open(str, O_RDONLY);
     int err = errno;
     char *estr = strerror(err);
     free(str);
@@ -251,7 +251,7 @@ ptr_t s_closeFile(ptr_t fd)
 {
     int err = errno;
     int cfd = fixnumToInt(fd);
-    int ret = _close(cfd);
+    int ret = close(cfd);
     char *estr = strerror(err);
     return intToFixnum(ret);
 }
@@ -280,6 +280,12 @@ ptr_t s_expt(ptr_t x, ptr_t y)
     double yy = flonumData(y);
     double z = pow(xx, yy);
     return allocateFlonum(z);
+}
+
+ptr_t s_randomFlonum()
+{
+    double val = rand() / (RAND_MAX + 1.0);
+    return allocateFlonum(val);
 }
 
 char *stackTop;

@@ -5,7 +5,7 @@
 
 // #define DEBUG_LOG_ALLOC
 // #define DEBUG_LOG_GC
-#define DEBUG_FORCE_GC
+// #define DEBUG_FORCE_GC
 
 extern ptr_t **globRootsTable;
 

@@ -5,3 +5,7 @@
 (define exit-scheme
     (lambda ()
         (foreign-call "s_exit" 0)))
+
+(define random-flonum
+    (lambda ()
+        (foreign-call "s_randomFlonum")))
