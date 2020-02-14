@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <assert.h>
 
+// #define DEBUG_LOG_ALLOC
 // #define DEBUG_LOG_GC
 #define DEBUG_FORCE_GC
 
@@ -369,7 +370,11 @@ void vectorAllocError()
 ptr_t allocateVector(ptr_t s)
 {
 	uint64_t size = fixnumToInt(s);
+
+	#ifdef DEBUG_LOG_ALLOC
 	printf("alloc vector = %d\n", size);
+	#endif
+
 	if (size == 0)
 		vectorAllocError();
 
@@ -383,7 +388,11 @@ ptr_t allocateVector(ptr_t s)
 ptr_t allocateString(ptr_t s)
 {
 	uint64_t charsCount = fixnumToInt(s);
+
+	#ifdef DEBUG_LOG_ALLOC
 	printf("alloc String = %d\n", charsCount);
+	#endif
+
 	uint64_t cells = stringSizeHelper(charsCount);
 	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
 	p[0] = charsCount << stringSizeShift;
@@ -396,7 +405,11 @@ ptr_t allocateString(ptr_t s)
 ptr_t allocateClosure(int free, uint64_t procAddr)
 {
 	uint64_t cells = free + 2;
+
+	#ifdef DEBUG_LOG_ALLOC
 	printf("alloc Closure free = %d\n", free);
+	#endif
+
 	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
 	p[0] = (cells - 1) << closureSizeShift; // Store count of free args + cell for proc.
 	p[1] = procAddr;
@@ -406,7 +419,11 @@ ptr_t allocateClosure(int free, uint64_t procAddr)
 ptr_t allocatePair()
 {
 	uint64_t cells = 3;
+
+	#ifdef DEBUG_LOG_ALLOC
 	printf("alloc Pair \n");
+	#endif
+
 	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
 	p[0] = 0;
 	return ((ptr_t)p) | pairTag;
@@ -415,7 +432,11 @@ ptr_t allocatePair()
 ptr_t allocateSymbol()
 {
 	uint64_t cells = 2;
+
+	#ifdef DEBUG_LOG_ALLOC
 	printf("allocateSymbol \n");
+	#endif
+
 	uint64_t* p = (uint64_t*)allocateC(cells * wordSize);
 	p[0] = 0;
 	return ((ptr_t)p) | symbolTag;
@@ -424,7 +445,11 @@ ptr_t allocateSymbol()
 ptr_t allocateFlonum(double value)
 {
     double *d = (double*)allocateC(2 * wordSize);
+
+	#ifdef DEBUG_LOG_ALLOC
 	printf("allocateFlonum %f \n", value);
+	#endif
+
 	d[0] = 0;
     d[1] = value;
     ptr_t p = (ptr_t)d;

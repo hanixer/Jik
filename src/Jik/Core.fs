@@ -132,7 +132,6 @@ let stringToProgram str : Program =
             globals, sexpr :: sexprs
 
     let desugared = desugar sexpr
-    printfn "desugared: %s" (sexprToString (exprsToList desugared))
     match desugared with
     | sexprs when not (sexprs.IsEmpty) ->
         let globals, sexprs = List.fold convertDefinitions ([], []) sexprs
