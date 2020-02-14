@@ -206,7 +206,23 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Camera.
+(define (make-camera)
+  (let ([lower-left (vec -2.0 -1.0 -1.0)]
+        [horizontal (vec 4.0 0.0 0.0)]
+        [vertical (vec 0.0 2.0 0.0)]
+        [origin (vec 0.0 0.0 0.0)])
+    (vector 'camera lower-left horizontal vertical origin)))
 
+(define (generate-ray camera u v)
+  (let* ([lower-left (vector-ref camera 1)]
+         [horizontal (vector-ref camera 2)]
+         [vertical (vector-ref camera 3)]
+         [origin (vector-ref camera 4)]
+         [d (vec-v+ lower-left-corner
+                    (vec-v+ (vec-s* horizontal u)
+                            (vec-v- (vec-s* vertical v)
+                                    origin)))])
+    (make-ray origin d)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
@@ -234,11 +250,32 @@
 (define vertical (vec 0.0 2.0 0.0))
 (define origin (vec 0.0 0.0 0.0))
 
+(define (make-samples world out nx ny ns camera i j)
+  (let loop ([s 0] [col (vec 0.0 0.0 0.0)])
+    (if (< s ns)
+      (let* ([u (fl/ (fl+ (fixnum->flonum i) (random-flonum)) (fixnum->flonum nx))]
+             [v (fl/ (fl+ (fixnum->flonum j) (random-flonum)) (fixnum->flonum ny))]
+             [r (generate-ray camera u v)]
+             [col2 (color r world)])
+        (loop (+ s 1) (vec-v+ col col2)))
+      (let* ([col (vec-s/ col (fixnum->flonum ns))]
+             [ir (flonum->fixnum (fl* 255.59 (vec-x col)))]
+             [ig (flonum->fixnum (fl* 255.59 (vec-y col)))]
+             [ib (flonum->fixnum (fl* 255.59 (vec-z col)))])
+        (display ir out)
+        (display " " out)
+        (display ig out)
+        (display " " out)
+        (display ib out)
+        (newline out)))))
+
 (define (main)
   (let* (;[out (open-output-file "misc/out.ppm")]
          [out (current-output-port)]
          [nx 200]
-         [ny 100])
+         [ny 100]
+         [ns 100]
+         [camera (make-camera)])
     (display "P3" out)
     (newline out)
     (display nx out)
@@ -252,22 +289,7 @@
         ((< j 0))
         (do ([i 0 (+ i 1)])
             ((= i nx))
-            (let* ([u (fl/ (fixnum->flonum i) (fixnum->flonum nx))]
-                   [v (fl/ (fixnum->flonum j) (fixnum->flonum ny))]
-                   [d (vec-v+ lower-left-corner
-                        (vec-v+ (vec-s* horizontal u)
-                          (vec-s* vertical v)))]
-                   [r (make-ray origin d)]
-                   [col (color r world)]
-                   [ir (flonum->fixnum (fl* 255.59 (vec-x col)))]
-                   [ig (flonum->fixnum (fl* 255.59 (vec-y col)))]
-                   [ib (flonum->fixnum (fl* 255.59 (vec-z col)))])
-                     (display ir out)
-                     (display " " out)
-                     (display ig out)
-                     (display " " out)
-                     (display ib out)
-                     (newline out))))
+            (make-samples world out nx ny ns camera i j)))
 
     (close-port out)))
 

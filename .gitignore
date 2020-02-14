@@ -346,3 +346,4 @@ gdb.txt
 .gdb_history
 .#*
 \#*
+*.so
