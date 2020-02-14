@@ -43,11 +43,11 @@
          "request": "launch",
          "preLaunchTask": "build",
          "program": "${workspaceFolder}/src/CompilerDriver/bin/Debug/netcoreapp3.0/CompilerDriver.dll",
-         "args": [],
+         "args": ["examples/one.scm", "-nolib"],
          "cwd": "${workspaceFolder}",
          "console": "internalConsole",
          "stopAtEntry": false,
-         "internalConsoleOptions": "openOnSessionStart"
+         "internalConsoleOptions": "openOnSessionStart",
       }
    ]
 }

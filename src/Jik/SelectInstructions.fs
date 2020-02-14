@@ -33,8 +33,13 @@ let argumentToLocation (siStart, siMult) reg args =
 
 /// Generate instruction to prepare arguments for call.
 let moveArgsForCall args =
-    let argToLoc = argumentToLocation (-2 * wordSize, -wordSize) Rsp args
-    List.map (fun arg -> Mov, [Var arg; Map.find arg argToLoc]) args
+    let siStart = -2 * wordSize
+    let siMult = -wordSize
+    let handleArg index arg =
+        let offset = siStart + siMult * index
+        Mov, [Var arg; Deref(offset, Rsp)]
+
+    List.mapi handleArg args
 
 let argumentToLocationFF (siStart, siMult) reg args =
     let fold (regs, index, pairs) arg =
