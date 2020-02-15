@@ -32,6 +32,13 @@
         [z (vec-z v)])
     (sqrt (fl+ (fl* x x) (fl+ (fl* y y) (fl* z z))))))
 
+(define (vec-squared-length v)
+  (check-vec v 'vec-squared-length)
+  (let ([x (vec-x v)]
+        [y (vec-y v)]
+        [z (vec-z v)])
+    (fl+ (fl* x x) (fl+ (fl* y y) (fl* z z)))))
+
 (define (vec-dot u v)
   (check-vec u 'vec-dot-1)
   (check-vec v 'vec-dot-2)
@@ -40,27 +47,27 @@
             (fl* (vec-z u) (vec-z v)))))
 
 ;;; Vector-vector arithmetic operations.
-(define (vec-v+ u v)
-  (check-vec v 'vec-v+)
+(define (vec-add u v)
+  (check-vec v 'vec-add)
   (vec (fl+ (vec-x u) (vec-x v))
        (fl+ (vec-y u) (vec-y v))
        (fl+ (vec-z u) (vec-z v))))
 
-(define (vec-v- u v)
-  (check-vec v 'vec-v-)
+(define (vec-sub u v)
+  (check-vec v 'vec-sub)
   (vec (fl- (vec-x u) (vec-x v))
        (fl- (vec-y u) (vec-y v))
        (fl- (vec-z u) (vec-z v))))
 
 ;;; Vector-scalar arithmetic operations.
-(define (vec-s* v s)
-  (check-vec v 'vec-s*)
+(define (vec-scale v s)
+  (check-vec v 'vec-scale)
   (vec (fl* (vec-x v) s)
        (fl* (vec-y v) s)
        (fl* (vec-z v) s)))
 
 (define (vec-s/ v s)
-  (check-vec v 'vec-s*)
+  (check-vec v 'vec-scale)
   (vec (fl/ (vec-x v) s)
        (fl/ (vec-y v) s)
        (fl/ (vec-z v) s)))
@@ -72,24 +79,23 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Rays
 (define (ray? r)
-  (and (vector? r) (eq? (vector-length r) 2)))
+  (and (vector? r)
+       (eq? (vector-length r) 3)
+       (eq? (vector-ref r 0) 'ray)))
 
 (define (make-ray a b)
-  (let ([r (make-vector 2)])
-    (vector-set! r 0 a)
-    (vector-set! r 1 b)
-    r))
+  (vector 'ray a b))
 
 (define (ray-origin r)
-  (vector-ref r 0))
+  (vector-ref r 1))
 
 (define (ray-direction r)
-  (vector-ref r 1))
+  (vector-ref r 2))
 
 (define (point-at r t)
   (unless (ray? r) (error "not a ray" 'point-at r))
-  (vec-v+ (ray-origin r)
-    (vec-s* (ray-direction r) t)))
+  (vec-add (ray-origin r)
+    (vec-scale (ray-direction r) t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Hit.
@@ -153,11 +159,11 @@
 
 (define (sphere-make-hit-rec r t center radius)
   (let* ([p (point-at r t)]
-         [normal (vec-s/ (vec-v- p center) radius)])
+         [normal (vec-s/ (vec-sub p center) radius)])
     (make-hit-record t p normal)))
 
 (define (hit-sphere r t-min t-max center radius)
-  (let* ([oc (vec-v- (ray-origin r) center)]
+  (let* ([oc (vec-sub (ray-origin r) center)]
          [a (vec-dot (ray-direction r) (ray-direction r))]
          [b (vec-dot oc (ray-direction r))]
          [c (fl- (vec-dot oc oc) (fl* radius radius))]
@@ -218,27 +224,57 @@
          [horizontal (vector-ref camera 2)]
          [vertical (vector-ref camera 3)]
          [origin (vector-ref camera 4)]
-         [d (vec-v+ lower-left-corner
-                    (vec-v+ (vec-s* horizontal u)
-                            (vec-v- (vec-s* vertical v)
+         [d (vec-add lower-left-corner
+                    (vec-add (vec-scale horizontal u)
+                            (vec-sub (vec-scale vertical v)
                                     origin)))])
     (make-ray origin d)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Random.
+(define (random-in-unit-sphere)
+  (define (pick-one)
+      (let* ([x (random-flonum)]
+             [y (random-flonum)]
+             [z (random-flonum)]
+             [v (vec x y z)]
+             [v (vec-scale v 2.0)]
+             [one (vec 1.0 1.0 1.0)]
+             [diff (vec-sub v one)])
+        diff))
+
+  (let loop ([p (pick-one)])
+    (if (fl>= (vec-squared-length p) 1.0)
+        (loop (pick-one))
+        p)))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
+(define deee 0)
 (define (color r world)
-  (let ([rec (hit r 0.0 1e20 world)])
+  (set! deee (+ deee 1))
+  ; (display "color : : : : ")
+  ; (display deee)
+  ; (newline)
+  (let ((result
+  (let ([rec (hit r 0.001 1e20 world)])
     (if rec
-      (let ([N (hit-record-normal rec)])
-        (vec-s* (vec (fl+ (vec-x N) 1.0)
-                     (fl+ (vec-y N) 1.0)
-                     (fl+ (vec-z N) 1.0))
-                0.5))
+      (let* ([N (hit-record-normal rec)]
+             [p (hit-record-p rec)]
+             [target (vec-add p (vec-add N (random-in-unit-sphere)))]
+            ;  [target (vec-add p N)]
+             [dir (vec-sub target p)]
+             [r (make-ray p dir)]
+             [col (color r world)])
+        (vec-scale col 0.5))
+        ;(vec-scale (vec-add (random-in-unit-sphere) (vec 1.0 1.0 1.0)) 0.5)) ; debug
       (let* ([dir (unit-vector (ray-direction r))]
              [t (fl* 0.5 (fl+ (vec-y dir) 1.0))])
-        (vec-v+ (vec-s* (vec 1.0 1.0 1.0)
-                        (fl- 1.0 t))
-                (vec-s* (vec 0.5 0.7 1.0) t))))))
+        (vec-add (vec-scale (vec 1.0 1.0 1.0) (fl- 1.0 t))
+                (vec-scale (vec 0.5 0.7 1.0) t)))))))
+        ;(vec 1.0 1.0 1.0)))))) ; debug
+  (set! deee (- deee 1))
+  result))
 
 (define world
   (make-object-seq
@@ -257,7 +293,7 @@
              [v (fl/ (fl+ (fixnum->flonum j) (random-flonum)) (fixnum->flonum ny))]
              [r (generate-ray camera u v)]
              [col2 (color r world)])
-        (loop (+ s 1) (vec-v+ col col2)))
+        (loop (+ s 1) (vec-add col col2)))
       (let* ([col (vec-s/ col (fixnum->flonum ns))]
              [ir (flonum->fixnum (fl* 255.59 (vec-x col)))]
              [ig (flonum->fixnum (fl* 255.59 (vec-y col)))]
@@ -274,7 +310,7 @@
          [out (current-output-port)]
          [nx 200]
          [ny 100]
-         [ns 100]
+         [ns 24]
          [camera (make-camera)])
     (display "P3" out)
     (newline out)
@@ -294,3 +330,7 @@
     (close-port out)))
 
 (main)
+
+; (fl>= (vec-squared-length (vec 0.0 0.0 0.0)) 1.0)
+; (list (random-flonum) (random-flonum) (random-flonum) (random-flonum))
+; (vec-squared-length (random-in-unit-sphere))

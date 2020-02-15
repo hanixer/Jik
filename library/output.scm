@@ -48,7 +48,7 @@
         ((string? x) (if d? (write-string x p) (wrstring x p)))
         ((vector? x) (wrvector x d? p))
         ((procedure? x) (write-string "#<procedure>" p))
-        ((flonum? x) (write-string "#<flonum>" p))
+        ((flonum? x) (wrflonum x p))
         (else (write-string "#<unknown>" p)))))
 
 ;   ;; write-string writes each character of s to p
@@ -105,6 +105,12 @@
               (write-char c p))
             (loop (+ i 1)))))
       (write-char #\" p)))
+
+  (define wrflonum
+    (lambda (x p)
+      (let ([n (flonum->fixnum (fl* x 100000.0))])
+        (write-int n p)
+        (write-string "/100000" p))))
 
 ;   ;; wrvector handles vectors
   (define wrvector

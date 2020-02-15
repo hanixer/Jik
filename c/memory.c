@@ -253,6 +253,7 @@ void *allocate(uint64_t *rootStack, uint64_t size)
 	if (freePointer + size >= fromSpaceEnd)
 	{
 		collect(rootStack, size);
+		// printf("freePointer = %p, fromSpaceEnd = %p, diff = %d\n", freePointer, fromSpaceEnd, fromSpaceEnd - freePointer);
 	}
 	void *p = freePointer;
 	markInBitmap(fromBitmap, fromSpaceBegin, freePointer);
