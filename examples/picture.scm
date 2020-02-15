@@ -59,6 +59,12 @@
        (fl- (vec-y u) (vec-y v))
        (fl- (vec-z u) (vec-z v))))
 
+(define (vec-mul u v)
+  (check-vec v 'vec-mul)
+  (vec (fl* (vec-x u) (vec-x v))
+       (fl* (vec-y u) (vec-y v))
+       (fl* (vec-z u) (vec-z v))))
+
 ;;; Vector-scalar arithmetic operations.
 (define (vec-scale v s)
   (check-vec v 'vec-scale)
@@ -76,6 +82,9 @@
   (check-vec v 'unit-vector)
   (vec-s/ v (vec-length v)))
 
+(define (reflect v n)
+  (vec-sub v (vec-scale n (fl* 2.0 (vec-dot v n)))))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Rays
 (define (ray? r)
@@ -83,72 +92,63 @@
        (eq? (vector-length r) 3)
        (eq? (vector-ref r 0) 'ray)))
 
-(define (make-ray a b)
-  (vector 'ray a b))
+(define (make-ray o dir)
+  (unless (vec? o) (error "o not vec"))
+  (unless (vec? dir) (error "dir not vec"))
+  (vector 'ray o dir))
 
 (define (ray-origin r)
+  (unless (ray? r) (error "r not ray"))
   (vector-ref r 1))
 
 (define (ray-direction r)
   (vector-ref r 2))
 
 (define (point-at r t)
-  (unless (ray? r) (error "not a ray" 'point-at r))
+  (unless (ray? r) (error "point-at: not a ray"))
   (vec-add (ray-origin r)
     (vec-scale (ray-direction r) t)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Hit.
-(define (make-hit-record t p normal)
-  (vector t p normal))
+(define (make-hit-record t p normal material)
+  (unless (flonum? t) (error "t is not flonum"))
+  (vector 'hit-record t p normal material))
 
 (define (make-hit-record-empty)
   (vector
+    'hit-record
     0.0
     (vec 0.0 0.0 0.0)
-    (vec 0.0 0.0 0.0)))
+    (vec 0.0 0.0 0.0)
+    #f))
 
 (define (hit-record? rec)
   (and (vector? rec)
-       (eq? (vector-length rec) 3)
-       (flonum? (vector-ref rec 0))
-       (vec? (vector-ref rec 1))
-       (vec? (vector-ref rec 2))))
+       (eq? (vector-ref rec 0) 'hit-record)))
 
 (define (hit-record-t rec)
-  (vector-ref rec 0))
-
-(define (hit-record-t-set! rec t)
-  (vector-set! rec 0 t))
-
-(define (hit-record-p rec)
   (vector-ref rec 1))
 
-(define (hit-record-p-set! rec p)
-  (vector-set! rec 1 p))
-
-(define (hit-record-normal rec)
+(define (hit-record-p rec)
   (vector-ref rec 2))
 
-(define (hit-record-normal-set! rec n)
-  (vector-set! rec 2 n))
+(define (hit-record-normal rec)
+  (vector-ref rec 3))
 
-(define (copy-hit-record to from)
-  (hit-record-t-set! to (hit-record-t from))
-  (hit-record-p-set! to (hit-record-p from))
-  (hit-record-normal-set! to (hit-record-normal from)))
+(define (hit-record-material rec)
+  (vector-ref rec 4))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Sphere.
 (define (object-type o)
   (vector-ref o 0))
 
-(define (make-sphere center r)
-  (vector 'sphere center r))
+(define (make-sphere center r material)
+  (vector 'sphere center r material))
 
 (define (sphere? sphere)
   (and (vector? sphere)
-       (eq? (vector-length sphere) 3)
        (eq? (vector-ref sphere 0) 'sphere)))
 
 (define (sphere-center sphere)
@@ -157,12 +157,20 @@
 (define (sphere-radius sphere)
   (vector-ref sphere 2))
 
-(define (sphere-make-hit-rec r t center radius)
-  (let* ([p (point-at r t)]
-         [normal (vec-s/ (vec-sub p center) radius)])
-    (make-hit-record t p normal)))
+(define (sphere-material sphere)
+  (vector-ref sphere 3))
 
-(define (hit-sphere r t-min t-max center radius)
+(define (hit-sphere r t-min t-max center radius material)
+
+  (define (make-rec t)
+    (unless (flonum? t) (error "make-rec - t is not a flonum"))
+    (let* ([p (point-at r t)]
+          [normal (vec-s/ (vec-sub p center) radius)])
+      (make-hit-record t p normal material)))
+  (unless (flonum? t-max) (error "t-max is not a flonum"))
+  (unless (vec? (ray-origin r)) (error "ray-origin not vector"))
+  (unless (vec? center) (error "center not vector"))
+
   (let* ([oc (vec-sub (ray-origin r) center)]
          [a (vec-dot (ray-direction r) (ray-direction r))]
          [b (vec-dot oc (ray-direction r))]
@@ -171,10 +179,10 @@
     (if (fl> discriminant 0.0)
       (let ([temp (fl/ (fl- (fl- 0.0 b) (sqrt discriminant)) a)])
         (if (and (fl< temp t-max) (fl> temp t-min))
-          (sphere-make-hit-rec r temp center radius)
+          (make-rec temp)
           (let ([temp (fl/ (fl+ (fl- 0.0 b) (sqrt discriminant)) a)])
             (if (and (fl< temp t-max) (fl> temp t-min))
-              (sphere-make-hit-rec r temp center radius)
+              (make-rec temp)
               #f))))
       #f)))
 
@@ -194,21 +202,77 @@
 
 (define (hit-object-seq r t-min t-max objs)
     (let loop ([objs objs] [hit-anything #f] [closest-so-far t-max] [rec #f])
+      (unless (flonum? closest-so-far)
+        (display closest-so-far)
+        (display (symbol? closest-so-far))
+        (error "cl-so-far not fl"))
       (if (empty? objs)
         rec
         (let* ([o (car objs)]
                [rec2 (hit r t-min closest-so-far o)])
+          (unless (or (hit-record? rec2) (boolean? rec2))
+            (display rec2)
+            (error "rec2 not record"))
           (if rec2
             (loop (cdr objs) #t (hit-record-t rec2) rec2)
             (loop (cdr objs) hit-anything closest-so-far rec))))))
 
 (define (hit r t-min t-max obj)
+  (unless (ray? r) (error "hit: ray not ray"))
   (cond
     ((sphere? obj)
-      (hit-sphere r t-min t-max (sphere-center obj) (sphere-radius obj)))
+      (hit-sphere r t-min t-max (sphere-center obj) (sphere-radius obj) (sphere-material obj)))
     ((object-seq? obj)
       (hit-object-seq r t-min t-max (object-seq-objs obj)))
     (else (error "hit: wrong object"))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; Materials.
+(define (make-lambertian albedo)
+  (vector 'lambertian albedo))
+
+(define (lambertian? m)
+  (and (vector m)
+       (eq? (vector-ref m 0) 'lambertian)))
+
+(define (lambertian-albedo m)
+  (vector-ref m 1))
+
+(define (make-metal albedo)
+  (vector 'metal albedo))
+
+(define (metal? m)
+  (and (vector m)
+       (eq? (vector-ref m 0) 'metal)))
+
+(define (metal-albedo m)
+  (vector-ref m 1))
+
+(define (scatter-lambertian r-in rec albedo)
+  (let* ([N (hit-record-normal rec)]
+         [p (hit-record-p rec)]
+         [target (vec-add p (vec-add N (random-in-unit-sphere)))]
+         [dir (vec-sub target p)]
+         [scattered (make-ray p dir)]
+         [attenutation albedo])
+    (cons attenutation scattered)))
+
+(define (scatter-metal r-in rec albedo)
+  (let* ([N (hit-record-normal rec)]
+         [p (hit-record-p rec)]
+         [udir (unit-vector (ray-direction r-in))]
+         [reflected (reflect udir N)]
+         [scattered (make-ray p reflected)]
+         [attenutation albedo])
+    (if (fl> (vec-dot reflected N) 0.0)
+      (cons attenutation scattered)
+      #f)))
+
+(define (scatter r-in rec material)
+  (cond
+    ((lambertian? material) (scatter-lambertian r-in rec (lambertian-albedo material)))
+    ((metal? material) (scatter-metal r-in rec (metal-albedo material))))
+)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Camera.
@@ -250,36 +314,29 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Main
-(define deee 0)
-(define (color r world)
-  (set! deee (+ deee 1))
-  ; (display "color : : : : ")
-  ; (display deee)
-  ; (newline)
-  (let ((result
+(define (color r world depth)
   (let ([rec (hit r 0.001 1e20 world)])
-    (if rec
-      (let* ([N (hit-record-normal rec)]
-             [p (hit-record-p rec)]
-             [target (vec-add p (vec-add N (random-in-unit-sphere)))]
-            ;  [target (vec-add p N)]
-             [dir (vec-sub target p)]
-             [r (make-ray p dir)]
-             [col (color r world)])
-        (vec-scale col 0.5))
-        ;(vec-scale (vec-add (random-in-unit-sphere) (vec 1.0 1.0 1.0)) 0.5)) ; debug
+    (if (and rec (< depth 50))
+      (let ([scat (scatter r rec (hit-record-material rec))])
+        (if scat
+          (let* ([attenuation (car scat)]
+                 [scattered (cdr scat)]
+                 [col (color scattered world (+ depth 1))])
+            (unless (vector? attenuation) (error "atten is not vector"))
+            (unless (vector? scattered) (error "scattered is not vector"))
+            (vec-mul attenuation col))
+          (vec 0.0 0.0 0.0)))
       (let* ([dir (unit-vector (ray-direction r))]
              [t (fl* 0.5 (fl+ (vec-y dir) 1.0))])
         (vec-add (vec-scale (vec 1.0 1.0 1.0) (fl- 1.0 t))
-                (vec-scale (vec 0.5 0.7 1.0) t)))))))
-        ;(vec 1.0 1.0 1.0)))))) ; debug
-  (set! deee (- deee 1))
-  result))
+                 (vec-scale (vec 0.5 0.7 1.0) t))))))
 
 (define world
   (make-object-seq
-    (make-sphere (vec 0.0 0.0 -1.0) 0.5)
-    (make-sphere (vec 0.0 -100.5 -1.0) 100.0)))
+    (make-sphere (vec 0.0 0.0 -1.0) 0.5 (make-lambertian (vec 0.8 0.3 0.3)))
+    (make-sphere (vec 0.0 -100.5 -1.0) 100.0 (make-lambertian (vec 0.8 0.8 0.0)))
+    (make-sphere (vec 1.0 0.0 -1.0) 0.5 (make-metal (vec 0.8 0.6 0.2)))
+    (make-sphere (vec -1.0 0.0 -1.0) 0.5 (make-metal (vec 0.8 0.8 0.8)))))
 
 (define lower-left-corner (vec -2.0 -1.0 -1.0))
 (define horizontal (vec 4.0 0.0 0.0))
@@ -292,7 +349,7 @@
       (let* ([u (fl/ (fl+ (fixnum->flonum i) (random-flonum)) (fixnum->flonum nx))]
              [v (fl/ (fl+ (fixnum->flonum j) (random-flonum)) (fixnum->flonum ny))]
              [r (generate-ray camera u v)]
-             [col2 (color r world)])
+             [col2 (color r world 0)])
         (loop (+ s 1) (vec-add col col2)))
       (let* ([col (vec-s/ col (fixnum->flonum ns))]
              [ir (flonum->fixnum (fl* 255.59 (vec-x col)))]
@@ -310,7 +367,7 @@
          [out (current-output-port)]
          [nx 200]
          [ny 100]
-         [ns 24]
+         [ns 20]
          [camera (make-camera)])
     (display "P3" out)
     (newline out)
