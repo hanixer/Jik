@@ -1,7 +1,7 @@
 
 (define %output-port-id 1999817)
 (define %output-port-length 6)
-(define %output-buf-size 16)
+(define %output-buf-size 4096)
 
 (define output-port?
     (lambda (port)

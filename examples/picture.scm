@@ -53,6 +53,12 @@
        (fl+ (vec-y u) (vec-y v))
        (fl+ (vec-z u) (vec-z v))))
 
+(define (vec-neg v)
+  (check-vec v 'vec-neg)
+  (vec (fl- 0.0 (vec-x v))
+       (fl- 0.0 (vec-y v))
+       (fl- 0.0 (vec-z v))))
+
 (define (vec-sub u v)
   (check-vec v 'vec-sub)
   (vec (fl- (vec-x u) (vec-x v))
@@ -84,6 +90,15 @@
 
 (define (reflect v n)
   (vec-sub v (vec-scale n (fl* 2.0 (vec-dot v n)))))
+
+(define (refract v n ni/nt)
+  (let* ([uv (unit-vector v)]
+         [dt (vec-dot uv n)]
+         [discriminant (fl- 1.0 (fl* ni/nt (fl* ni/nt (fl- 1.0 (fl* dt dt)))))])
+    (if (fl> discriminant 0.0)
+      (vec-sub (vec-scale (vec-sub uv (vec-scale n dt)) ni/nt)
+               (vec-scale n (sqrt discriminant)))
+      #f)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Rays
@@ -229,23 +244,38 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Materials.
 (define (make-lambertian albedo)
+  (unless (vec? albedo) (error "make-lamb error"))
   (vector 'lambertian albedo))
 
 (define (lambertian? m)
-  (and (vector m)
+  (and (vector? m)
        (eq? (vector-ref m 0) 'lambertian)))
 
 (define (lambertian-albedo m)
+  (unless (vec? (vector-ref m 1)) (error 'lamb-albedo "error"))
   (vector-ref m 1))
 
-(define (make-metal albedo)
-  (vector 'metal albedo))
+(define (make-metal albedo fuzz)
+  (vector 'metal albedo fuzz))
 
 (define (metal? m)
-  (and (vector m)
+  (and (vector? m)
        (eq? (vector-ref m 0) 'metal)))
 
 (define (metal-albedo m)
+  (vector-ref m 1))
+
+(define (metal-fuzz m)
+  (vector-ref m 2))
+
+(define (make-dielectric ri)
+  (vector 'dielectric ri))
+
+(define (dielectric? m)
+  (and (vector? m)
+       (eq? (vector-ref m 0) 'dielectric)))
+
+(define (dielectric-ri m)
   (vector-ref m 1))
 
 (define (scatter-lambertian r-in rec albedo)
@@ -254,25 +284,46 @@
          [target (vec-add p (vec-add N (random-in-unit-sphere)))]
          [dir (vec-sub target p)]
          [scattered (make-ray p dir)]
-         [attenutation albedo])
-    (cons attenutation scattered)))
+         [attenuation albedo])
+         (unless (vec? attenuation) (error "scatte lamberti"))
+    (cons attenuation scattered)))
 
-(define (scatter-metal r-in rec albedo)
+(define (scatter-metal r-in rec albedo fuzz)
   (let* ([N (hit-record-normal rec)]
          [p (hit-record-p rec)]
          [udir (unit-vector (ray-direction r-in))]
          [reflected (reflect udir N)]
-         [scattered (make-ray p reflected)]
-         [attenutation albedo])
+         [rand (random-in-unit-sphere)]
+         [scat-dir (vec-add reflected (vec-scale rand fuzz))]
+         [scattered (make-ray p scat-dir)]
+         [attenuation albedo])
+         (unless (vec? attenuation) (error "sc-met"))
     (if (fl> (vec-dot reflected N) 0.0)
-      (cons attenutation scattered)
+      (cons attenuation scattered)
+      #f)))
+
+(define (scatter-dielectric r-in rec ref-idx)
+  (let* ([N (hit-record-normal rec)]
+         [p (hit-record-p rec)]
+         [rdir (ray-direction r-in)]
+         [reflected (reflect rdir N)]
+         [outward? (fl> (vec-dot rdir N) 0.0)]
+         [outward-normal (if outward? (vec-neg N) N)]
+         [ni/nt (if outward? ref-idx (fl/ 1.0 ref-idx))]
+         [refracted (refract rdir outward-normal ni/nt)]
+         [attenuation (vec 1.0 1.0 0.0)]
+         [scattered (make-ray p refracted)])
+    (if refracted
+      (cons attenuation scattered)
       #f)))
 
 (define (scatter r-in rec material)
   (cond
-    ((lambertian? material) (scatter-lambertian r-in rec (lambertian-albedo material)))
-    ((metal? material) (scatter-metal r-in rec (metal-albedo material))))
-)
+    ((lambertian? material)
+      (unless (vec? (lambertian-albedo material)) (error 'scatter "scatter "))
+      (scatter-lambertian r-in rec (lambertian-albedo material)))
+    ((metal? material) (scatter-metal r-in rec (metal-albedo material) (metal-fuzz material)))
+    ((dielectric? material) (scatter-dielectric r-in rec (dielectric-ri material)))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; Camera.
@@ -322,8 +373,8 @@
           (let* ([attenuation (car scat)]
                  [scattered (cdr scat)]
                  [col (color scattered world (+ depth 1))])
-            (unless (vector? attenuation) (error "atten is not vector"))
-            (unless (vector? scattered) (error "scattered is not vector"))
+            (unless (vec? attenuation) (error "atten is not vec" attenuation scat))
+            (unless (ray? scattered) (error "scattered is not ray"))
             (vec-mul attenuation col))
           (vec 0.0 0.0 0.0)))
       (let* ([dir (unit-vector (ray-direction r))]
@@ -335,8 +386,8 @@
   (make-object-seq
     (make-sphere (vec 0.0 0.0 -1.0) 0.5 (make-lambertian (vec 0.8 0.3 0.3)))
     (make-sphere (vec 0.0 -100.5 -1.0) 100.0 (make-lambertian (vec 0.8 0.8 0.0)))
-    (make-sphere (vec 1.0 0.0 -1.0) 0.5 (make-metal (vec 0.8 0.6 0.2)))
-    (make-sphere (vec -1.0 0.0 -1.0) 0.5 (make-metal (vec 0.8 0.8 0.8)))))
+    (make-sphere (vec 1.0 0.0 -1.0) 0.5 (make-metal (vec 0.8 0.6 0.2) 0.0))
+    (make-sphere (vec -1.0 0.0 -1.0) 0.5 (make-dielectric 1.5))))
 
 (define lower-left-corner (vec -2.0 -1.0 -1.0))
 (define horizontal (vec 4.0 0.0 0.0))
@@ -367,7 +418,7 @@
          [out (current-output-port)]
          [nx 200]
          [ny 100]
-         [ns 20]
+         [ns 100]
          [camera (make-camera)])
     (display "P3" out)
     (newline out)
@@ -388,6 +439,4 @@
 
 (main)
 
-; (fl>= (vec-squared-length (vec 0.0 0.0 0.0)) 1.0)
-; (list (random-flonum) (random-flonum) (random-flonum) (random-flonum))
-; (vec-squared-length (random-in-unit-sphere))
+; (refract (vec 1.0 -1.0 0.0) (vec 0.0 1.0 0.0) 1.3)
