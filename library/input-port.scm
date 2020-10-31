@@ -89,6 +89,8 @@
 
   (define rd
     (lambda (ip)
+      (unless (input-port? ip) (error "input-port is expected in rd"))
+
       (if (vector-ref ip 7)
         (let ([c (vector-ref ip 7)])
           (vector-set! ip 7 #f)
@@ -102,6 +104,8 @@
 
   (define pk
     (lambda (ip)
+      (unless (input-port? ip) (error "input-port is expected in pk"))
+
         (unless (vector-ref ip 7)
             (read-data-if-needed ip)
             (vector-set! ip 7 (rd-single ip))) ; Set lookahead.
@@ -110,11 +114,11 @@
   (set! peek-char
     (lambda args
       (if (null? args)
-          (pk (current-output-port))
+          (pk (current-input-port))
           (pk (car args)))))
 
   (set! read-char
       (lambda args
         (if (null? args)
-          (rd (current-output-port))
+          (rd (current-input-port))
           (rd (car args))))))
