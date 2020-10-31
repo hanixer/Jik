@@ -303,7 +303,7 @@ let copyArgsToRootStack =
      Jmp(loopStart), []
      Label(loopEnd), []]
 
-/// Construct dotted argument, that is construct a list from rest arguments.
+/// Construct dotted argument, i.e. construct a list from rest arguments.
 /// After this all arguments will be on the root stack
 /// and R15 will point one after the last argument.
 let constructDotted =

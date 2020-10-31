@@ -266,6 +266,10 @@ void *allocate(uint64_t *rootStack, uint64_t size)
 		exit(1);
 	}
 
+#ifdef DEBUG_LOG_ALLOC
+	printf("allocate: result address = 0x%p, bytes = %d\n", p, size);
+#endif
+
 	return p;
 }
 
@@ -373,7 +377,7 @@ ptr_t allocateVector(ptr_t s)
 	uint64_t size = fixnumToInt(s);
 
 	#ifdef DEBUG_LOG_ALLOC
-	printf("alloc vector = %d\n", size);
+	printf("alloc vector size = %d\n", size);
 	#endif
 
 	if (size == 0)
@@ -391,7 +395,7 @@ ptr_t allocateString(ptr_t s)
 	uint64_t charsCount = fixnumToInt(s);
 
 	#ifdef DEBUG_LOG_ALLOC
-	printf("alloc String = %d\n", charsCount);
+	printf("alloc String charsCount = %d\n", charsCount);
 	#endif
 
 	uint64_t cells = stringSizeHelper(charsCount);
