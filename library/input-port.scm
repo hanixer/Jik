@@ -82,7 +82,7 @@
     (lambda (ip)
       (if (port-data-available? ip)
         (let ([index (vector-ref ip 4)]
-                [buf (vector-ref ip 3)])
+              [buf (vector-ref ip 3)])
           (vector-set! ip 4 (+ index 1))
           (string-ref buf index))
         (eof-object))))
@@ -97,10 +97,7 @@
           c)
         (begin
           (read-data-if-needed ip)
-          (let ([c (rd-single ip)])
-            (read-data-if-needed ip)
-            (vector-set! ip 7 (rd-single ip)) ; Set lookahead.
-            c)))))
+          (rd-single ip)))))
 
   (define pk
     (lambda (ip)
