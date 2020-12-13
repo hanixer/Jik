@@ -4,22 +4,25 @@ open System
 open System.Text
 
 type Token =
-    | Open | Close
-    | OpenBr | CloseBr
+    | Open 
+    | Close
+    | OpenBr 
+    | CloseBr
+    | Dot
+    | Quote
+    | Unquote
     | Number of string
     | FloatNum of string
     | String of string
     | Symbol of string
     | Bool of bool
     | Char of char
-    | Dot
-    | Quote
-    | Unquote
 
 let specialChars = [
     "tab", '\t'
     "newline", '\n'
     "return", '\n'
+    "space", ' '
 ]
 
 let charsToString rev cs =
@@ -343,6 +346,28 @@ let rec sexprToString expr =
     loop expr
 
 
+    s.ToString()
+
+let sexprToCompactString sexpr =
+    let s = StringBuilder()
+
+    let newline() = s.AppendLine() |> ignore
+    let indent n = s.Append(' ', n).Append("- ") |> ignore
+
+    let rec loop sexpr n = 
+        match sexpr with
+        | Cons(x, y) ->
+            s.Append("Cons") |> ignore
+            newline()
+            indent n
+            loop x (n + 1)
+            newline()
+            indent n
+            loop y (n + 1)
+        | _ ->             
+            s.Append(sprintf "%A" sexpr) |> ignore
+            
+    loop sexpr 0
     s.ToString()
 
 let define s env value =

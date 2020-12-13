@@ -26,3 +26,9 @@
 
 (define (sqrt x)
     (expt x 0.5))
+
+(define (modulo x y)
+  (let ((z (remainder (abs x) (abs y))))
+    (if (>= y 0)
+        z
+        (- 0 z))))

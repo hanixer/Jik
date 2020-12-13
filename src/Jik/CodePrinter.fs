@@ -261,6 +261,8 @@ let escapeString chars =
         | [] ->
             let list = List.rev acc
             System.String.Concat(list)
+        | '\r' :: '\n' :: cs
+        | '\n' :: cs -> loop ('n'  :: '\\' :: acc) cs
         | '\\' :: cs -> loop ('\\' :: '\\' :: acc) cs
         | c :: cs -> loop (c :: acc) cs
 
@@ -285,7 +287,13 @@ let programToString writeGlobals (prog : Program) =
         | StringConst literal ->
             let firstField = (literal.Length <<< stringSizeShift) ||| stringTag
             fprintfn out "    .quad %d" firstField
-            fprintfn out "    .ascii \"%s\"" (escapeString literal)
+            let escaped = (escapeString literal)
+            // printfn "original: %A" literal
+            // printfn "length: %A" literal.Length
+            // printfn "escaped: %A" escaped
+            // printfn "length: %A" escaped.Length
+            // printfn "\n"
+            fprintfn out "    .ascii \"%s\"" escaped
         | FloatConst value ->
             let i64 = BitConverter.DoubleToInt64Bits(value)
             let hi = (i64 >>> 62) &&& (int64 0x03)

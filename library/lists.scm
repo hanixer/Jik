@@ -100,3 +100,38 @@
       (if (eq? k (car (car m)))
           (car m)
           (assq k (cdr m)))))
+
+(define eqv?
+  (lambda (x y)
+    (cond
+      ((eq? x y))
+      ((and (flonum? x) (flonum? y)) (fl= x y))
+      ((number? x) (= x y))
+      ((char? x) (and (char? y) (= x y)))
+      (else #f)))) 
+
+(define equal?
+  (lambda (x y)
+    (cond
+      ((eqv? x y))
+      ((pair? x)
+       (and (pair? y)
+            (equal? (car x) (car y))
+            (equal? (cdr x) (cdr y))))
+      ((string? x) (and (string? y) (string=? x y)))
+      ((vector? x)
+       (and (vector? y)
+            (let ((n (vector-length x)))
+              (and (= (vector-length y) n)
+                   (let loop ((i 0))
+                     (or (= i n)
+                         (and (equal? (vector-ref x i) (vector-ref y i))
+                              (loop (+ i 1)))))))))
+      (else #f)))) 
+
+(define (assoc k m)
+  (if (null? m)
+      #f
+      (if (equal? k (car (car m)))
+          (car m)
+          (assq k (cdr m)))))

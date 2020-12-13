@@ -65,6 +65,8 @@
                       (string-set! s i c)
                       (fill s (+ i 1) (cdr ls)))]))])
        (lambda (ls)
+         (unless (list? ls)
+           (error "list->string: not a list"))
          (let ([n (length ls)])
            (let ([s (make-string n)])
              (fill s 0 ls))))))

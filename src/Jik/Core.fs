@@ -347,8 +347,12 @@ let rec replaceVars mapping expr =
 let makeAndInitStringExprs literal =
     let tmp = freshLabel "tmp"
 
+    let handleNewlines = 
+        List.collect (fun c -> if c = '\n' then ['\\'; 'n'] else [c])
+
     let assignments =
         literal
+        |> handleNewlines
         |> Seq.mapi (fun i ch ->
             PrimApp(StringSet, [Ref tmp; Int i; Char ch]))
         |> Seq.toList
