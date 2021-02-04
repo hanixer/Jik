@@ -285,9 +285,9 @@ let programToString writeGlobals (prog : Program) =
         printLabel out name
         match constant with
         | StringConst literal ->
-            let firstField = (literal.Length <<< stringSizeShift) ||| stringTag
+            let escaped = escapeString literal
+            let firstField = (escaped.Length <<< stringSizeShift) ||| stringTag
             fprintfn out "    .quad %d" firstField
-            let escaped = (escapeString literal)
             // printfn "original: %A" literal
             // printfn "length: %A" literal.Length
             // printfn "escaped: %A" escaped
