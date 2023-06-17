@@ -219,10 +219,10 @@
          (list (convert-cell c1 s) (convert-cell c2 s)))) l)))
 
 (write "Size: ") ; T
-(let ((size 11))
+(let ((size 20))
 ; (let ((size (read-int)))
   (write "Seed: ") ; G
-  (let ((seed 11))
+  (let ((seed 20))
   ; (let ((seed (read-int)))
   (let ((rmaze (random-maze size seed)))
     (newline)

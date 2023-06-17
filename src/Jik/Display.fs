@@ -24,7 +24,6 @@ let rec iInterleave sep = function
     | [iseq] -> iseq
     | iseq :: rest -> iseq |>iAppend<| sep |>iAppend<| (iInterleave sep rest)
 let iNum n = sprintf "%d" n |> iStr    
-let showAddr = string >> iStr
 let rec flatten col xs =
     let space (n:int) : string = String.replicate n " "
 

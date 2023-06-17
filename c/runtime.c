@@ -10,7 +10,7 @@
 #include "memory.h"
 #include "objects.h"
 
-extern int schemeEntry();
+extern ptr_t schemeEntry();
 extern char *globVarNameTable[];
 
 static void printSymbol(ptr_t p);

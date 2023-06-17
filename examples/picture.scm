@@ -407,9 +407,9 @@
              [ig (flonum->fixnum (fl* 255.59 (vec-y col)))]
              [ib (flonum->fixnum (fl* 255.59 (vec-z col)))])
         (display ir out)
-        (display " " out)
+        (newline out)
         (display ig out)
-        (display " " out)
+        (newline out)
         (display ib out)
         (newline out)))))
 

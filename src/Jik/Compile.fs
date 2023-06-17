@@ -12,7 +12,8 @@ open CodePrinter
 
 let miscPath = Util.getPathRelativeToRoot "misc/"
 
-let saveToFile filename str = System.IO.File.WriteAllText(filename, str)
+let saveToFile filename str = 
+    System.IO.File.WriteAllText(filename, str)
 
 let defaultOutFile = Util.getPathRelativeToRoot ("misc/a.exe")
 
@@ -59,7 +60,7 @@ let compileMany files outFile =
         |> stringToProgram
         |> allCoreTransformations
         |> allIntermediateTransformations
-        // |> printIr ("interm.ir")
+        |> printIr ("interm.ir")
         |> allCodegenTransformations
 
     let handleFile file =

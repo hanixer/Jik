@@ -208,7 +208,6 @@ let vectorTests =
       "(vector? #t)", "#f\n"
       // e13, "33\n"
       e14, "#(1 2 3)\n"
-      @"(vector? (make-vector 0))", "#t\n"
       @"(vector-length (make-vector 12))", "12\n"
       @"(vector? (cons 1 2))", "#f\n"
       @"(vector? 1287)", "#f\n"

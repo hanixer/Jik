@@ -1,1 +1,1 @@
-(equal? '(1 2 3) '(1 2 3))
+(vector? (make-vector 0))

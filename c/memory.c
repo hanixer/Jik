@@ -37,6 +37,13 @@ uint64_t *rootStackCurr;
 
 void hexDump(const char *desc, const void *addr, const int len);
 
+/// size is number of bytes
+/// The structure is
+/// xxxxxxxxxxxxxxxxxxxxxxx - first page
+/// (aligned size of bytes)
+/// xxxxxxxxxxxxxxxxxxxxxxx - second page
+/// The first and second page are protected from reading and writing.
+/// Returns a pointer to the beging of the actual space. (aligned...)
 char *allocateProtectedSpace(int size)
 {
 	SYSTEM_INFO si;

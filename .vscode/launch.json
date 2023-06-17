@@ -41,13 +41,13 @@
          "name": "Compiler driver",
          "type": "coreclr",
          "request": "launch",
-         "preLaunchTask": "build",
-         "program": "${workspaceFolder}/src/CompilerDriver/bin/Debug/netcoreapp3.0/CompilerDriver.dll",
+         "program": "${workspaceFolder}/src/CompilerDriver/bin/Debug/net6.0/CompilerDriver.dll",
          "args": ["examples/one.scm", "-nolib"],
          "cwd": "${workspaceFolder}",
          "console": "internalConsole",
          "stopAtEntry": false,
          "internalConsoleOptions": "openOnSessionStart",
+         "justMyCode": false,
       }
    ]
 }
