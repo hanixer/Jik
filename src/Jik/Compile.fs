@@ -28,7 +28,6 @@ let sourceFile = ""
 
 let allCodegenTransformations =
     selectInstructions
-    // >> revealGlobals // seems that this is useless
     >> convertGlobalRefs
     >> convertVarsToSlots
     >> convertSlots

@@ -9,7 +9,6 @@
     <Compile Include="SExpr.fs" />
     <Compile Include="Display.fs" />
     <Compile Include="Util.fs" />
-    <Compile Include="CompileOld.fs" />
     <Compile Include="Graph.fs" />
     <Compile Include="Desugar.fs" />
     <Compile Include="Primitive.fs" />
